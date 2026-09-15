@@ -1,0 +1,12 @@
+# fallback
+*                       @DENBARIT
+
+packages/shared/        @lelisa21
+packages/api/src/audit/ @lelisa21
+packages/api/src/ai/    @Dawud-Muhammed
+packages/api/           @lelisa21 @Dawud-Muhammed
+packages/web/src/features/admin/       @daryl-st
+packages/web/src/features/compliance/  @daryl-st
+packages/web/src/features/auctions/    @DENBARIT
+packages/web/src/features/bidding/     @DENBARIT
+packages/web/           @daryl-st @DENBARIT
