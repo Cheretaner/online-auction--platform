@@ -1,4 +1,4 @@
 packages:
-  - "online-auction-platform/packages/*"
+  - "packages/*"
 allowBuilds:
   esbuild: true
