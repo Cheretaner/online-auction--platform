@@ -5,7 +5,12 @@ type RequestPart = "body" | "query" | "params";
 
 export function validate(schema: ZodSchema, part: RequestPart = "body"): RequestHandler {
   return (req, _res, next) => {
-    req[part] = schema.parse(req[part]);
+    const parsed = schema.safeParse(req[part]);
+    if (!parsed.success) {
+      next(parsed.error);
+      return;
+    }
+    req[part] = parsed.data;
     next();
   };
 }

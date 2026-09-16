@@ -16,17 +16,27 @@ import { identityRouter } from "./identity/identity.routes.js";
 import { notificationRouter } from "./notification/notification.routes.js";
 import { organizationRouter } from "./organization/organization.routes.js";
 import { reportingRouter } from "./reporting/reporting.routes.js";
+import { attachSseStream } from "./infrastructure/realtime/realtime.adapter.js";
 import { errorMiddleware } from "./shared/middleware/error.middleware.js";
+import { notFoundMiddleware } from "./shared/middleware/notFound.middleware.js";
 import { apiRateLimiter } from "./shared/middleware/rateLimit.middleware.js";
+import { requestIdMiddleware } from "./shared/middleware/requestId.middleware.js";
+import { requireAuth } from "./shared/middleware/auth.middleware.js";
 import { logger } from "./shared/utils/logger.js";
 
 export function createApp(): express.Express {
   const app = express();
 
+  app.use(requestIdMiddleware);
   app.use(cors({ origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",") }));
   app.use(helmet());
-  app.use(express.json({ limit: "2mb" }));
-  app.use(pinoHttp({ logger }));
+  app.use(express.json({ limit: env.REQUEST_BODY_LIMIT }));
+  app.use(
+    pinoHttp({
+      logger,
+      genReqId: (req) => (req as express.Request).id ?? "unknown",
+    }),
+  );
   app.use(apiRateLimiter);
 
   app.use("/health", healthRouter);
@@ -42,7 +52,13 @@ export function createApp(): express.Express {
   app.use("/api/v1/notifications", notificationRouter);
   app.use("/api/v1/disputes", disputeRouter);
   app.use("/api/v1/reports", reportingRouter);
+  app.get("/api/v1/events", requireAuth(), (req, res) => {
+    const channel = typeof req.query.channel === "string" ? req.query.channel : "*";
+    const unsubscribe = attachSseStream(res, channel);
+    req.on("close", unsubscribe);
+  });
 
+  app.use(notFoundMiddleware);
   app.use(errorMiddleware);
 
   return app;

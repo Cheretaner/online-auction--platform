@@ -1,4 +1,5 @@
 import type { PlaceBidRequest } from "@auction/shared";
+import { realtimeAdapter } from "../infrastructure/realtime/realtime.adapter.js";
 import { getIdempotentReplay, setIdempotentReplay } from "../shared/utils/idempotency.js";
 import * as auctionService from "../auction/auction.service.js";
 import * as repo from "./bidding.repository.js";
@@ -29,6 +30,12 @@ export async function placeBid(
   if (idempotencyKey) {
     setIdempotentReplay(`${auctionId}:${idempotencyKey}`, bid);
   }
+
+  await realtimeAdapter.publish({
+    channel: `auction:${auctionId}`,
+    event: "bid.placed",
+    payload: bid,
+  });
 
   return bid;
 }

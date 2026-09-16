@@ -1,14 +1,13 @@
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE organization_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auctions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bids ENABLE ROW LEVEL SECURITY;
-ALTER TABLE deposits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_events ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS org_member_read ON organization_members;
 DROP POLICY IF EXISTS auction_org_read ON auctions;
 DROP POLICY IF EXISTS bid_read ON bids;
+DROP POLICY IF EXISTS organizations_isolation ON organizations;
+DROP POLICY IF EXISTS organization_members_isolation ON organization_members;
+DROP POLICY IF EXISTS auctions_isolation ON auctions;
+DROP POLICY IF EXISTS bids_isolation ON bids;
+DROP POLICY IF EXISTS deposits_isolation ON deposits;
+DROP POLICY IF EXISTS documents_isolation ON documents;
+DROP POLICY IF EXISTS audit_events_isolation ON audit_events;
 
 CREATE OR REPLACE FUNCTION app_bypass_rls() RETURNS BOOLEAN AS $$
   SELECT COALESCE(current_setting('app.bypass_rls', true), 'off') = 'on';

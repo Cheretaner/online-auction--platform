@@ -1,10 +1,11 @@
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { closePool } from "./infrastructure/database/pool.js";
-import { stopAllJobs } from "./infrastructure/scheduler/scheduler.js";
+import { startInfrastructureJobs, stopAllJobs } from "./infrastructure/scheduler/scheduler.js";
 import { logger } from "./shared/utils/logger.js";
 
 const app = createApp();
+startInfrastructureJobs();
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, "API server listening");

@@ -15,6 +15,10 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+export function paginationOffset(page: number, limit: number): number {
+  return (page - 1) * limit;
+}
+
 export function toPaginatedResult<T>(
   items: T[],
   total: number,
