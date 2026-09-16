@@ -8,16 +8,15 @@
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "dev": "pnpm --parallel --filter \"./packages/**\" dev",
+    "dev:api": "pnpm --filter @auction/api dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "migrate": "pnpm --filter @auction/api migrate"
   },
   "devDependencies": {
     "prettier": "^3.3.0",
     "typescript": "^5.6.0"
-  },
-  "dependencies": {
-    "@auction/shared": "workspace:*"
   }
 }

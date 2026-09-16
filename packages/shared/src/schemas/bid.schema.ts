@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-export const Money = z.string().regex(/^\d+(\.\d{2})?$/, "invalid amount");
+import { Money } from "./money.js";
 
 export const PlaceBidRequest = z.object({ amount: Money });
 export type PlaceBidRequest = z.infer<typeof PlaceBidRequest>;
