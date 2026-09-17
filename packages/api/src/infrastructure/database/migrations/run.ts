@@ -19,11 +19,7 @@ interface Migration {
 
 function loadMigrations(): Migration[] {
   return readdirSync(__dirname)
-    .filter(
-      (file) =>
-        file.endsWith(".sql") &&
-        !file.endsWith(".down.sql"),
-    )
+    .filter((file) => file.endsWith(".up.sql"))
     .sort()
     .map((filename) => ({
       id: filename,
@@ -32,6 +28,8 @@ function loadMigrations(): Migration[] {
     }));
 }
 
+
+  // Create the migration tracking table if it does not exist.
 async function ensureMigrationTable(): Promise<void> {
   const pool = getPool();
 
@@ -42,6 +40,7 @@ async function ensureMigrationTable(): Promise<void> {
     )
   `);
 }
+
 
 async function runMigrations(): Promise<void> {
   const pool = getPool();
@@ -111,6 +110,14 @@ async function runMigrations(): Promise<void> {
         );
       }
 
+      logger.error(
+        {
+          err: error,
+          migration: migration.filename,
+        },
+        "Migration failed",
+      );
+
       throw error;
     } finally {
       client.release();
@@ -118,7 +125,10 @@ async function runMigrations(): Promise<void> {
   }
 
   logger.info(
-    { count: migrations.length },
+    {
+      discovered: migrations.length,
+      applied: migrations.length,
+    },
     "Migrations complete",
   );
 }
@@ -127,7 +137,7 @@ runMigrations()
   .catch((error) => {
     logger.error(
       { err: error },
-      "Migration failed",
+      "Migration runner failed",
     );
 
     process.exitCode = 1;
