@@ -16,7 +16,9 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   return getExecutor(client).query<T>(text, params);
 }
 
-export async function queryAll<T extends pg.QueryResultRow = pg.QueryResultRow>(
+export async function queryAll<
+  T extends pg.QueryResultRow = pg.QueryResultRow,
+>(
   text: string,
   params?: unknown[],
   client?: Queryable,
@@ -25,7 +27,9 @@ export async function queryAll<T extends pg.QueryResultRow = pg.QueryResultRow>(
   return result.rows;
 }
 
-export async function queryOne<T extends pg.QueryResultRow = pg.QueryResultRow>(
+export async function queryOne<
+  T extends pg.QueryResultRow = pg.QueryResultRow,
+>(
   text: string,
   params?: unknown[],
   client?: Queryable,
