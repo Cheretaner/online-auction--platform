@@ -22,6 +22,7 @@ export const Organization = z.object({
   contactPhone: z.string(),
   logoUrl: z.string().url().nullable().optional(),
   isActive: z.boolean(),
+  onboardedBy: z.string().uuid().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
