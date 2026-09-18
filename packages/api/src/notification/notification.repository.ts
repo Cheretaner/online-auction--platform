@@ -77,6 +77,25 @@ export async function markRead(id: string, userId: string): Promise<Notification
   return result.rows[0] ? mapNotification(result.rows[0]) : null;
 }
 
+export async function claimNotificationById(
+  id: string,
+): Promise<(Notification & { email: string | null; attemptCount: number }) | null> {
+  const rows = await queryAll<DbNotification & { email: string | null; attempt_count: number }>(
+    `UPDATE notifications n
+        SET attempt_count = n.attempt_count + 1
+       FROM profiles p
+      WHERE n.id = $1
+        AND p.id = n.user_id
+        AND n.status IN ('pending', 'failed')
+        AND n.attempt_count < 8
+     RETURNING n.*, p.email, n.attempt_count`,
+    [id],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return { ...mapNotification(row), email: row.email, attemptCount: row.attempt_count };
+}
+
 export async function claimDispatchBatch(limit = 40): Promise<
   Array<Notification & { email: string | null; attemptCount: number }>
 > {

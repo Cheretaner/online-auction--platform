@@ -69,3 +69,20 @@ export const ERROR_CODES = [
   "REPORT_NOT_FOUND",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
+
+export const ORG_TYPES = [
+  "government",
+  "state_enterprise",
+  "bank",
+  "private",
+] as const;
+export type OrgType = (typeof ORG_TYPES)[number];
+
+export const DOCUMENT_TYPES = [
+  "specification",
+  "inspection_report",
+  "terms",
+  "image",
+  "other",
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];

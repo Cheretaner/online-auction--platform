@@ -1,4 +1,4 @@
--- Person 2 hardening: report taxonomy, sealed-bid uniqueness,
+-- Hardening pass: report taxonomy, sealed-bid uniqueness,
 -- dispute uniqueness, and officer read access that 003 missed.
 
 ALTER TABLE auction_reports
@@ -36,7 +36,7 @@ USING (
         WHERE a.id = disputes.auction_id
           AND a.org_id = app_current_org_id()
           AND om.user_id = app_current_user_id()
-          AND om.role IN ('organization_admin', 'auction_officer')
+          AND om.role IN ('org_admin', 'auction_officer')
     )
 );
 
@@ -53,7 +53,7 @@ USING (
         WHERE a.id = anomaly_flags.auction_id
           AND a.org_id = app_current_org_id()
           AND om.user_id = app_current_user_id()
-          AND om.role IN ('organization_admin', 'auction_officer')
+          AND om.role IN ('org_admin', 'auction_officer')
     )
 );
 
@@ -75,6 +75,6 @@ USING (
         WHERE a.id = compliance_checks.auction_id
           AND a.org_id = app_current_org_id()
           AND om.user_id = app_current_user_id()
-          AND om.role IN ('compliance_officer', 'organization_admin', 'auction_officer')
+          AND om.role IN ('compliance_officer', 'org_admin', 'auction_officer')
     )
 );

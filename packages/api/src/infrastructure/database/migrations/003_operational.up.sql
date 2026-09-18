@@ -1,4 +1,4 @@
--- Person 2 operational layer: hash-chain scoping, bidding knobs,
+-- Operational layer: hash-chain scoping, bidding knobs,
 -- durable idempotency, transactional outbox, compliance persistence,
 -- notification retries, and append-only audit enforcement.
 
@@ -131,7 +131,7 @@ USING (
         WHERE a.id = compliance_checks.auction_id
           AND a.org_id = app_current_org_id()
           AND om.user_id = app_current_user_id()
-          AND om.role IN ('compliance_officer', 'organization_admin')
+          AND om.role IN ('compliance_officer', 'org_admin')
     )
 );
 
@@ -158,7 +158,7 @@ USING (
         WHERE a.id = bids.auction_id
           AND a.org_id = app_current_org_id()
           AND om.user_id = app_current_user_id()
-          AND om.role IN ('compliance_officer', 'organization_admin', 'auction_officer')
+          AND om.role IN ('compliance_officer', 'org_admin', 'auction_officer')
     )
 );
 

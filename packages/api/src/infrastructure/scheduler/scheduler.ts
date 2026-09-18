@@ -1,5 +1,6 @@
 import { logger } from "../../shared/utils/logger.js";
 import { pruneExpiredIdempotencyKeys } from "../../shared/utils/idempotency.js";
+import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
 
 type ScheduledJob = {
   name: string;
@@ -40,6 +41,29 @@ export function startInfrastructureJobs(): void {
     intervalMs: 5 * 60 * 1000,
     run: () => {
       pruneExpiredIdempotencyKeys();
+    },
+  });
+
+  // Drains the transactional outbox: realtime broadcast (bids, extensions,
+  // disputes, anomaly flags, reports, ...) and near-real-time notification
+  // dispatch. Short interval - this is the only thing that turns
+  // `enqueueOutbox(...)` calls into actual delivered events.
+  scheduleJob({
+    name: "outbox-dispatch",
+    intervalMs: 2 * 1000,
+    runOnStart: true,
+    run: async () => {
+      await processOutboxBatch();
+    },
+  });
+
+  // Safety net for notifications whose first attempt failed (e.g. SMTP
+  // briefly unavailable); retries with backoff via next_attempt_at.
+  scheduleJob({
+    name: "notification-retry",
+    intervalMs: 60 * 1000,
+    run: async () => {
+      await processNotificationQueue();
     },
   });
 }

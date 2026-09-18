@@ -115,7 +115,7 @@ export async function isOrgOfficer(orgId: string, userId: string): Promise<boole
     `SELECT EXISTS (
         SELECT 1 FROM organization_members
          WHERE organization_id = $1 AND user_id = $2
-           AND role IN ('organization_admin', 'auction_officer', 'compliance_officer')
+           AND role IN ('org_admin', 'auction_officer', 'compliance_officer')
      ) AS ok`,
     [orgId, userId],
   );
@@ -264,7 +264,7 @@ export async function listOrgOfficerIds(orgId: string): Promise<string[]> {
   const rows = await queryAll<{ user_id: string }>(
     `SELECT user_id FROM organization_members
       WHERE organization_id = $1
-        AND role IN ('organization_admin', 'auction_officer', 'compliance_officer')`,
+        AND role IN ('org_admin', 'auction_officer', 'compliance_officer')`,
     [orgId],
   );
   return rows.map((row) => row.user_id);

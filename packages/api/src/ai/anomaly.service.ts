@@ -1,5 +1,6 @@
 import { DOMAIN_EVENTS } from "../kernel/events.js";
 import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
+import * as auctionService from "../auction/auction.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import * as repo from "./ai.repository.js";
@@ -30,6 +31,17 @@ export async function evaluateAuction(auctionId: string): Promise<AnomalyFlag | 
     eventType: DOMAIN_EVENTS.ANOMALY_FLAGGED,
     payload: { auctionId, flagId: flag.id, severity: flag.severity, score: flag.score },
   });
+
+  if (flag.severity === "high") {
+    // FR15: an unresolved high-severity flag marks the outcome provisional
+    // and keeps the auction under review until a compliance decision.
+    await auctionService.markUnderReviewIfNeeded({
+      auctionId,
+      actorId: null,
+      actorRole: "system",
+      reason: `High-severity anomaly flag ${flag.id}`,
+    });
+  }
 
   const officers = await biddingRepo.listOrgOfficerIds(auction.orgId);
   await notifications.notifyMany(

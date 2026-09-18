@@ -8,7 +8,7 @@ const transitions: Record<AuctionStatus, AuctionStatus[]> = {
   live: ["closed", "cancelled"],
   closed: ["under_review", "awarded"],
   under_review: ["awarded", "cancelled"],
-  awarded: [],
+  awarded: ["under_review"],
   cancelled: [],
 };
 

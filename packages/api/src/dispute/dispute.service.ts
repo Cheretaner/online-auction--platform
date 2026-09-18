@@ -5,6 +5,7 @@ import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import * as audit from "../audit/audit.service.js";
+import * as auctionService from "../auction/auction.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import * as repo from "./dispute.repository.js";
@@ -45,6 +46,13 @@ export async function openDispute(input: {
       entityId: dispute.id,
       action: DOMAIN_EVENTS.DISPUTE_OPENED,
       payload: { reason: input.reason },
+    });
+
+    await auctionService.markUnderReviewIfNeeded({
+      auctionId: auction.id,
+      actorId: input.raisedBy,
+      actorRole: primaryActorRole(input.roles),
+      reason: `Dispute ${dispute.id} opened`,
     });
 
     await enqueueOutbox({

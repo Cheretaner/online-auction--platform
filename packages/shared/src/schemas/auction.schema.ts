@@ -1,14 +1,20 @@
 import { z } from "zod";
-import { AUCTION_STATUS } from "../enums.js";
+import { AUCTION_STATUS, AUCTION_TYPE } from "../enums.js";
 import { Money } from "./money.js";
 
 export const CreateAuctionRequest = z.object({
   organizationId: z.string().uuid(),
   title: z.string().min(3).max(200),
   description: z.string().max(5000).optional(),
+  auctionType: z.enum(AUCTION_TYPE),
   startingPrice: Money,
-  opensAt: z.string().datetime().optional(),
-  closesAt: z.string().datetime().optional(),
+  reservePrice: Money.optional(),
+  minIncrement: Money,
+  depositAmount: Money.default("0.00"),
+  opensAt: z.string().datetime(),
+  closesAt: z.string().datetime(),
+  antiSnipeSeconds: z.number().int().min(0).max(3600).default(120),
+  maxExtensions: z.number().int().min(0).max(50).default(5),
 });
 
 export type CreateAuctionRequest = z.infer<typeof CreateAuctionRequest>;

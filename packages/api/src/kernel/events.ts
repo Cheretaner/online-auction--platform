@@ -2,6 +2,7 @@ export const DOMAIN_EVENTS = {
   BID_PLACED: "bid.placed",
   BID_WITHDRAWN: "bid.withdrawn",
   AUCTION_EXTENDED: "auction.extended",
+  AUCTION_UNDER_REVIEW: "auction.under_review",
   SEALED_OPENED: "sealed.opened",
   DISPUTE_OPENED: "dispute.opened",
   DISPUTE_UPDATED: "dispute.updated",
