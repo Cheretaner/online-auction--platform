@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { Money } from "./money.js";
 
-export const PlaceBidRequest = z.object({ amount: Money });
+export const PlaceBidRequest = z.object({
+  amount: Money,
+  commitmentHash: z
+    .string()
+    .regex(/^[a-fA-F0-9]{64}$/, "commitment hash must be sha256 hex")
+    .optional(),
+});
 export type PlaceBidRequest = z.infer<typeof PlaceBidRequest>;
 
 export const PlaceBidResponse = z.object({
@@ -21,3 +27,8 @@ export const PlaceBidResponse = z.object({
   }),
 });
 export type PlaceBidResponse = z.infer<typeof PlaceBidResponse>;
+
+export const WithdrawBidRequest = z.object({
+  reason: z.string().min(8).max(2000),
+});
+export type WithdrawBidRequest = z.infer<typeof WithdrawBidRequest>;

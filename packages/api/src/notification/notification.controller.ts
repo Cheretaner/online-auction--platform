@@ -1,29 +1,31 @@
 import type { RequestHandler } from "express";
-import type { AuthenticatedRequest } from "../shared/types/request.js";
+import type { SendNotificationRequest } from "@auction/shared";
+import { getAuth, routeParam } from "../shared/types/request.js";
 import * as service from "./notification.service.js";
 
-export const list: RequestHandler = async (req, res, next) => {
-  try {
-    const auth = (req as AuthenticatedRequest).auth!;
-    const items = await service.listNotifications(auth.userId);
-    res.json({ items });
-  } catch (error) {
-    next(error);
-  }
+export const list: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const unreadOnly = req.query.unread === "true";
+  const items = await service.listNotifications(auth.userId, unreadOnly);
+  res.json({ items });
 };
 
-export const send: RequestHandler = async (req, res, next) => {
-  try {
-    const { userId, email, channel, subject, body } = req.body as {
-      userId: string;
-      email?: string;
-      channel: "email" | "in_app";
-      subject: string;
-      body: string;
-    };
-    const notification = await service.notifyUser({ userId, email, channel, subject, body });
-    res.status(201).json(notification);
-  } catch (error) {
-    next(error);
-  }
+export const markRead: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const notification = await service.markNotificationRead(routeParam(req.params.id), auth.userId);
+  res.json(notification);
+};
+
+export const send: RequestHandler = async (req, res) => {
+  const body = req.body as SendNotificationRequest;
+  const notification = await service.enqueueNotification({
+    userId: body.userId,
+    channel: body.channel,
+    type: body.type,
+    title: body.title,
+    message: body.message,
+    relatedEntityType: body.relatedEntityType,
+    relatedEntityId: body.relatedEntityId,
+  });
+  res.status(201).json(notification);
 };

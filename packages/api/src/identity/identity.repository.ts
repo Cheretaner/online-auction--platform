@@ -1,5 +1,6 @@
 import type { Role } from "@auction/shared";
 import { query } from "../infrastructure/database/query.js";
+import { mapDbRole } from "../kernel/roles.js";
 
 export interface DbUser {
   id: string;
@@ -29,9 +30,10 @@ export async function createUser(
 }
 
 export async function getUserRoles(userId: string): Promise<Role[]> {
-  const result = await query<{ role: Role }>(
+  const result = await query<{ role: string }>(
     "SELECT role FROM organization_members WHERE user_id = $1",
     [userId],
   );
-  return result.rows.length ? result.rows.map((row) => row.role) : ["bidder"];
+  const roles = result.rows.map((row) => mapDbRole(row.role));
+  return roles.length ? [...new Set(roles)] : ["bidder"];
 }

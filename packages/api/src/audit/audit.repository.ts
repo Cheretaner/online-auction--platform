@@ -1,68 +1,139 @@
-import { query } from "../infrastructure/database/query.js";
+import { query, queryAll, queryOne } from "../infrastructure/database/query.js";
+import { GLOBAL_LEDGER_SCOPE } from "../kernel/events.js";
 import type { AuditEvent } from "./audit.types.js";
 
 interface DbAuditEvent {
   id: string;
-  organization_id: string | null;
-  actor_id: string | null;
+  auction_id: string | null;
+  sequence_no: string | number;
   entity_type: string;
   entity_id: string;
+  actor_id: string | null;
+  actor_role: string;
   action: string;
   payload: Record<string, unknown>;
-  sequence_no: number;
-  prev_hash: string | null;
+  prev_hash: string;
   hash: string;
-  created_at: Date;
+  occurred_at: Date;
 }
 
 function mapEvent(row: DbAuditEvent): AuditEvent {
   return {
     id: row.id,
-    organizationId: row.organization_id ?? undefined,
-    actorId: row.actor_id ?? undefined,
+    auctionId: row.auction_id ?? undefined,
+    sequenceNo: Number(row.sequence_no),
     entityType: row.entity_type,
     entityId: row.entity_id,
+    actorId: row.actor_id ?? undefined,
+    actorRole: row.actor_role,
     action: row.action,
     payload: row.payload,
-    sequenceNo: row.sequence_no,
-    prevHash: row.prev_hash ?? undefined,
+    prevHash: row.prev_hash,
     hash: row.hash,
-    createdAt: row.created_at.toISOString(),
+    occurredAt: row.occurred_at.toISOString(),
   };
 }
 
-export async function getLatestEvent(): Promise<AuditEvent | null> {
-  const result = await query<DbAuditEvent>(
-    "SELECT * FROM audit_events ORDER BY sequence_no DESC LIMIT 1",
+function ledgerScope(auctionId: string | null): string {
+  return auctionId ?? GLOBAL_LEDGER_SCOPE;
+}
+
+export async function lockLedger(auctionId: string | null): Promise<void> {
+  await query("SELECT pg_advisory_xact_lock(hashtext($1))", [`audit:${ledgerScope(auctionId)}`]);
+}
+
+export async function getLatestEvent(auctionId: string | null): Promise<AuditEvent | null> {
+  const row = await queryOne<DbAuditEvent>(
+    `SELECT * FROM audit_events
+      WHERE ledger_scope = $1::uuid
+      ORDER BY sequence_no DESC
+      LIMIT 1`,
+    [ledgerScope(auctionId)],
   );
-  return result.rows[0] ? mapEvent(result.rows[0]) : null;
+  return row ? mapEvent(row) : null;
 }
 
 export async function insertEvent(input: {
-  organizationId?: string;
-  actorId?: string;
+  auctionId: string | null;
+  sequenceNo: number;
   entityType: string;
   entityId: string;
+  actorId: string | null;
+  actorRole: string;
   action: string;
   payload: Record<string, unknown>;
-  prevHash?: string;
+  prevHash: string;
   hash: string;
+  occurredAt: Date;
 }): Promise<AuditEvent> {
   const result = await query<DbAuditEvent>(
-    `INSERT INTO audit_events
-      (organization_id, actor_id, entity_type, entity_id, action, payload, prev_hash, hash)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO audit_events (
+        auction_id, sequence_no, entity_type, entity_id, actor_id, actor_role,
+        action, payload, prev_hash, hash, occurred_at
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
      RETURNING *`,
     [
-      input.organizationId ?? null,
-      input.actorId ?? null,
+      input.auctionId,
+      input.sequenceNo,
       input.entityType,
       input.entityId,
+      input.actorId,
+      input.actorRole,
       input.action,
-      input.payload,
-      input.prevHash ?? null,
+      JSON.stringify(input.payload),
+      input.prevHash,
       input.hash,
+      input.occurredAt,
     ],
   );
   return mapEvent(result.rows[0]);
+}
+
+export async function listChain(auctionId: string | null): Promise<AuditEvent[]> {
+  const rows = await queryAll<DbAuditEvent>(
+    `SELECT * FROM audit_events
+      WHERE ledger_scope = $1::uuid
+      ORDER BY sequence_no ASC`,
+    [ledgerScope(auctionId)],
+  );
+  return rows.map(mapEvent);
+}
+
+export async function listEvents(input: {
+  auctionId?: string;
+  entityType?: string;
+  entityId?: string;
+  page: number;
+  limit: number;
+}): Promise<{ items: AuditEvent[]; total: number }> {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (input.auctionId) {
+    params.push(input.auctionId);
+    conditions.push(`auction_id = $${params.length}`);
+  }
+  if (input.entityType) {
+    params.push(input.entityType);
+    conditions.push(`entity_type = $${params.length}`);
+  }
+  if (input.entityId) {
+    params.push(input.entityId);
+    conditions.push(`entity_id = $${params.length}`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const count = await queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM audit_events ${where}`, params);
+  params.push(input.limit, (input.page - 1) * input.limit);
+  const rows = await queryAll<DbAuditEvent>(
+    `SELECT * FROM audit_events ${where}
+      ORDER BY occurred_at DESC, sequence_no DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params,
+  );
+
+  return {
+    items: rows.map(mapEvent),
+    total: Number(count?.count ?? 0),
+  };
 }
