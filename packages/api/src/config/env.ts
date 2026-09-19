@@ -1,7 +1,11 @@
 import dotenv from "dotenv";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-dotenv.config();
+dotenv.config({
+  path: resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env"),
+});
 
 const envSchema = z
   .object({
@@ -34,20 +38,10 @@ const envSchema = z
       .default("false")
       .transform((value) => value === "true"),
     MAIL_FROM: z.string().default("noreply@localhost"),
-    // AI provider chain: Gemini first, OpenRouter as fallback, then a
-    // deterministic stub. "auto" tries whichever of Gemini/OpenRouter has
-    // an API key configured, in that order. Groq and paid providers are
-    // deliberately not supported here - see provider.adapter.ts.
-    AI_PROVIDER: z.enum(["auto", "gemini", "openrouter", "stub"]).default("auto"),
-    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(8_000),
-    GEMINI_API_KEY: z.string().optional(),
-    GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
-    GEMINI_MODEL: z.string().default("gemini-flash-latest"),
-    OPENROUTER_API_KEY: z.string().optional(),
-    OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
-    OPENROUTER_MODEL: z.string().default("google/gemini-2.0-flash-exp:free"),
-    OPENROUTER_SITE_URL: z.string().default("http://localhost:3000"),
-    OPENROUTER_SITE_NAME: z.string().default("AI-Powered Transparent Online Auction System"),
+    AI_PROVIDER: z.enum(["stub", "openai"]).default("stub"),
+    AI_API_KEY: z.string().optional(),
+    AI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
+    AI_MODEL: z.string().default("gpt-4o-mini"),
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
     REQUEST_BODY_LIMIT: z.string().default("2mb"),
   })

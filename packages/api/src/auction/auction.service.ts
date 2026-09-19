@@ -1,87 +1,116 @@
-import type { CreateAuctionRequest } from "@auction/shared";
+import { withTransaction } from "../infrastructure/database/tx.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
-import { DOMAIN_EVENTS } from "../kernel/events.js";
-import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
-import * as audit from "../audit/audit.service.js";
-import { assertTransition } from "./auction.stateMachine.js";
-import * as repo from "./auction.repository.js";
 import type { Auction } from "./auction.types.js";
+import * as AuctionRepo from "./auction.repository.js";
+import { canTransition } from "./auction.stateMachine.js";
+import type { AuctionStatus } from "@auction/shared";
+import type { CreateAuctionRequest, UpdateAuctionRequest } from "@auction/shared";
 
-export async function createAuction(
-  input: CreateAuctionRequest & { createdBy: string },
-): Promise<Auction> {
-  if (new Date(input.closesAt) <= new Date(input.opensAt)) {
+export async function createAuction(orgId: string, userId: string, data: CreateAuctionRequest): Promise<Auction> {
+  if (new Date(data.closesAt) <= new Date(data.opensAt)) {
     throw new AppError("closesAt must be after opensAt", HttpStatus.BAD_REQUEST);
   }
-  return repo.createAuction({
-    organizationId: input.organizationId,
-    title: input.title,
-    description: input.description,
-    auctionType: input.auctionType,
-    startingPrice: input.startingPrice,
-    reservePrice: input.reservePrice,
-    minIncrement: input.minIncrement,
-    depositAmount: input.depositAmount,
-    opensAt: input.opensAt,
-    closesAt: input.closesAt,
-    antiSnipeSeconds: input.antiSnipeSeconds,
-    maxExtensions: input.maxExtensions,
-    createdBy: input.createdBy,
+  return withTransaction(async (client) => {
+    return AuctionRepo.createAuction(orgId, userId, data, client);
   });
 }
 
 export async function getAuction(id: string): Promise<Auction> {
-  const auction = await repo.findAuctionById(id);
-  if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+  const auction = await AuctionRepo.findById(id);
+  if (!auction) {
+    throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+  }
   return auction;
 }
 
-export async function transitionAuction(id: string, toStatus: Auction["status"]): Promise<Auction> {
-  const auction = await getAuction(id);
-  assertTransition(auction.status, toStatus);
-  return repo.updateAuctionStatus(id, toStatus);
+export async function listPublicAuctions(): Promise<Auction[]> {
+  return AuctionRepo.listPublicAuctions();
 }
 
-/**
- * Per FR12/FR15/FR19: an unresolved high-severity anomaly flag or a raised
- * dispute against an auction's outcome pulls that auction into the
- * `under_review` state until a compliance officer records a decision. Both
- * the dispute and anomaly-detection subsystems call this instead of
- * duplicating the transition + audit + realtime-broadcast logic.
- *
- * No-op (returns null) if the auction is already under review or in a
- * state the SRS doesn't define this transition for (e.g. still `live`,
- * where bidding - not review - is the right response).
- */
-export async function markUnderReviewIfNeeded(input: {
-  auctionId: string;
-  actorId: string | null;
-  actorRole: string;
-  reason: string;
-}): Promise<Auction | null> {
-  const auction = await repo.findAuctionById(input.auctionId);
-  if (!auction) return null;
-  if (auction.status !== "closed" && auction.status !== "awarded") return null;
+export async function listByOrg(orgId: string): Promise<Auction[]> {
+  return AuctionRepo.listByOrgId(orgId);
+}
 
-  assertTransition(auction.status, "under_review");
-  const updated = await repo.updateAuctionStatus(auction.id, "under_review");
-
-  await audit.appendAuditEvent({
-    auctionId: updated.id,
-    actorId: input.actorId,
-    actorRole: input.actorRole,
-    entityType: "auction",
-    entityId: updated.id,
-    action: DOMAIN_EVENTS.AUCTION_UNDER_REVIEW,
-    payload: { fromStatus: auction.status, reason: input.reason },
+export async function submitForApproval(id: string, orgId: string, userId: string): Promise<Auction> {
+  return withTransaction(async (client) => {
+    const auction = await AuctionRepo.findById(id, client);
+    if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+    if (auction.orgId !== orgId) throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+    
+    if (!canTransition(auction.status, "pending_review")) {
+      throw new AppError(`Cannot transition from ${auction.status} to pending_review`, HttpStatus.BAD_REQUEST);
+    }
+    return AuctionRepo.updateStatus(id, "pending_review", null, client);
   });
+}
 
-  await enqueueOutbox({
-    aggregateType: "auction",
-    aggregateId: updated.id,
-    eventType: DOMAIN_EVENTS.AUCTION_UNDER_REVIEW,
-    payload: { auctionId: updated.id, reason: input.reason },
+export async function approveAuction(id: string, orgId: string, userId: string): Promise<Auction> {
+  return withTransaction(async (client) => {
+    const auction = await AuctionRepo.findById(id, client);
+    if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+    if (auction.orgId !== orgId) throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+    
+    if (auction.createdBy === userId) {
+      throw new AppError("Two-person rule: cannot approve your own auction", HttpStatus.BAD_REQUEST);
+    }
+    
+    if (!canTransition(auction.status, "scheduled")) {
+      throw new AppError(`Cannot transition from ${auction.status} to scheduled`, HttpStatus.BAD_REQUEST);
+    }
+    return AuctionRepo.updateStatus(id, "scheduled", userId, client);
   });
+}
 
-  return updated;
+export async function transitionAuction(id: string, orgId: string, status: AuctionStatus): Promise<Auction> {
+  return withTransaction(async (client) => {
+    const auction = await AuctionRepo.findById(id, client);
+    if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+    if (auction.orgId !== orgId) throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+    
+    if (!canTransition(auction.status, status)) {
+      throw new AppError(`Cannot transition from ${auction.status} to ${status}`, HttpStatus.BAD_REQUEST);
+    }
+    return AuctionRepo.updateStatus(id, status, undefined, client);
+  });
+}
+
+export async function amendAuction(id: string, orgId: string, data: UpdateAuctionRequest): Promise<Auction> {
+  return withTransaction(async (client) => {
+    const auction = await AuctionRepo.findById(id, client);
+    if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+    if (auction.orgId !== orgId) throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+    
+    if (auction.status !== "draft") {
+      throw new AppError("Only draft auctions can be amended", HttpStatus.BAD_REQUEST);
+    }
+    
+    if (data.closesAt && data.opensAt) {
+      if (new Date(data.closesAt) <= new Date(data.opensAt)) {
+        throw new AppError("closesAt must be after opensAt", HttpStatus.BAD_REQUEST);
+      }
+    } else if (data.closesAt) {
+      if (new Date(data.closesAt) <= new Date(auction.opensAt)) {
+         throw new AppError("closesAt must be after opensAt", HttpStatus.BAD_REQUEST);
+      }
+    } else if (data.opensAt) {
+      if (new Date(auction.closesAt) <= new Date(data.opensAt)) {
+         throw new AppError("closesAt must be after opensAt", HttpStatus.BAD_REQUEST);
+      }
+    }
+
+    return AuctionRepo.updateAuction(id, data, client);
+  });
+}
+
+export async function cancelAuction(id: string, orgId: string): Promise<Auction> {
+  return withTransaction(async (client) => {
+    const auction = await AuctionRepo.findById(id, client);
+    if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+    if (auction.orgId !== orgId) throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+    
+    if (!canTransition(auction.status, "cancelled")) {
+      throw new AppError(`Cannot cancel auction in status ${auction.status}`, HttpStatus.BAD_REQUEST);
+    }
+    return AuctionRepo.updateStatus(id, "cancelled", undefined, client);
+  });
 }
