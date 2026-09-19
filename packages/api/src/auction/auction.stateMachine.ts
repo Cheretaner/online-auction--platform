@@ -1,19 +1,16 @@
 import type { AuctionStatus } from "@auction/shared";
-import { AppError, HttpStatus } from "../shared/errors/index.js";
 
-const transitions: Record<AuctionStatus, AuctionStatus[]> = {
+export const ALLOWED_TRANSITIONS: Record<AuctionStatus, AuctionStatus[]> = {
   draft: ["pending_review", "cancelled"],
   pending_review: ["scheduled", "draft", "cancelled"],
   scheduled: ["live", "cancelled"],
-  live: ["closed", "cancelled"],
+  live: ["closed", "cancelled", "under_review"],
   closed: ["under_review", "awarded"],
   under_review: ["awarded", "cancelled"],
-  awarded: ["under_review"],
+  awarded: [],
   cancelled: [],
 };
 
-export function assertTransition(from: AuctionStatus, to: AuctionStatus): void {
-  if (!transitions[from].includes(to)) {
-    throw new AppError(`Invalid auction transition: ${from} -> ${to}`, HttpStatus.UNPROCESSABLE);
-  }
+export function canTransition(from: AuctionStatus, to: AuctionStatus): boolean {
+  return ALLOWED_TRANSITIONS[from]?.includes(to) ?? false;
 }

@@ -1,9 +1,12 @@
 import { Router } from "express";
-import { LoginRequest, RegisterRequest } from "@auction/shared";
-import { validate } from "../shared/middleware/validate.middleware.js";
-import * as controller from "./identity.controller.js";
+import { register, login, getProfile, updateProfile } from "./identity.controller.js";
+import { requireAuth } from "../shared/middleware/auth.middleware.js";
 
-export const identityRouter = Router();
+const router = Router();
 
-identityRouter.post("/register", validate(RegisterRequest), controller.register);
-identityRouter.post("/login", validate(LoginRequest), controller.login);
+router.post("/register", register);
+router.post("/login", login);
+router.get("/me", requireAuth, getProfile);
+router.patch("/me", requireAuth, updateProfile);
+
+export default router;
