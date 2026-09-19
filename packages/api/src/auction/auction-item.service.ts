@@ -10,13 +10,13 @@ async function verifyAuctionDraftStatus(auctionId: string): Promise<void> {
   );
   
   if (!auction) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Auction not found');
+    throw new AppError('Auction not found', HttpStatus.NOT_FOUND);
   }
   
   if (auction.status !== 'draft') {
     throw new AppError(
+      'Auction items can only be modified when the auction is in draft state',
       HttpStatus.BAD_REQUEST,
-      'Auction items can only be modified when the auction is in draft state'
     );
   }
 }
@@ -33,7 +33,7 @@ export async function getAuctionItems(auctionId: string) {
 export async function getAuctionItemById(id: string) {
   const item = await repo.getAuctionItemById(id);
   if (!item) {
-    throw new AppError(HttpStatus.NOT_FOUND, 'Auction item not found');
+    throw new AppError('Auction item not found', HttpStatus.NOT_FOUND);
   }
   return item;
 }
@@ -42,7 +42,7 @@ export async function updateAuctionItem(userId: string, auctionId: string, id: s
   await verifyAuctionDraftStatus(auctionId);
   const item = await getAuctionItemById(id);
   if (item.auctionId !== auctionId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Item does not belong to this auction');
+    throw new AppError('Item does not belong to this auction', HttpStatus.BAD_REQUEST);
   }
   return repo.updateAuctionItem(userId, id, data);
 }
@@ -51,7 +51,7 @@ export async function deleteAuctionItem(userId: string, auctionId: string, id: s
   await verifyAuctionDraftStatus(auctionId);
   const item = await getAuctionItemById(id);
   if (item.auctionId !== auctionId) {
-    throw new AppError(HttpStatus.BAD_REQUEST, 'Item does not belong to this auction');
+    throw new AppError('Item does not belong to this auction', HttpStatus.BAD_REQUEST);
   }
   return repo.deleteAuctionItem(userId, id);
 }

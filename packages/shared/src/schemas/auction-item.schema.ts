@@ -9,6 +9,8 @@ export const CreateAuctionItemRequest = z.object({
   unit: z.string().max(30).optional(),
   condition: z.enum(ITEM_CONDITIONS).optional(),
   estimatedValue: Money.optional(),
+  categoryId: z.string().uuid().optional(),
+  categorySource: z.enum(CATEGORY_SOURCES).optional(),
   region: z.string().max(80).optional(),
   city: z.string().max(100).optional(),
 });
@@ -22,6 +24,8 @@ export const UpdateAuctionItemRequest = z.object({
   unit: z.string().max(30).optional(),
   condition: z.enum(ITEM_CONDITIONS).optional(),
   estimatedValue: Money.optional(),
+  categoryId: z.string().uuid().optional(),
+  categorySource: z.enum(CATEGORY_SOURCES).optional(),
   region: z.string().max(80).optional(),
   city: z.string().max(100).optional(),
 });

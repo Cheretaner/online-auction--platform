@@ -56,7 +56,7 @@ export async function createAuctionItem(
   auctionId: string,
   data: CreateAuctionItemRequest,
 ): Promise<AuctionItemRecord> {
-  return withTransaction({ userId }, async (tx) => {
+  return withTransaction(async (tx) => {
     const row = await queryOne<DbAuctionItem>(
       `INSERT INTO auction_items (
         auction_id, title, description, quantity, unit, estimated_value,
@@ -81,7 +81,7 @@ export async function createAuctionItem(
     );
     if (!row) throw new Error('Failed to create auction item');
     return mapRow(row);
-  });
+  }, { userId });
 }
 
 export async function getAuctionItems(auctionId: string): Promise<AuctionItemRecord[]> {
@@ -105,7 +105,7 @@ export async function updateAuctionItem(
   id: string,
   data: UpdateAuctionItemRequest,
 ): Promise<AuctionItemRecord> {
-  return withTransaction({ userId }, async (tx) => {
+  return withTransaction(async (tx) => {
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramIndex = 1;
@@ -149,15 +149,15 @@ export async function updateAuctionItem(
     );
     if (!row) throw new Error('Failed to update auction item');
     return mapRow(row);
-  });
+  }, { userId });
 }
 
 export async function deleteAuctionItem(userId: string, id: string): Promise<void> {
-  await withTransaction({ userId }, async (tx) => {
+  await withTransaction(async (tx) => {
     await query(
       `DELETE FROM auction_items WHERE id = $1`,
       [id],
       tx,
     );
-  });
+  }, { userId });
 }

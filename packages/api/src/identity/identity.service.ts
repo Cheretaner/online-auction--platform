@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { IdentityRepository } from "./identity.repository.js";
 import { signAccessToken } from "../infrastructure/auth/jwt.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
-import type { RegisterRequest, LoginRequest, UpdateProfileRequest } from "@auction/shared";
+import type { RegisterRequest, LoginRequest, UpdateProfileRequest, Role } from "@auction/shared";
 
 export class IdentityService {
   private repository = new IdentityRepository();
@@ -19,7 +19,7 @@ export class IdentityService {
       passwordHash,
     });
 
-    const roles = ['bidder'];
+    const roles: Role[] = ['bidder'];
     const token = signAccessToken({ sub: profile.id, roles });
 
     const { passwordHash: _, ...userWithoutPassword } = profile;

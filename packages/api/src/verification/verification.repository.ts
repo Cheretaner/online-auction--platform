@@ -4,7 +4,7 @@ import type { Verification } from "./verification.types.js";
 
 export class VerificationRepository {
   async createVerification(userId: string, data: { documentType: string; documentNumber: string }): Promise<Verification> {
-    return await withTransaction(userId, async (client) => {
+    return await withTransaction(async (client) => {
       await queryOne(
         `UPDATE profiles SET verification_status = 'pending', updated_at = NOW() WHERE id = $1`,
         [userId],
@@ -21,11 +21,11 @@ export class VerificationRepository {
 
       if (!row) throw new Error("Failed to create verification");
       return this.mapVerification(row);
-    });
+    }, { userId });
   }
 
   async reviewVerification(adminId: string, verificationId: string, data: { status: 'verified' | 'rejected'; decision: 'approved' | 'rejected' | 'resubmission_required'; decisionReason?: string }): Promise<Verification> {
-    return await withTransaction(adminId, async (client) => {
+    return await withTransaction(async (client) => {
       const v = await queryOne(`SELECT user_id FROM verifications WHERE id = $1 FOR UPDATE`, [verificationId], client);
       if (!v) throw new Error("Verification not found");
 
@@ -52,7 +52,7 @@ export class VerificationRepository {
       );
 
       return this.mapVerification(row);
-    });
+    }, { userId: adminId });
   }
 
   async listPendingVerifications(): Promise<Verification[]> {

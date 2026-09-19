@@ -22,6 +22,7 @@ export type CreateAuctionRequest = z.infer<typeof CreateAuctionRequest>;
 export const UpdateAuctionRequest = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().max(5000).optional(),
+  startPrice: Money.optional(),
   reservePrice: Money.optional(),
   minIncrement: Money.optional(),
   depositAmount: Money.optional(),

@@ -1,14 +1,13 @@
 import type { RequestHandler } from "express";
-import type { AuthenticatedRequest } from "../shared/types/request.js";
-import { routeParam } from "../shared/types/request.js";
+import { getAuth, routeParam } from "../shared/types/request.js";
 import * as service from "./auction-item.service.js";
 import type { CreateAuctionItemRequest, UpdateAuctionItemRequest } from "@auction/shared";
 import { HttpStatus } from "../shared/errors/index.js";
 
 export const createAuctionItem: RequestHandler = async (req, res, next) => {
   try {
-    const userId = (req as AuthenticatedRequest).user.id;
-    const auctionId = routeParam(req, 'auctionId');
+    const userId = getAuth(req).userId;
+    const auctionId = routeParam(req.params.auctionId);
     const data = req.body as CreateAuctionItemRequest;
     
     const item = await service.createAuctionItem(userId, auctionId, data);
@@ -20,7 +19,7 @@ export const createAuctionItem: RequestHandler = async (req, res, next) => {
 
 export const getAuctionItems: RequestHandler = async (req, res, next) => {
   try {
-    const auctionId = routeParam(req, 'auctionId');
+    const auctionId = routeParam(req.params.auctionId);
     const items = await service.getAuctionItems(auctionId);
     res.status(HttpStatus.OK).json(items);
   } catch (error) {
@@ -30,7 +29,7 @@ export const getAuctionItems: RequestHandler = async (req, res, next) => {
 
 export const getAuctionItem: RequestHandler = async (req, res, next) => {
   try {
-    const id = routeParam(req, 'id');
+    const id = routeParam(req.params.id);
     const item = await service.getAuctionItemById(id);
     res.status(HttpStatus.OK).json(item);
   } catch (error) {
@@ -40,9 +39,9 @@ export const getAuctionItem: RequestHandler = async (req, res, next) => {
 
 export const updateAuctionItem: RequestHandler = async (req, res, next) => {
   try {
-    const userId = (req as AuthenticatedRequest).user.id;
-    const auctionId = routeParam(req, 'auctionId');
-    const id = routeParam(req, 'id');
+    const userId = getAuth(req).userId;
+    const auctionId = routeParam(req.params.auctionId);
+    const id = routeParam(req.params.id);
     const data = req.body as UpdateAuctionItemRequest;
     
     const item = await service.updateAuctionItem(userId, auctionId, id, data);
@@ -54,9 +53,9 @@ export const updateAuctionItem: RequestHandler = async (req, res, next) => {
 
 export const deleteAuctionItem: RequestHandler = async (req, res, next) => {
   try {
-    const userId = (req as AuthenticatedRequest).user.id;
-    const auctionId = routeParam(req, 'auctionId');
-    const id = routeParam(req, 'id');
+    const userId = getAuth(req).userId;
+    const auctionId = routeParam(req.params.auctionId);
+    const id = routeParam(req.params.id);
     
     await service.deleteAuctionItem(userId, auctionId, id);
     res.status(HttpStatus.NO_CONTENT).send();

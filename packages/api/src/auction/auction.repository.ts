@@ -3,7 +3,7 @@ import { AppError, HttpStatus } from "../shared/errors/index.js";
 import type { Auction } from "./auction.types.js";
 import type { AuctionStatus } from "@auction/shared";
 import type { CreateAuctionRequest, UpdateAuctionRequest } from "@auction/shared";
-import type { ClientBase } from "pg";
+import type { Queryable } from "../infrastructure/database/query.js";
 
 function mapRowToAuction(row: any): Auction {
   return {
@@ -39,7 +39,7 @@ export async function createAuction(
   orgId: string,
   createdBy: string,
   data: CreateAuctionRequest,
-  client?: ClientBase
+  client?: Queryable
 ): Promise<Auction> {
   const sql = `
     INSERT INTO auctions (
@@ -77,7 +77,7 @@ export async function createAuction(
   return mapRowToAuction(row);
 }
 
-export async function findById(id: string, client?: ClientBase): Promise<Auction | null> {
+export async function findById(id: string, client?: Queryable): Promise<Auction | null> {
   const sql = `SELECT * FROM auctions WHERE id = $1`;
   const row = await queryOne(sql, [id], client);
   return row ? mapRowToAuction(row) : null;
@@ -86,51 +86,51 @@ export async function findById(id: string, client?: ClientBase): Promise<Auction
 export async function updateAuction(
   id: string,
   data: UpdateAuctionRequest,
-  client?: ClientBase
+  client?: Queryable
 ): Promise<Auction> {
   const updates: string[] = [];
   const values: any[] = [];
   let paramIndex = 1;
 
   if (data.title !== undefined) {
-    updates.push(`title = $\${paramIndex++}`);
+    updates.push(`title = $${paramIndex++}`);
     values.push(data.title);
   }
   if (data.description !== undefined) {
-    updates.push(`description = $\${paramIndex++}`);
+    updates.push(`description = $${paramIndex++}`);
     values.push(data.description);
   }
   if (data.startPrice !== undefined) {
-    updates.push(`start_price = $\${paramIndex++}`);
+    updates.push(`start_price = $${paramIndex++}`);
     values.push(data.startPrice);
   }
   if (data.reservePrice !== undefined) {
-    updates.push(`reserve_price = $\${paramIndex++}`);
+    updates.push(`reserve_price = $${paramIndex++}`);
     values.push(data.reservePrice);
   }
   if (data.minIncrement !== undefined) {
-    updates.push(`min_increment = $\${paramIndex++}`);
+    updates.push(`min_increment = $${paramIndex++}`);
     values.push(data.minIncrement);
   }
   if (data.depositAmount !== undefined) {
-    updates.push(`deposit_amount = $\${paramIndex++}`);
+    updates.push(`deposit_amount = $${paramIndex++}`);
     values.push(data.depositAmount);
   }
   if (data.eligibilityRules !== undefined) {
-    updates.push(`eligibility_rules = $\${paramIndex++}`);
+    updates.push(`eligibility_rules = $${paramIndex++}`);
     values.push(data.eligibilityRules);
   }
   if (data.region !== undefined) {
-    updates.push(`region = $\${paramIndex++}`);
+    updates.push(`region = $${paramIndex++}`);
     values.push(data.region);
   }
   if (data.opensAt !== undefined) {
-    updates.push(`opens_at = $\${paramIndex++}`);
+    updates.push(`opens_at = $${paramIndex++}`);
     values.push(data.opensAt);
   }
   if (data.closesAt !== undefined) {
-    updates.push(`closes_at = $\${paramIndex++}`);
-    updates.push(`original_closes_at = $\${paramIndex++}`);
+    updates.push(`closes_at = $${paramIndex++}`);
+    updates.push(`original_closes_at = $${paramIndex++}`);
     values.push(data.closesAt);
     values.push(data.closesAt);
   }
@@ -146,8 +146,8 @@ export async function updateAuction(
 
   const sql = `
     UPDATE auctions 
-    SET \${updates.join(", ")}
-    WHERE id = $\${paramIndex}
+    SET ${updates.join(", ")}
+    WHERE id = $${paramIndex}
     RETURNING *
   `;
 
@@ -160,7 +160,7 @@ export async function updateStatus(
   id: string,
   status: AuctionStatus,
   approvedBy?: string | null,
-  client?: ClientBase
+  client?: Queryable
 ): Promise<Auction> {
   let sql = `UPDATE auctions SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`;
   let values: any[] = [status, id];
@@ -175,7 +175,7 @@ export async function updateStatus(
   return mapRowToAuction(row);
 }
 
-export async function listPublicAuctions(client?: ClientBase): Promise<Auction[]> {
+export async function listPublicAuctions(client?: Queryable): Promise<Auction[]> {
   const sql = `
     SELECT * FROM auctions 
     WHERE status IN ('scheduled', 'live', 'closed', 'awarded')
@@ -185,7 +185,7 @@ export async function listPublicAuctions(client?: ClientBase): Promise<Auction[]
   return rows.map(mapRowToAuction);
 }
 
-export async function listByOrgId(orgId: string, client?: ClientBase): Promise<Auction[]> {
+export async function listByOrgId(orgId: string, client?: Queryable): Promise<Auction[]> {
   const sql = `
     SELECT * FROM auctions 
     WHERE org_id = $1

@@ -1,5 +1,6 @@
 import { queryOne, queryAll } from "../infrastructure/database/query.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
+import type { Role } from "@auction/shared";
 import type { Profile, OrganizationMember } from "./identity.types.js";
 
 export class IdentityRepository {
@@ -20,7 +21,7 @@ export class IdentityRepository {
   }
 
   async createProfile(data: Partial<Profile>): Promise<Profile> {
-    return await withTransaction(null, async (client) => {
+    return await withTransaction(async (client) => {
       const row = await queryOne(
         `INSERT INTO profiles (
           email, full_name, password_hash, phone, account_type,
@@ -39,7 +40,7 @@ export class IdentityRepository {
   }
 
   async updateProfile(id: string, data: Partial<Profile>): Promise<Profile> {
-    return await withTransaction(id, async (client) => {
+    return await withTransaction(async (client) => {
       const row = await queryOne(
         `UPDATE profiles SET
           full_name = COALESCE($2, full_name),
@@ -54,15 +55,15 @@ export class IdentityRepository {
       );
       if (!row) throw new Error("Failed to update profile");
       return this.mapProfile(row);
-    });
+    }, { userId: id });
   }
 
-  async findUserRoles(userId: string): Promise<string[]> {
+  async findUserRoles(userId: string): Promise<Role[]> {
     const rows = await queryAll(
       `SELECT role FROM organization_members WHERE user_id = $1`,
       [userId]
     );
-    const roles = rows.map((r: any) => r.role);
+    const roles = rows.map((r: any) => r.role as Role);
     return roles.length > 0 ? roles : ['bidder'];
   }
 

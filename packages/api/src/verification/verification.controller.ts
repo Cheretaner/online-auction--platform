@@ -17,7 +17,7 @@ export const submitVerification: RequestHandler = async (req: Request, res: Resp
 export const reviewVerification: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const auth = getAuth(req);
-    const verificationId = routeParam(req, "id");
+    const verificationId = routeParam(req.params.id);
     const result = await service.review(auth.userId, verificationId, req.body);
     res.json(result);
   } catch (error) {
@@ -36,7 +36,7 @@ export const listPending: RequestHandler = async (req: Request, res: Response, n
 
 export const checkDuplicates: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const userId = routeParam(req, "userId");
+    const userId = routeParam(req.params.userId);
     const result = await service.checkDuplicates(userId);
     res.json(result);
   } catch (error) {

@@ -10,7 +10,7 @@ export function validateBidPlacement(auction: Auction, bidderId: string, amount:
     throw new BiddingError("Self bidding is not allowed", "SELF_BIDDING");
   }
 
-  const minimum = auction.currentHighestBid ?? auction.startingPrice;
+  const minimum = auction.currentHighestBid ?? auction.startPrice;
   if (Number(amount) <= Number(minimum)) {
     throw new BiddingError("Bid below minimum", "BID_BELOW_MINIMUM");
   }
