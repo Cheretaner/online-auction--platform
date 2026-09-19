@@ -1,10 +1,17 @@
+import type { DocumentType } from "@auction/shared";
+
 export interface DocumentRecord {
   id: string;
-  organizationId: string;
-  auctionId?: string;
-  storageKey: string;
-  filename: string;
-  contentType: string;
+  auctionId: string | null;
   uploadedBy: string;
+  documentType: DocumentType;
+  fileName: string;
+  storagePath: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  checksumSha256: string;
+  isPrivate: boolean;
+  summary: string | null;
   createdAt: string;
+  updatedAt: string;
 }

@@ -2,12 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import dotenv from "dotenv";
-
 import { closePool, getPool } from "../pool.js";
 import { logger } from "../../../shared/utils/logger.js";
-
-dotenv.config();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

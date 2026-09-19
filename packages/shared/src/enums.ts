@@ -2,7 +2,7 @@ export const ROLES = [
   "guest",
   "bidder",
   "auction_officer",
-  "org_admin",
+  "organization_admin",
   "compliance_officer",
   "super_admin",
 ] as const;
@@ -52,3 +52,27 @@ export const DOCUMENT_TYPES = [
   "other",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+export const AUCTION_TYPES = ['open_ascending', 'sealed_bid'] as const;
+export type AuctionType = (typeof AUCTION_TYPES)[number];
+
+export const ITEM_CONDITIONS = ['new', 'used_good', 'used_fair', 'salvage', 'unknown'] as const;
+export type ItemCondition = (typeof ITEM_CONDITIONS)[number];
+
+export const CATEGORY_SOURCES = ['ai_auto', 'ai_confirmed', 'manual'] as const;
+export type CategorySource = (typeof CATEGORY_SOURCES)[number];
+
+export const DEPOSIT_STATUS = ['pending', 'verified', 'rejected', 'released'] as const;
+export type DepositStatus = (typeof DEPOSIT_STATUS)[number];
+
+export const INSTRUMENT_TYPES = ['cpo', 'bank_guarantee', 'transfer'] as const;
+export type InstrumentType = (typeof INSTRUMENT_TYPES)[number];
+
+export const VERIFICATION_STATUS = ['unverified', 'pending', 'verified', 'rejected'] as const;
+export type VerificationStatus = (typeof VERIFICATION_STATUS)[number];
+
+export const VERIFICATION_DECISIONS = ['approved', 'rejected', 'resubmission_required'] as const;
+export type VerificationDecision = (typeof VERIFICATION_DECISIONS)[number];
+
+export const ACCOUNT_TYPES = ['individual', 'business'] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
