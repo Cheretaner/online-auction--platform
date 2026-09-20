@@ -1,5 +1,11 @@
 import type { RequestHandler } from "express";
-import type { AssistRequest, CategorizeRequest, ReviewAnomalyRequest } from "@auction/shared";
+import type {
+  AssistRequest,
+  CategorizeRequest,
+  DetectAnomalyRequest,
+  OptionalAuctionScopedQuery,
+  ReviewAnomalyRequest,
+} from "@auction/shared";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import * as anomalyService from "./anomaly.service.js";
 import * as assistantService from "./assistant.service.js";
@@ -12,17 +18,13 @@ export const categorize: RequestHandler = async (req, res) => {
 };
 
 export const detectAnomaly: RequestHandler = async (req, res) => {
-  const auctionId = typeof req.body?.auctionId === "string" ? req.body.auctionId : undefined;
-  if (!auctionId) {
-    res.status(400).json({ error: { message: "auctionId is required" } });
-    return;
-  }
+  const { auctionId } = req.body as DetectAnomalyRequest;
   const flag = await anomalyService.evaluateAuction(auctionId);
   res.json({ flagged: Boolean(flag), flag });
 };
 
 export const listAnomalies: RequestHandler = async (req, res) => {
-  const auctionId = typeof req.query.auctionId === "string" ? req.query.auctionId : undefined;
+  const { auctionId } = req.query as unknown as OptionalAuctionScopedQuery;
   const items = await anomalyService.listAnomalies(auctionId);
   res.json({ items });
 };

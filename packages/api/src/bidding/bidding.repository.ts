@@ -95,18 +95,27 @@ export async function findAuction(auctionId: string): Promise<AuctionLockSnapsho
 }
 
 export async function findBidder(userId: string): Promise<BidderSnapshot | null> {
+  // NOTE: the column is full_name. It was renamed from display_name by
+  // migration 003_schema_alignment; the old name here made every bid
+  // placement fail with "column display_name does not exist".
   const row = await queryOne<{
     id: string;
     verification_status: string;
     email: string;
-    display_name: string;
-  }>(`SELECT id, verification_status, email, display_name FROM profiles WHERE id = $1`, [userId]);
+    full_name: string;
+    is_active: boolean;
+  }>(
+    `SELECT id, verification_status, email, full_name, is_active
+       FROM profiles WHERE id = $1`,
+    [userId],
+  );
   if (!row) return null;
   return {
     id: row.id,
     verificationStatus: row.verification_status,
     email: row.email,
-    displayName: row.display_name,
+    displayName: row.full_name,
+    isActive: row.is_active,
   };
 }
 
@@ -115,7 +124,7 @@ export async function isOrgOfficer(orgId: string, userId: string): Promise<boole
     `SELECT EXISTS (
         SELECT 1 FROM organization_members
          WHERE organization_id = $1 AND user_id = $2
-           AND role IN ('org_admin', 'auction_officer', 'compliance_officer')
+           AND role IN ('org_admin', 'organization_admin', 'auction_officer', 'compliance_officer')
      ) AS ok`,
     [orgId, userId],
   );
@@ -264,7 +273,7 @@ export async function listOrgOfficerIds(orgId: string): Promise<string[]> {
   const rows = await queryAll<{ user_id: string }>(
     `SELECT user_id FROM organization_members
       WHERE organization_id = $1
-        AND role IN ('org_admin', 'auction_officer', 'compliance_officer')`,
+        AND role IN ('org_admin', 'organization_admin', 'auction_officer', 'compliance_officer')`,
     [orgId],
   );
   return rows.map((row) => row.user_id);
@@ -277,6 +286,14 @@ export async function countActiveBids(auctionId: string): Promise<{ count: numbe
     [auctionId],
   );
   return { count: Number(row?.count ?? 0), highest: row?.highest ?? "0.00" };
+}
+
+export async function countAuctionItems(auctionId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM auction_items WHERE auction_id = $1`,
+    [auctionId],
+  );
+  return Number(row?.count ?? 0);
 }
 
 export async function listBidFeatures(auctionId: string): Promise<{

@@ -1,4 +1,3 @@
-import { RegisterRequest, LoginRequest, UpdateProfileRequest } from "@auction/shared";
 import type { Role, AccountType, VerificationStatus } from "@auction/shared";
 
 export interface Profile {
@@ -13,15 +12,27 @@ export interface Profile {
   tinNumber: string | null;
   region: string | null;
   verificationStatus: VerificationStatus;
+  platformRole: Role | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface OrganizationMember {
-  id: string;
+/** Profile with the password hash stripped — the only shape sent over HTTP. */
+export type PublicProfile = Omit<Profile, "passwordHash">;
+
+export interface OrganizationMembership {
   organizationId: string;
-  userId: string;
+  organizationName: string;
   role: Role;
-  assignedAt: string;
+}
+
+export interface AuthSession {
+  user: PublicProfile;
+  roles: Role[];
+  organizationId: string | null;
+  organizations: OrganizationMembership[];
+  token: string;
+  refreshToken: string;
+  expiresIn: string;
 }

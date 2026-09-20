@@ -1,45 +1,36 @@
-import type { Request, Response, NextFunction, RequestHandler } from "express";
-import { VerificationService } from "./verification.service.js";
+import type { RequestHandler } from "express";
+import type { ReviewVerificationRequest, SubmitVerificationRequest } from "@auction/shared";
+import { HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
+import { VerificationService } from "./verification.service.js";
 
 const service = new VerificationService();
 
-export const submitVerification: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const auth = getAuth(req);
-    const result = await service.submit(auth.userId, req.body);
-    res.status(201).json(result);
-  } catch (error) {
-    next(error);
-  }
+export const submitVerification: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const result = await service.submit(auth.userId, req.body as SubmitVerificationRequest);
+  res.status(HttpStatus.CREATED).json(result);
 };
 
-export const reviewVerification: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const auth = getAuth(req);
-    const verificationId = routeParam(req.params.id);
-    const result = await service.review(auth.userId, verificationId, req.body);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
+export const reviewVerification: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const result = await service.review(
+    { userId: auth.userId, roles: auth.roles },
+    routeParam(req.params.id),
+    req.body as ReviewVerificationRequest,
+  );
+  res.json(result);
 };
 
-export const listPending: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await service.listPending();
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
+export const listPending: RequestHandler = async (_req, res) => {
+  res.json({ items: await service.listPending() });
 };
 
-export const checkDuplicates: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = routeParam(req.params.userId);
-    const result = await service.checkDuplicates(userId);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
+export const getMyVerification: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  res.json(await service.getLatestFor(auth.userId));
+};
+
+export const checkDuplicates: RequestHandler = async (req, res) => {
+  res.json(await service.checkDuplicates(routeParam(req.params.userId)));
 };

@@ -91,6 +91,12 @@ export async function listDisputes(input: {
   return repo.listDisputes({ raisedBy: input.viewerId });
 }
 
+export async function getDispute(id: string): Promise<DisputeRecord> {
+  const dispute = await repo.findDispute(id);
+  if (!dispute) throw new AppError("Dispute not found", HttpStatus.NOT_FOUND);
+  return dispute;
+}
+
 export async function assignDispute(input: {
   id: string;
   actorId: string;
@@ -101,6 +107,16 @@ export async function assignDispute(input: {
     const dispute = await repo.findDispute(input.id);
     if (!dispute) throw new AppError("Dispute not found", HttpStatus.NOT_FOUND);
     assertDisputeTransition(dispute.status, "under_review");
+
+    // The person who raised a dispute must not end up reviewing it.
+    if (dispute.raisedBy === input.reviewerId) {
+      throw new AppError(
+        "The bidder who raised a dispute cannot review it",
+        HttpStatus.UNPROCESSABLE,
+        "APPROVAL_SELF",
+      );
+    }
+
     const updated = await repo.assignReviewer(input.id, input.reviewerId);
 
     await audit.appendAuditEvent({
@@ -139,6 +155,14 @@ export async function resolveDispute(input: {
     const dispute = await repo.findDispute(input.id);
     if (!dispute) throw new AppError("Dispute not found", HttpStatus.NOT_FOUND);
     assertDisputeTransition(dispute.status, input.status);
+
+    if (dispute.raisedBy === input.actorId) {
+      throw new AppError(
+        "You cannot resolve a dispute you raised",
+        HttpStatus.UNPROCESSABLE,
+        "APPROVAL_SELF",
+      );
+    }
     const updated = await repo.resolveDispute({
       id: input.id,
       status: input.status,

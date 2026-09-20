@@ -1,9 +1,6 @@
 import type { Role } from "@auction/shared";
+import { ROLES } from "@auction/shared";
 
-// DB storage now uses the same role strings as the app-level `Role` type
-// (see organization_members_role_check in the 001 migration). The legacy
-// "organization_admin" alias is kept here only so rows written before the
-// naming was unified still map correctly.
 const DB_TO_APP: Record<string, Role> = {
   org_admin: "org_admin",
   organization_admin: "org_admin",
@@ -17,6 +14,16 @@ const DB_TO_APP: Record<string, Role> = {
 export function mapDbRole(role: string): Role {
   return DB_TO_APP[role] ?? "bidder";
 }
+
+/** Normalises and de-duplicates a set of raw role strings from the database. */
+export function mapDbRoles(roles: string[]): Role[] {
+  return [...new Set(roles.map(mapDbRole))];
+}
+
+export function isRole(value: unknown): value is Role {
+  return typeof value === "string" && (ROLES as readonly string[]).includes(value);
+}
+
 
 export function primaryActorRole(roles: Role[]): Role {
   const rank: Role[] = [
@@ -37,4 +44,8 @@ export function isOfficerRole(role: Role | string): boolean {
     role === "compliance_officer" ||
     role === "super_admin"
   );
+}
+
+export function hasOfficerRole(roles: Array<Role | string>): boolean {
+  return roles.some(isOfficerRole);
 }

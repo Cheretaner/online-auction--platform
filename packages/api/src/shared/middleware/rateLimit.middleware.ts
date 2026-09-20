@@ -5,7 +5,7 @@ export function createRateLimiter(overrides: Partial<Options> = {}) {
   return rateLimit({
     windowMs: env.RATE_LIMIT_WINDOW_MS,
     limit: env.RATE_LIMIT_MAX,
-    standardHeaders: true,
+    standardHeaders: "draft-7",
     legacyHeaders: false,
     skip: (req) => req.path.startsWith("/health"),
     message: { error: { message: "Too many requests" } },
@@ -14,3 +14,15 @@ export function createRateLimiter(overrides: Partial<Options> = {}) {
 }
 
 export const apiRateLimiter = createRateLimiter();
+
+/**
+ * Tight bucket for credential endpoints (register/login/refresh). Keyed by
+ * IP so one client cannot brute-force passwords under the much larger
+ * global allowance. Successful requests still count, which is deliberate:
+ * it also caps automated account creation.
+ */
+export const authRateLimiter = createRateLimiter({
+  limit: env.AUTH_RATE_LIMIT_MAX,
+  skip: () => false,
+  message: { error: { message: "Too many authentication attempts, please retry shortly" } },
+});

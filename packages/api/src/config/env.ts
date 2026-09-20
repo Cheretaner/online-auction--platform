@@ -3,9 +3,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
+// Load the monorepo-root .env first, then any .env in the working
+// directory. dotenv never overwrites an already-set variable, so real
+// environment variables (Docker, systemd, a PaaS) always win over files.
 dotenv.config({
   path: resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env"),
 });
+dotenv.config();
 
 const envSchema = z
   .object({
@@ -27,6 +31,32 @@ const envSchema = z
     CORS_ORIGIN: z.string().default("*"),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+    // Number of reverse proxies in front of the API. Needed so
+    // express-rate-limit and audit IP hashing see the real client address.
+    // Leave at 0 when the process is exposed directly.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
+    // The account allowed to bootstrap the platform as super_admin. When
+    // unset, the first account ever registered is promoted instead.
+    BOOTSTRAP_SUPER_ADMIN_EMAIL: z.string().email().optional(),
+    // Interval for the auction lifecycle sweep (scheduled -> live -> closed).
+    AUCTION_TICK_MS: z.coerce.number().int().positive().default(10_000),
+    // Pepper for hashing bidder IP addresses in the audit trail. Falls back
+    // to JWT_SECRET so existing deployments keep working.
+    IP_HASH_PEPPER: z.string().min(16).optional(),
+    // TLS to the database. DATABASE_CA_CERT (PEM contents) is preferred for
+    // managed providers; otherwise the platform trust store is used.
+    DATABASE_SSL_REJECT_UNAUTHORIZED: z
+      .enum(["true", "false"])
+      .default("true")
+      .transform((value) => value === "true"),
+    DATABASE_CA_CERT: z.string().optional(),
+    DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+    DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+    RUN_MIGRATIONS_ON_BOOT: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     STORAGE_DRIVER: z.enum(["memory", "filesystem"]).default("filesystem"),
     STORAGE_DIR: z.string().default("./data/storage"),
     SMTP_HOST: z.string().optional(),
@@ -38,10 +68,17 @@ const envSchema = z
       .default("false")
       .transform((value) => value === "true"),
     MAIL_FROM: z.string().default("noreply@localhost"),
-    AI_PROVIDER: z.enum(["stub", "openai"]).default("stub"),
-    AI_API_KEY: z.string().optional(),
-    AI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
-    AI_MODEL: z.string().default("gpt-4o-mini"),
+    
+    AI_PROVIDER: z.enum(["auto", "stub", "gemini", "openrouter"]).default("auto"),
+    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
+    GEMINI_API_KEY: z.string().optional(),
+    GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
+    GEMINI_MODEL: z.string().default("gemini-flash-latest"),
+    OPENROUTER_API_KEY: z.string().optional(),
+    OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+    OPENROUTER_MODEL: z.string().default("google/gemini-2.0-flash-exp:free"),
+    OPENROUTER_SITE_URL: z.string().default("http://localhost:3000"),
+    OPENROUTER_SITE_NAME: z.string().default("AI-Powered Transparent Online Auction System"),
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
     REQUEST_BODY_LIMIT: z.string().default("2mb"),
   })
@@ -51,6 +88,13 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["JWT_SECRET"],
         message: "must be set to a non-default value in production",
+      });
+    }
+    if (value.NODE_ENV === "production" && value.CORS_ORIGIN === "*") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["CORS_ORIGIN"],
+        message: "must list explicit origins in production, not '*'",
       });
     }
     if (value.NODE_ENV === "production" && !value.DATABASE_URL) {

@@ -1,12 +1,39 @@
 import { Router } from "express";
-import { submitVerification, reviewVerification, listPending, checkDuplicates } from "./verification.controller.js";
+import { ReviewVerificationRequest, SubmitVerificationRequest } from "@auction/shared";
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
+import { asyncHandler } from "../shared/middleware/asyncHandler.js";
+import { validate } from "../shared/middleware/validate.middleware.js";
+import * as controller from "./verification.controller.js";
 
 const router = Router();
 
-router.post("/submit", requireAuth, submitVerification);
-router.get("/pending", requireAuth, listPending);
-router.post("/:id/review", requireAuth, reviewVerification);
-router.get("/users/:userId/duplicates", requireAuth, checkDuplicates);
+// KYC reviewers. Previously every one of these routes used the un-invoked
+// `requireAuth` factory, which both hung the request AND — had it resolved —
+// would have let any signed-in bidder approve their own KYC.
+const REVIEWERS = ["compliance_officer", "org_admin", "super_admin"] as const;
+
+router.post(
+  "/submit",
+  requireAuth(),
+  validate(SubmitVerificationRequest),
+  asyncHandler(controller.submitVerification),
+);
+
+router.get("/me", requireAuth(), asyncHandler(controller.getMyVerification));
+
+router.get("/pending", requireAuth([...REVIEWERS]), asyncHandler(controller.listPending));
+
+router.post(
+  "/:id/review",
+  requireAuth([...REVIEWERS]),
+  validate(ReviewVerificationRequest),
+  asyncHandler(controller.reviewVerification),
+);
+
+router.get(
+  "/users/:userId/duplicates",
+  requireAuth([...REVIEWERS]),
+  asyncHandler(controller.checkDuplicates),
+);
 
 export default router;

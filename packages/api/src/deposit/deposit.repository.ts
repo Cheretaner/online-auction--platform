@@ -72,6 +72,14 @@ export async function findByAuction(auctionId: string): Promise<Deposit[]> {
   return rows.map(mapDeposit);
 }
 
+export async function findByBidder(bidderId: string): Promise<Deposit[]> {
+  const rows = await queryAll<DbDeposit>(
+    "SELECT * FROM deposits WHERE bidder_id = $1 ORDER BY created_at DESC",
+    [bidderId],
+  );
+  return rows.map(mapDeposit);
+}
+
 export async function updateStatus(
   id: string,
   status: DepositStatus,

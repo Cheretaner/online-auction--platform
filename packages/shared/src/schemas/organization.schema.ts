@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ORG_TYPES } from "../enums.js";
+import { ORG_TYPES, OFFICER_ROLES } from "../enums.js";
 
 export const CreateOrganizationRequest = z.object({
   name: z.string().min(2).max(200),
@@ -27,3 +27,18 @@ export const Organization = z.object({
   updatedAt: z.string().datetime(),
 });
 export type Organization = z.infer<typeof Organization>;
+
+export const AddOrganizationMemberRequest = z.object({
+  userId: z.string().uuid().optional(),
+  email: z.string().email().optional(),
+  role: z.enum(OFFICER_ROLES),
+}).superRefine((data, ctx) => {
+  if (!data.userId && !data.email) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either userId or email is required",
+      path: ["userId"],
+    });
+  }
+});
+export type AddOrganizationMemberRequest = z.infer<typeof AddOrganizationMemberRequest>;

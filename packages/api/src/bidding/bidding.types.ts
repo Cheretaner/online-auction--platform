@@ -29,6 +29,7 @@ export interface BidderSnapshot {
   verificationStatus: string;
   email: string;
   displayName: string;
+  isActive: boolean;
 }
 
 export interface BidRecord {

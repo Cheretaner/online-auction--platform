@@ -1,57 +1,96 @@
 import type { RequestHandler } from "express";
-import type { DocumentType } from "@auction/shared";
-import type { AuthenticatedRequest } from "../shared/types/request.js";
-import { routeParam } from "../shared/types/request.js";
+import { DOCUMENT_TYPES } from "@auction/shared";
+import type { AuctionScopedQuery, DocumentType } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
+import { getAuth, routeParam } from "../shared/types/request.js";
+import { findAuctionOwner } from "../shared/authz/auction-access.js";
 import * as service from "./document.service.js";
 
-export const upload: RequestHandler = async (req, res, next) => {
-  try {
-    const auth = (req as AuthenticatedRequest).auth!;
-    const file = req.file;
-    if (!file) {
-      throw new AppError("No file uploaded", HttpStatus.BAD_REQUEST);
-    }
+const OFFICER_ROLES = ["auction_officer", "org_admin", "compliance_officer", "super_admin"];
 
-    const { auctionId, docType, isPrivate } = req.body as {
-      auctionId?: string;
-      docType: DocumentType;
-      isPrivate?: string;
-    };
-
-    const document = await service.uploadDocument({
-      auctionId,
-      uploadedBy: auth.userId,
-      documentType: docType,
-      fileName: file.originalname,
-      mimeType: file.mimetype,
-      data: file.buffer,
-      isPrivate: isPrivate === "true",
-    });
-
-    res.status(201).json(document);
-  } catch (error) {
-    next(error);
+export const upload: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const file = req.file;
+  if (!file) {
+    throw AppError.badRequest("No file uploaded. Send multipart/form-data with a 'file' field.");
   }
+
+  // Multipart fields arrive as strings, so this body cannot go through a
+  // normal Zod body validator — it is checked here instead.
+  const { auctionId, docType, isPrivate } = req.body as {
+    auctionId?: string;
+    docType?: string;
+    isPrivate?: string;
+  };
+
+  if (!docType || !(DOCUMENT_TYPES as readonly string[]).includes(docType)) {
+    throw AppError.badRequest(`docType must be one of: ${DOCUMENT_TYPES.join(", ")}`);
+  }
+
+  const document = await service.uploadDocument({
+    auctionId: auctionId || undefined,
+    uploadedBy: auth.userId,
+    roles: auth.roles,
+    documentType: docType as DocumentType,
+    fileName: file.originalname,
+    mimeType: file.mimetype,
+    data: file.buffer,
+    // Default to private: a document is only public once someone says so.
+    isPrivate: isPrivate !== "false",
+  });
+
+  res.status(HttpStatus.CREATED).json(document);
 };
 
-export const getById: RequestHandler = async (req, res, next) => {
-  try {
-    const doc = await service.getDocument(routeParam(req.params.id));
-    if (!doc) throw AppError.notFound("Document not found");
-    res.json(doc);
-  } catch (error) {
-    next(error);
+export const getById: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const doc = await service.getDocument(routeParam(req.params.id));
+  if (!doc) throw AppError.notFound("Document not found");
+
+  const isOfficer = auth.roles.some((role) => OFFICER_ROLES.includes(role));
+  if (doc.isPrivate && doc.uploadedBy !== auth.userId && !isOfficer) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
+
+  res.json(doc);
 };
 
-export const listByAuction: RequestHandler = async (req, res, next) => {
-  try {
-    const auctionId = req.query.auctionId as string;
-    if (!auctionId) throw AppError.badRequest("auctionId query parameter is required");
-    const docs = await service.listByAuction(auctionId);
-    res.json({ items: docs });
-  } catch (error) {
-    next(error);
-  }
+export const download: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const result = await service.readDocument(routeParam(req.params.id), {
+    userId: auth.userId,
+    roles: auth.roles,
+  });
+
+  res.setHeader("Content-Type", result.document.mimeType);
+  res.setHeader("Content-Length", String(result.document.fileSizeBytes));
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${encodeURIComponent(result.document.fileName)}"`,
+  );
+  res.send(result.data);
+};
+
+export const listByAuction: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const { auctionId } = req.query as unknown as AuctionScopedQuery;
+
+  // Officer status alone is not enough to see another organization's
+  // private document pack; it must be an officer OF THIS auction's org.
+  const owner = await findAuctionOwner(auctionId);
+  if (!owner) throw AppError.notFound("Auction not found");
+
+  const isOfficer =
+    auth.roles.some((role) => OFFICER_ROLES.includes(role)) &&
+    (auth.roles.includes("super_admin") || auth.organizationId === owner.orgId);
+
+  const docs = await service.listByAuction(auctionId);
+
+  // Bidders see only the published pack, not internal inspection notes.
+  res.json({ items: isOfficer ? docs : docs.filter((doc) => !doc.isPrivate) });
+};
+
+export const listMine: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  res.json({ items: await service.listByUploader(auth.userId) });
 };

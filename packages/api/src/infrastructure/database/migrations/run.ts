@@ -24,8 +24,6 @@ function loadMigrations(): Migration[] {
     }));
 }
 
-
-  // Create the migration tracking table if it does not exist.
 async function ensureMigrationTable(): Promise<void> {
   const pool = getPool();
 
@@ -37,83 +35,61 @@ async function ensureMigrationTable(): Promise<void> {
   `);
 }
 
-
-async function runMigrations(): Promise<void> {
+/**
+ * Applies pending migrations.
+ * Returns the number of migrations that were newly applied.
+ */
+export async function runMigrations(): Promise<number> {
   const pool = getPool();
 
   await ensureMigrationTable();
 
   const migrations = loadMigrations();
 
-  const appliedResult = await pool.query<{ id: string }>(
-    `
-      SELECT id
-      FROM schema_migrations
-      ORDER BY id
-    `,
-  );
+  const appliedResult = await pool.query<{ id: string }>(`
+    SELECT id
+    FROM schema_migrations
+    ORDER BY id
+  `);
 
-  const appliedIds = new Set(
-    appliedResult.rows.map((row) => row.id),
-  );
+  const appliedIds = new Set(appliedResult.rows.map((row) => row.id));
+  let newlyApplied = 0;
 
   for (const migration of migrations) {
     if (appliedIds.has(migration.id)) {
-      logger.info(
-        { file: migration.filename },
-        "Migration already applied",
-      );
-
+      logger.info({ file: migration.filename }, "Migration already applied");
       continue;
     }
 
     const client = await pool.connect();
 
     try {
-      logger.info(
-        { file: migration.filename },
-        "Applying migration",
-      );
+      logger.info({ file: migration.filename }, "Applying migration");
 
       await client.query("BEGIN");
-
       await client.query(migration.sql);
-
       await client.query(
-        `
-          INSERT INTO schema_migrations (id)
-          VALUES ($1)
-        `,
+        `INSERT INTO schema_migrations (id) VALUES ($1)`,
         [migration.id],
       );
-
       await client.query("COMMIT");
 
-      logger.info(
-        { file: migration.filename },
-        "Migration applied",
-      );
+      newlyApplied++;
+      logger.info({ file: migration.filename }, "Migration applied");
     } catch (error) {
       try {
         await client.query("ROLLBACK");
       } catch (rollbackError) {
         logger.error(
-          {
-            err: rollbackError,
-            migration: migration.filename,
-          },
+          { err: rollbackError, migration: migration.filename },
           "Migration rollback failed",
         );
       }
 
       logger.error(
-        {
-          err: error,
-          migration: migration.filename,
-        },
+        { err: error, migration: migration.filename },
         "Migration failed",
       );
-
       throw error;
     } finally {
       client.release();
@@ -121,23 +97,28 @@ async function runMigrations(): Promise<void> {
   }
 
   logger.info(
-    {
-      discovered: migrations.length,
-      applied: migrations.length,
-    },
+    { discovered: migrations.length, applied: newlyApplied },
     "Migrations complete",
   );
+
+  return newlyApplied;
 }
 
-runMigrations()
-  .catch((error) => {
-    logger.error(
-      { err: error },
-      "Migration runner failed",
-    );
+// Only auto-run when this file is executed directly (CLI),
+// not when it is imported by the server.
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  (process.argv[1].endsWith("run.ts") ||
+    process.argv[1].endsWith("run.js") ||
+    process.argv[1].includes("migrations/run"));
 
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await closePool();
-  });
+if (isDirectRun) {
+  runMigrations()
+    .catch((error) => {
+      logger.error({ err: error }, "Migration runner failed");
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await closePool();
+    });
+}

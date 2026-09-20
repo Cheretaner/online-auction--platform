@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { AssistRequest, CategorizeRequest, ReviewAnomalyRequest } from "@auction/shared";
+import {
+  AssistRequest,
+  CategorizeRequest,
+  DetectAnomalyRequest,
+  OptionalAuctionScopedQuery,
+  ReviewAnomalyRequest,
+} from "@auction/shared";
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
@@ -17,12 +23,14 @@ aiRouter.post(
 aiRouter.post(
   "/anomaly",
   requireAuth(["compliance_officer", "org_admin", "super_admin"]),
+  validate(DetectAnomalyRequest),
   asyncHandler(controller.detectAnomaly),
 );
 
 aiRouter.get(
   "/anomalies",
   requireAuth(["compliance_officer", "org_admin", "auction_officer", "super_admin"]),
+  validate(OptionalAuctionScopedQuery, "query"),
   asyncHandler(controller.listAnomalies),
 );
 

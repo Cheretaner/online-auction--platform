@@ -25,15 +25,31 @@ import { notFoundMiddleware } from "./shared/middleware/notFound.middleware.js";
 import { apiRateLimiter } from "./shared/middleware/rateLimit.middleware.js";
 import { requestIdMiddleware } from "./shared/middleware/requestId.middleware.js";
 import { requireAuth } from "./shared/middleware/auth.middleware.js";
+import { getAuth } from "./shared/types/request.js";
 import { logger } from "./shared/utils/logger.js";
 
 export function createApp(): express.Express {
   const app = express();
 
+  // A specific hop count, never `true`: express-rate-limit refuses a
+  // permissive trust-proxy setting because it lets a client spoof
+  // X-Forwarded-For and escape its own bucket.
+  if (env.TRUST_PROXY_HOPS > 0) {
+    app.set("trust proxy", env.TRUST_PROXY_HOPS);
+  }
+  app.disable("x-powered-by");
+
   app.use(requestIdMiddleware);
-  app.use(cors({ origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",") }));
+  app.use(
+    cors({
+      origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",").map((o) => o.trim()),
+      credentials: true,
+      exposedHeaders: ["x-request-id"],
+    }),
+  );
   app.use(helmet());
   app.use(express.json({ limit: env.REQUEST_BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: false, limit: env.REQUEST_BODY_LIMIT }));
   app.use(
     pinoHttp({
       logger,
@@ -59,10 +75,29 @@ export function createApp(): express.Express {
   app.use("/api/v1/notifications", notificationRouter);
   app.use("/api/v1/disputes", disputeRouter);
   app.use("/api/v1/reports", reportingRouter);
+
+  // Server-sent events for live bid/auction updates. Channels look like
+  // `auction:<id>` or `user:<id>`; a user may only subscribe to their own
+  // personal channel.
   app.get("/api/v1/events", requireAuth(), (req, res) => {
+    const auth = getAuth(req);
     const channel = typeof req.query.channel === "string" ? req.query.channel : "*";
+
+    if (channel.startsWith("user:") && channel !== `user:${auth.userId}`) {
+      res.status(403).json({ error: { message: "Forbidden", code: "FORBIDDEN" } });
+      return;
+    }
+
     const unsubscribe = attachSseStream(res, channel);
-    req.on("close", unsubscribe);
+
+    // Without a keepalive, idle proxies drop the connection after ~60s.
+    const keepAlive = setInterval(() => res.write(": ping\n\n"), 25_000);
+    keepAlive.unref();
+
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      unsubscribe();
+    });
   });
 
   app.use(notFoundMiddleware);

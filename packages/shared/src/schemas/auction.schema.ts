@@ -35,3 +35,13 @@ export const UpdateAuctionRequest = z.object({
 export type UpdateAuctionRequest = z.infer<typeof UpdateAuctionRequest>;
 
 export const AuctionStatusSchema = z.enum(AUCTION_STATUS);
+
+export const TransitionAuctionRequest = z.object({
+  status: z.enum(AUCTION_STATUS),
+});
+export type TransitionAuctionRequest = z.infer<typeof TransitionAuctionRequest>;
+
+export const CancelAuctionRequest = z.object({
+  reason: z.string().min(4).max(2000).optional(),
+});
+export type CancelAuctionRequest = z.infer<typeof CancelAuctionRequest>;

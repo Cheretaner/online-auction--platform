@@ -21,6 +21,12 @@ function mapRowToAuction(row: any): Auction {
     depositAmount: row.deposit_amount,
     eligibilityRules: row.eligibility_rules,
     region: row.region,
+    antiSnipeSeconds: row.anti_snipe_seconds ?? 120,
+    maxExtensions: row.max_extensions ?? 5,
+    sealedOpenedAt: row.sealed_opened_at ?? null,
+    closedAt: row.closed_at ?? null,
+    awardedAt: row.awarded_at ?? null,
+    cancellationReason: row.cancellation_reason ?? null,
     opensAt: row.opens_at,
     closesAt: row.closes_at,
     originalClosesAt: row.original_closes_at,
@@ -58,12 +64,12 @@ export async function createAuction(
   const values = [
     orgId,
     data.title,
-    data.description || null,
+    data.description ?? null,
     data.auctionType,
     data.startPrice,
-    data.reservePrice || null,
+    data.reservePrice ?? null,
     data.minIncrement,
-    data.depositAmount || 0,
+    data.depositAmount ?? "0.00",
     data.eligibilityRules || null,
     data.region || null,
     data.opensAt,
@@ -177,12 +183,128 @@ export async function updateStatus(
 
 export async function listPublicAuctions(client?: Queryable): Promise<Auction[]> {
   const sql = `
-    SELECT * FROM auctions 
-    WHERE status IN ('scheduled', 'live', 'closed', 'awarded')
-    ORDER BY created_at DESC
+    SELECT * FROM auctions
+    WHERE status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')
+    ORDER BY
+      CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END,
+      closes_at ASC
   `;
   const rows = await queryAll(sql, [], client);
   return rows.map(mapRowToAuction);
+}
+
+/** Locks a single auction row for the duration of the current transaction. */
+export async function lockById(id: string, client?: Queryable): Promise<Auction | null> {
+  const row = await queryOne(`SELECT * FROM auctions WHERE id = $1 FOR UPDATE`, [id], client);
+  return row ? mapRowToAuction(row) : null;
+}
+
+/** Scheduled auctions whose opening time has passed. */
+export async function findDueToOpen(now: Date, limit = 50, client?: Queryable): Promise<Auction[]> {
+  const rows = await queryAll(
+    `SELECT * FROM auctions
+      WHERE status = 'scheduled' AND opens_at <= $1
+      ORDER BY opens_at ASC
+      LIMIT $2`,
+    [now, limit],
+    client,
+  );
+  return rows.map(mapRowToAuction);
+}
+
+/** Live auctions whose closing time has passed (including any extensions). */
+export async function findDueToClose(now: Date, limit = 50, client?: Queryable): Promise<Auction[]> {
+  const rows = await queryAll(
+    `SELECT * FROM auctions
+      WHERE status = 'live' AND closes_at <= $1
+      ORDER BY closes_at ASC
+      LIMIT $2`,
+    [now, limit],
+    client,
+  );
+  return rows.map(mapRowToAuction);
+}
+
+/**
+ * Closes an auction and records the provisional outcome in the same
+ * statement, so a crash between "closed" and "winner recorded" is not
+ * possible. The status guard makes the update idempotent under concurrent
+ * scheduler ticks.
+ */
+export async function closeWithOutcome(
+  id: string,
+  outcome: { winnerId: string | null; winningAmount: string | null },
+  client?: Queryable,
+): Promise<Auction | null> {
+  const row = await queryOne(
+    `UPDATE auctions
+        SET status = 'closed',
+            closed_at = NOW(),
+            winner_id = $2,
+            winning_amount = $3,
+            updated_at = NOW()
+      WHERE id = $1 AND status = 'live'
+      RETURNING *`,
+    [id, outcome.winnerId, outcome.winningAmount],
+    client,
+  );
+  return row ? mapRowToAuction(row) : null;
+}
+
+/** Publishes a scheduled auction. Idempotent: only acts on 'scheduled'. */
+export async function markLive(id: string, client?: Queryable): Promise<Auction | null> {
+  const row = await queryOne(
+    `UPDATE auctions
+        SET status = 'live',
+            published_at = COALESCE(published_at, NOW()),
+            updated_at = NOW()
+      WHERE id = $1 AND status = 'scheduled'
+      RETURNING *`,
+    [id],
+    client,
+  );
+  return row ? mapRowToAuction(row) : null;
+}
+
+/** Moves an auction to under_review. Idempotent and safe to call twice. */
+export async function markUnderReview(id: string, client?: Queryable): Promise<Auction | null> {
+  const row = await queryOne(
+    `UPDATE auctions
+        SET status = 'under_review', updated_at = NOW()
+      WHERE id = $1 AND status IN ('live', 'closed')
+      RETURNING *`,
+    [id],
+    client,
+  );
+  return row ? mapRowToAuction(row) : null;
+}
+
+export async function markCancelled(
+  id: string,
+  reason: string | null,
+  client?: Queryable,
+): Promise<Auction | null> {
+  const row = await queryOne(
+    `UPDATE auctions
+        SET status = 'cancelled', cancellation_reason = $2, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *`,
+    [id, reason],
+    client,
+  );
+  return row ? mapRowToAuction(row) : null;
+}
+
+export async function markAwarded(id: string, client?: Queryable): Promise<Auction | null> {
+  const row = await queryOne(
+    `UPDATE auctions
+        SET status = 'awarded', awarded_at = NOW(), updated_at = NOW()
+      WHERE id = $1
+      RETURNING *`,
+    [id],
+    client,
+  );
+  return row ? mapRowToAuction(row) : null;
 }
 
 export async function listByOrgId(orgId: string, client?: Queryable): Promise<Auction[]> {

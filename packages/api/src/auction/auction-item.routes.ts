@@ -1,15 +1,35 @@
 import { Router } from "express";
-import { requireAuth } from "../shared/middleware/auth.middleware.js";
+import { CreateAuctionItemRequest, UpdateAuctionItemRequest } from "@auction/shared";
+import { optionalAuth, requireAuth } from "../shared/middleware/auth.middleware.js";
+import { asyncHandler } from "../shared/middleware/asyncHandler.js";
+import { validate } from "../shared/middleware/validate.middleware.js";
 import * as controller from "./auction-item.controller.js";
 
-// Uses mergeParams to access :auctionId from parent router
+// mergeParams gives access to :auctionId from the parent mount point.
 export const auctionItemRouter = Router({ mergeParams: true });
 
-// All auction item routes require authentication
-auctionItemRouter.use(requireAuth);
+const OFFICERS = ["auction_officer", "org_admin", "super_admin"] as const;
 
-auctionItemRouter.post("/", controller.createAuctionItem);
-auctionItemRouter.get("/", controller.getAuctionItems);
-auctionItemRouter.get("/:id", controller.getAuctionItem);
-auctionItemRouter.patch("/:id", controller.updateAuctionItem);
-auctionItemRouter.delete("/:id", controller.deleteAuctionItem);
+// Reading an auction's lots is part of public discovery (FR6).
+auctionItemRouter.get("/", optionalAuth(), asyncHandler(controller.getAuctionItems));
+auctionItemRouter.get("/:id", optionalAuth(), asyncHandler(controller.getAuctionItem));
+
+auctionItemRouter.post(
+  "/",
+  requireAuth([...OFFICERS]),
+  validate(CreateAuctionItemRequest),
+  asyncHandler(controller.createAuctionItem),
+);
+
+auctionItemRouter.patch(
+  "/:id",
+  requireAuth([...OFFICERS]),
+  validate(UpdateAuctionItemRequest),
+  asyncHandler(controller.updateAuctionItem),
+);
+
+auctionItemRouter.delete(
+  "/:id",
+  requireAuth([...OFFICERS]),
+  asyncHandler(controller.deleteAuctionItem),
+);

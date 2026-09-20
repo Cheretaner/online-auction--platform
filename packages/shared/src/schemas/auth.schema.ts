@@ -30,3 +30,8 @@ export const LoginRequest = z.object({
 });
 
 export type LoginRequest = z.infer<typeof LoginRequest>;
+
+export const RefreshTokenRequest = z.object({
+  refreshToken: z.string().min(10),
+});
+export type RefreshTokenRequest = z.infer<typeof RefreshTokenRequest>;

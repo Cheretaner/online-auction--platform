@@ -30,6 +30,14 @@ export async function listNotifications(userId: string, unreadOnly = false): Pro
   return repo.listByUser(userId, unreadOnly);
 }
 
+export async function countUnread(userId: string): Promise<number> {
+  return repo.countUnread(userId);
+}
+
+export async function markAllRead(userId: string): Promise<number> {
+  return repo.markAllRead(userId);
+}
+
 export async function markNotificationRead(id: string, userId: string): Promise<Notification> {
   const notification = await repo.markRead(id, userId);
   if (!notification) {

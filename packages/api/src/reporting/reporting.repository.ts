@@ -92,6 +92,28 @@ export async function listReports(auctionId?: string): Promise<ReportRecord[]> {
   return rows.map(mapReport);
 }
 
+/** Every report, newest first. Platform operators only. */
+export async function listAllReports(): Promise<ReportRecord[]> {
+  const rows = await queryAll<DbReport>(
+    `SELECT * FROM auction_reports ORDER BY generated_at DESC LIMIT 200`,
+  );
+  return rows.map(mapReport);
+}
+
+/** Reports for auctions owned by one organization. */
+export async function listReportsByOrg(organizationId: string): Promise<ReportRecord[]> {
+  const rows = await queryAll<DbReport>(
+    `SELECT r.*
+       FROM auction_reports r
+       JOIN auctions a ON a.id = r.auction_id
+      WHERE a.org_id = $1
+      ORDER BY r.generated_at DESC
+      LIMIT 200`,
+    [organizationId],
+  );
+  return rows.map(mapReport);
+}
+
 export async function publishReport(id: string): Promise<ReportRecord | null> {
   const result = await query<DbReport>(
     `UPDATE auction_reports SET published_at = COALESCE(published_at, NOW()) WHERE id = $1 RETURNING *`,

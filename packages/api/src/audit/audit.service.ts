@@ -1,4 +1,5 @@
-import { env } from "../../config/env.js";
+import type { Role } from "@auction/shared";
+import { primaryActorRole } from "../kernel/roles.js";
 import { canonicalize } from "./canonical.js";
 import { computeAuditHash, GENESIS_HASH } from "./hash.js";
 import * as repo from "./audit.repository.js";
@@ -97,6 +98,18 @@ export async function verifyAuditChain(auctionId?: string): Promise<ChainVerific
   };
 }
 
+/** Actor role recorded for events raised by a scheduler or background job. */
+export const SYSTEM_ACTOR_ROLE = "system";
+
 export function systemActorRole(): string {
-  return env.NODE_ENV === "test" ? "system" : "system";
+  return SYSTEM_ACTOR_ROLE;
+}
+
+/**
+ * The capacity an actor is deemed to be acting in for the audit ledger:
+ * their highest-privilege role, or `system` for unattended work.
+ */
+export function actorRoleOf(roles: Role[] | undefined | null): string {
+  if (!roles || roles.length === 0) return SYSTEM_ACTOR_ROLE;
+  return primaryActorRole(roles);
 }

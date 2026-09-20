@@ -1,112 +1,91 @@
 import type { RequestHandler } from "express";
-import * as AuctionService from "./auction.service.js";
+import type {
+  CancelAuctionRequest,
+  CreateAuctionRequest,
+  TransitionAuctionRequest,
+  UpdateAuctionRequest,
+} from "@auction/shared";
+import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
+import type { AuthContext } from "../shared/types/request.js";
+import * as AuctionService from "./auction.service.js";
 
-export const create: RequestHandler = async (req, res, next) => {
-  try {
-    const auth = getAuth(req);
-    const orgId = auth.organizationId;
-    const userId = auth.userId;
-    if (!orgId) {
-      res.status(403).json({ error: "User does not belong to an organization" });
-      return;
-    }
-    const auction = await AuctionService.createAuction(orgId, userId, req.body);
-    res.status(201).json(auction);
-  } catch (error) {
-    next(error);
+
+function orgContext(auth: AuthContext): { orgId: string; actor: AuctionService.AuctionActor } {
+  if (!auth.organizationId) {
+    throw new AppError(
+      "Organization context required",
+      HttpStatus.FORBIDDEN,
+      "ORG_CONTEXT_REQUIRED",
+    );
   }
+  return {
+    orgId: auth.organizationId,
+    actor: { userId: auth.userId, roles: auth.roles, organizationId: auth.organizationId },
+  };
+}
+
+export const create: RequestHandler = async (req, res) => {
+  const { orgId, actor } = orgContext(getAuth(req));
+  const body = req.body as CreateAuctionRequest;
+
+  // The organization is taken from the authenticated context, never from the
+  // request body, so a member of one org cannot create auctions for another.
+  if (body.organizationId && body.organizationId !== orgId) {
+    throw new AppError(
+      "You cannot create an auction for another organization",
+      HttpStatus.FORBIDDEN,
+      "FORBIDDEN",
+    );
+  }
+
+  const auction = await AuctionService.createAuction(orgId, actor, body);
+  res.status(HttpStatus.CREATED).json(auction);
 };
 
-export const getById: RequestHandler = async (req, res, next) => {
-  try {
-    const id = routeParam(req.params.id);
-    const auction = await AuctionService.getAuction(id);
-    res.status(200).json(auction);
-  } catch (error) {
-    next(error);
-  }
+export const getById: RequestHandler = async (req, res) => {
+  res.json(await AuctionService.getAuction(routeParam(req.params.id)));
 };
 
-export const listPublic: RequestHandler = async (req, res, next) => {
-  try {
-    const auctions = await AuctionService.listPublicAuctions();
-    res.status(200).json(auctions);
-  } catch (error) {
-    next(error);
-  }
+export const listPublic: RequestHandler = async (_req, res) => {
+  const items = await AuctionService.listPublicAuctions();
+  res.json({ items });
 };
 
-export const listByOrg: RequestHandler = async (req, res, next) => {
-  try {
-    const orgId = routeParam(req.params.orgId);
-    if (getAuth(req).organizationId !== orgId) {
-      res.status(403).json({ error: "Forbidden" });
-      return;
-    }
-    const auctions = await AuctionService.listByOrg(orgId);
-    res.status(200).json(auctions);
-  } catch (error) {
-    next(error);
+export const listByOrg: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const orgId = routeParam(req.params.orgId);
+  if (auth.organizationId !== orgId && !auth.roles.includes("super_admin")) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
+  const items = await AuctionService.listByOrg(orgId);
+  res.json({ items });
 };
 
-export const submitForApproval: RequestHandler = async (req, res, next) => {
-  try {
-    const id = routeParam(req.params.id);
-    const auth = getAuth(req);
-    const orgId = auth.organizationId!;
-    const userId = auth.userId;
-    const auction = await AuctionService.submitForApproval(id, orgId, userId);
-    res.status(200).json(auction);
-  } catch (error) {
-    next(error);
-  }
+export const submitForApproval: RequestHandler = async (req, res) => {
+  const { orgId, actor } = orgContext(getAuth(req));
+  res.json(await AuctionService.submitForApproval(routeParam(req.params.id), orgId, actor));
 };
 
-export const approve: RequestHandler = async (req, res, next) => {
-  try {
-    const id = routeParam(req.params.id);
-    const auth = getAuth(req);
-    const orgId = auth.organizationId!;
-    const userId = auth.userId;
-    const auction = await AuctionService.approveAuction(id, orgId, userId);
-    res.status(200).json(auction);
-  } catch (error) {
-    next(error);
-  }
+export const approve: RequestHandler = async (req, res) => {
+  const { orgId, actor } = orgContext(getAuth(req));
+  res.json(await AuctionService.approveAuction(routeParam(req.params.id), orgId, actor));
 };
 
-export const transition: RequestHandler = async (req, res, next) => {
-  try {
-    const id = routeParam(req.params.id);
-    const orgId = getAuth(req).organizationId!;
-    const { status } = req.body;
-    const auction = await AuctionService.transitionAuction(id, orgId, status);
-    res.status(200).json(auction);
-  } catch (error) {
-    next(error);
-  }
+export const transition: RequestHandler = async (req, res) => {
+  const { orgId, actor } = orgContext(getAuth(req));
+  const body = req.body as TransitionAuctionRequest;
+  res.json(await AuctionService.transitionAuction(routeParam(req.params.id), orgId, body.status, actor));
 };
 
-export const amend: RequestHandler = async (req, res, next) => {
-  try {
-    const id = routeParam(req.params.id);
-    const orgId = getAuth(req).organizationId!;
-    const auction = await AuctionService.amendAuction(id, orgId, req.body);
-    res.status(200).json(auction);
-  } catch (error) {
-    next(error);
-  }
+export const amend: RequestHandler = async (req, res) => {
+  const { orgId, actor } = orgContext(getAuth(req));
+  const body = req.body as UpdateAuctionRequest;
+  res.json(await AuctionService.amendAuction(routeParam(req.params.id), orgId, body, actor));
 };
 
-export const cancel: RequestHandler = async (req, res, next) => {
-  try {
-    const id = routeParam(req.params.id);
-    const orgId = getAuth(req).organizationId!;
-    const auction = await AuctionService.cancelAuction(id, orgId);
-    res.status(200).json(auction);
-  } catch (error) {
-    next(error);
-  }
+export const cancel: RequestHandler = async (req, res) => {
+  const { orgId, actor } = orgContext(getAuth(req));
+  const body = (req.body ?? {}) as CancelAuctionRequest;
+  res.json(await AuctionService.cancelAuction(routeParam(req.params.id), orgId, actor, body.reason));
 };

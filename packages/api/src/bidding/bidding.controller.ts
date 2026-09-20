@@ -17,7 +17,10 @@ export const placeBid: RequestHandler = async (req, res) => {
   });
   res.status(201).json({
     bidId: result.bid.id,
-    amount: result.bid.isSealed ? result.bid.amount : result.bid.amount,
+    // The bidder always sees their own amount back — it is their receipt.
+    amount: result.bid.amount,
+    isSealed: result.bid.isSealed,
+    commitmentHash: result.bid.commitmentHash,
     placedAt: result.bid.placedAt,
     auction: result.auction,
     audit: result.audit,

@@ -15,6 +15,12 @@ export interface Auction {
   depositAmount: string;
   eligibilityRules: string | null;
   region: string | null;
+  antiSnipeSeconds: number;
+  maxExtensions: number;
+  sealedOpenedAt: Date | null;
+  closedAt: Date | null;
+  awardedAt: Date | null;
+  cancellationReason: string | null;
   opensAt: Date;
   closesAt: Date;
   originalClosesAt: Date;

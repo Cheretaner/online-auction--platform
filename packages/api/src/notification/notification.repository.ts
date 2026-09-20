@@ -88,7 +88,7 @@ export async function claimNotificationById(
         AND p.id = n.user_id
         AND n.status IN ('pending', 'failed')
         AND n.attempt_count < 8
-     RETURNING n.*, p.email, n.attempt_count`,
+     RETURNING n.*, p.email`,
     [id],
   );
   const row = rows[0];
@@ -112,10 +112,10 @@ export async function claimDispatchBatch(limit = 40): Promise<
      )
      UPDATE notifications n
         SET attempt_count = n.attempt_count + 1
-       FROM next
-       JOIN profiles p ON p.id = n.user_id
+       FROM next, profiles p
       WHERE n.id = next.id
-     RETURNING n.*, p.email, n.attempt_count`,
+        AND p.id = n.user_id
+     RETURNING n.*, p.email`,
     [limit],
   );
 
@@ -124,6 +124,25 @@ export async function claimDispatchBatch(limit = 40): Promise<
     email: row.email,
     attemptCount: row.attempt_count,
   }));
+}
+
+export async function countUnread(userId: string): Promise<number> {
+  const row = await queryOne<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM notifications
+      WHERE user_id = $1 AND status <> 'read'`,
+    [userId],
+  );
+  return Number(row?.count ?? 0);
+}
+
+export async function markAllRead(userId: string): Promise<number> {
+  const result = await query(
+    `UPDATE notifications
+        SET status = 'read', read_at = COALESCE(read_at, NOW())
+      WHERE user_id = $1 AND status <> 'read'`,
+    [userId],
+  );
+  return result.rowCount ?? 0;
 }
 
 export async function markSent(id: string, providerMessageId?: string): Promise<void> {

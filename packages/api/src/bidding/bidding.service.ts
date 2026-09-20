@@ -7,6 +7,7 @@ import { primaryActorRole } from "../kernel/roles.js";
 import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
+import { logger } from "../shared/utils/logger.js";
 import type { PlaceBidRequest } from "@auction/shared";
 import * as audit from "../audit/audit.service.js";
 import * as notifications from "../notification/notification.service.js";
@@ -36,7 +37,7 @@ export async function placeBid(input: {
 }): Promise<PlaceBidResult> {
   const idempotencyKey = requireKey(input.idempotencyKey);
 
-  return withTransaction(
+  const result = await withTransaction(
     async () => {
       const existing = await repo.findBidByIdempotencyKey(idempotencyKey);
       if (existing) {
@@ -102,7 +103,7 @@ export async function placeBid(input: {
           isSealed,
           commitmentHash: input.body.commitmentHash ?? null,
           idempotencyKey,
-          ipHash: hashIp(input.ip, env.JWT_SECRET),
+          ipHash: hashIp(input.ip, env.IP_HASH_PEPPER ?? env.JWT_SECRET),
         });
       } catch (error) {
         if (isUniqueViolation(error)) {
@@ -187,8 +188,6 @@ export async function placeBid(input: {
         })),
       );
 
-      void anomaly.evaluateAuction(auction.id).catch(() => undefined);
-
       return {
         bid,
         auction: {
@@ -206,6 +205,18 @@ export async function placeBid(input: {
     },
     { userId: input.bidderId, organizationId: input.organizationId },
   );
+
+  // Anomaly scoring runs AFTER the bid transaction commits. Starting it
+  // inside withTransaction() left it holding the AsyncLocalStorage session
+  // whose pooled client is released the moment the transaction ends, so the
+  // queries raced against "Client has already been released". It is also
+  // advisory-only: per the SRS no AI work sits on the critical path of
+  // bidding, so a failure here must never fail the bid.
+  void anomaly.evaluateAuction(input.auctionId).catch((error: unknown) => {
+    logger.warn({ err: error, auctionId: input.auctionId }, "Anomaly evaluation failed");
+  });
+
+  return result;
 }
 
 export async function listBids(input: {

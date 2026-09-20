@@ -19,7 +19,11 @@ export const list: RequestHandler = async (req, res) => {
 };
 
 export const verify: RequestHandler = async (req, res) => {
-  const auctionId = req.query.auctionId === undefined ? undefined : routeParam(String(req.query.auctionId));
+  // Omitting auctionId verifies the global ledger (events not tied to a
+  // single auction, e.g. KYC and organization changes).
+  const auctionId = typeof req.query.auctionId === "string" && req.query.auctionId.length > 0
+    ? req.query.auctionId
+    : undefined;
   const verification = await service.verifyAuditChain(auctionId);
   res.json(verification);
 };

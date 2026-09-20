@@ -17,3 +17,8 @@ export const AssistRequest = z.object({
   auctionId: z.string().uuid().optional(),
 });
 export type AssistRequest = z.infer<typeof AssistRequest>;
+
+export const DetectAnomalyRequest = z.object({
+  auctionId: z.string().uuid(),
+});
+export type DetectAnomalyRequest = z.infer<typeof DetectAnomalyRequest>;

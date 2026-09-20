@@ -96,6 +96,19 @@ export async function getReport(id: string): Promise<ReportRecord> {
   return report;
 }
 
+/**
+ * Reports visible to one organization. Used when no auction filter is
+ * supplied, so a listing never spans organizations.
+ */
+export async function listReportsForOrg(
+  organizationId: string | undefined,
+  isPlatformOperator: boolean,
+): Promise<ReportRecord[]> {
+  if (isPlatformOperator) return repo.listAllReports();
+  if (!organizationId) return [];
+  return repo.listReportsByOrg(organizationId);
+}
+
 export async function listReports(auctionId?: string): Promise<ReportRecord[]> {
   return repo.listReports(auctionId);
 }
@@ -106,11 +119,38 @@ export async function publishReport(input: {
   roles: import("@auction/shared").Role[];
 }): Promise<ReportRecord> {
   return withTransaction(async () => {
+    // Check before writing rather than after. The old order set published_at
+    // and relied on the rollback to undo it, which worked but meant the
+    // "reject" path always burned a write.
+    const existing = await repo.findReport(input.id);
+    if (!existing) throw new AppError("Report not found", HttpStatus.NOT_FOUND, "REPORT_NOT_FOUND");
+
+    if (!existing.chainVerified) {
+      throw new AppError(
+        "Cannot publish a report with a broken audit chain",
+        HttpStatus.UNPROCESSABLE,
+        "CHAIN_BROKEN",
+      );
+    }
+
+    // Re-verify at publish time: the stored flag reflects the chain as it
+    // was when the report was generated, and publishing is the point at
+    // which the platform vouches for it.
+    const chain = await audit.verifyAuditChain(existing.auctionId);
+    if (!chain.intact) {
+      throw new AppError(
+        "Audit chain is no longer intact for this auction",
+        HttpStatus.UNPROCESSABLE,
+        "CHAIN_BROKEN",
+      );
+    }
+
+    if (existing.publishedAt) {
+      return existing;
+    }
+
     const report = await repo.publishReport(input.id);
     if (!report) throw new AppError("Report not found", HttpStatus.NOT_FOUND, "REPORT_NOT_FOUND");
-    if (!report.chainVerified) {
-      throw new AppError("Cannot publish a report with a broken audit chain", HttpStatus.UNPROCESSABLE, "CHAIN_BROKEN");
-    }
 
     await audit.appendAuditEvent({
       auctionId: report.auctionId,

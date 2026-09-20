@@ -1,6 +1,9 @@
+import { env } from "../../config/env.js";
 import { logger } from "../../shared/utils/logger.js";
 import { pruneExpiredIdempotencyKeys } from "../../shared/utils/idempotency.js";
+import { pruneExpiredIdempotencyKeys as pruneIdempotencyRows } from "../idempotency/idempotency.repository.js";
 import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
+import { closeDueAuctions, openDueAuctions } from "../../auction/auction.service.js";
 
 type ScheduledJob = {
   name: string;
@@ -39,8 +42,32 @@ export function startInfrastructureJobs(): void {
   scheduleJob({
     name: "idempotency-prune",
     intervalMs: 5 * 60 * 1000,
-    run: () => {
+    run: async () => {
+      // Both stores need pruning: the in-process cache and the durable
+      // idempotency_keys table. Only the first was being swept, so the
+      // table grew without bound.
       pruneExpiredIdempotencyKeys();
+      if (env.DATABASE_URL) {
+        await pruneIdempotencyRows();
+      }
+    },
+  });
+
+  // Auction lifecycle. Nothing else moves an auction from scheduled to live
+  // or from live to closed, so without this job an approved auction never
+  // opens and a finished auction never produces a winner.
+  scheduleJob({
+    name: "auction-lifecycle",
+    intervalMs: env.AUCTION_TICK_MS,
+    runOnStart: true,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const now = new Date();
+      const opened = await openDueAuctions(now);
+      const closed = await closeDueAuctions(now);
+      if (opened > 0 || closed > 0) {
+        logger.info({ opened, closed }, "Auction lifecycle tick");
+      }
     },
   });
 
@@ -53,6 +80,7 @@ export function startInfrastructureJobs(): void {
     intervalMs: 2 * 1000,
     runOnStart: true,
     run: async () => {
+      if (!env.DATABASE_URL) return;
       await processOutboxBatch();
     },
   });
@@ -63,6 +91,7 @@ export function startInfrastructureJobs(): void {
     name: "notification-retry",
     intervalMs: 60 * 1000,
     run: async () => {
+      if (!env.DATABASE_URL) return;
       await processNotificationQueue();
     },
   });
