@@ -81,6 +81,19 @@ const envSchema = z
     OPENROUTER_SITE_NAME: z.string().default("AI-Powered Transparent Online Auction System"),
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
     REQUEST_BODY_LIMIT: z.string().default("2mb"),
+    TELEGRAM_BOT_TOKEN: z.string().transform((v) => v.trim() || undefined).optional(),
+    TELEGRAM_BOT_USERNAME: z.string().transform((v) => v.trim() || undefined).optional(),
+    TELEGRAM_CHANNEL_ID: z.string().transform((v) => v.trim() || undefined).optional(),
+    TELEGRAM_WEBHOOK_URL: z
+      .string()
+      .transform((v) => v.trim() || undefined)
+      .pipe(z.string().url().optional()),
+    TELEGRAM_WEBHOOK_SECRET: z.string().transform((v) => v.trim() || undefined).optional(),
+    TELEGRAM_POLLING: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((val) => val === "true"),
+    WEB_BASE_URL: z.string().default("http://localhost:5173"),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === "production" && value.JWT_SECRET.includes("dev-secret")) {

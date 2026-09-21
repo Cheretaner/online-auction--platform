@@ -18,6 +18,7 @@ import identityRouter from "./identity/identity.routes.js";
 import { notificationRouter } from "./notification/notification.routes.js";
 import { organizationRouter } from "./organization/organization.routes.js";
 import { reportingRouter } from "./reporting/reporting.routes.js";
+import { telegramRouter } from "./telegram/telegram.routes.js";
 import verificationRouter from "./verification/verification.routes.js";
 import { attachSseStream } from "./infrastructure/realtime/realtime.adapter.js";
 import { errorMiddleware } from "./shared/middleware/error.middleware.js";
@@ -75,6 +76,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/notifications", notificationRouter);
   app.use("/api/v1/disputes", disputeRouter);
   app.use("/api/v1/reports", reportingRouter);
+  app.use("/api/v1/telegram", telegramRouter);
 
   // Server-sent events for live bid/auction updates. Channels look like
   // `auction:<id>` or `user:<id>`; a user may only subscribe to their own

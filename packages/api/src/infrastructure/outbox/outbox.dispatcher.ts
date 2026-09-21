@@ -1,5 +1,6 @@
 import { mailAdapter } from "../mail/mail.adapter.js";
 import { realtimeAdapter } from "../realtime/realtime.adapter.js";
+import { telegramService } from "../../telegram/telegram.service.js";
 import { logger } from "../../shared/utils/logger.js";
 import { withTransaction } from "../database/tx.js";
 import * as notificationRepo from "../../notification/notification.repository.js";
@@ -17,6 +18,17 @@ async function sendClaimedNotification(item: NonNullable<ClaimedNotification>): 
         throw new Error("Profile email missing");
       }
       await mailAdapter.send({ to: item.email, subject: item.title, body: item.message });
+    } else if (item.channel === "telegram") {
+      const delivered = await telegramService.notifyUser(item.userId, {
+        title: item.title,
+        message: item.message,
+        type: item.type,
+        relatedEntityType: item.relatedEntityType,
+        relatedEntityId: item.relatedEntityId,
+      });
+      if (!delivered) {
+        logger.debug({ notificationId: item.id, userId: item.userId }, "Telegram notification skipped (user unlinked or bot offline)");
+      }
     }
 
     await notificationRepo.markSent(item.id);
@@ -56,12 +68,31 @@ export async function processOutboxBatch(): Promise<number> {
           payload: message.payload,
         });
 
-        const auctionId = typeof message.payload.auctionId === "string" ? message.payload.auctionId : undefined;
+        const auctionId =
+          typeof message.payload.auctionId === "string"
+            ? message.payload.auctionId
+            : message.aggregateType === "auction"
+              ? message.aggregateId
+              : undefined;
+
         if (auctionId && message.aggregateType !== "auction") {
           await realtimeAdapter.publish({
             channel: `auction:${auctionId}`,
             event: message.eventType,
             payload: message.payload,
+          });
+        }
+
+        if (
+          auctionId &&
+          (message.eventType === "auction.published" ||
+            message.eventType === "auction.opened" ||
+            message.eventType === "auction.extended" ||
+            message.eventType === "bid.placed" ||
+            message.eventType === "auction.closed")
+        ) {
+          void telegramService.broadcastAuction(auctionId).catch((err) => {
+            logger.warn({ err, auctionId }, "Automatic Telegram channel broadcast skipped or failed");
           });
         }
 

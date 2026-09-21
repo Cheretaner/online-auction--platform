@@ -3,6 +3,7 @@ import { env } from "./config/env.js";
 import { closePool, pingDatabase } from "./infrastructure/database/pool.js";
 import { runMigrations } from "./infrastructure/database/migrations/run.js";
 import { startInfrastructureJobs, stopAllJobs } from "./infrastructure/scheduler/scheduler.js";
+import { telegramService } from "./telegram/telegram.service.js";
 import { logger } from "./shared/utils/logger.js";
 
 // A rejected promise that nobody handles used to terminate the process
@@ -43,6 +44,7 @@ async function main(): Promise<void> {
 
   const app = createApp();
   startInfrastructureJobs();
+  await telegramService.start();
 
   const server = app.listen(env.PORT, () => {
     logger.info({ port: env.PORT, env: env.NODE_ENV }, "API server listening");
@@ -58,6 +60,7 @@ async function main(): Promise<void> {
     // Stop background work first so no job starts a transaction while the
     // pool is closing.
     stopAllJobs();
+    void telegramService.stop().catch(() => undefined);
 
     server.close(async () => {
       await closePool().catch(() => undefined);
