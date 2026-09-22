@@ -32,7 +32,9 @@ export class TelegramBotService {
 
   constructor() {
     if (env.TELEGRAM_BOT_TOKEN) {
-      this.bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
+      this.bot = new Telegraf(env.TELEGRAM_BOT_TOKEN, {
+        ...(env.TELEGRAM_API_ROOT ? { telegram: { apiRoot: env.TELEGRAM_API_ROOT } } : {}),
+      });
       this.setupMiddlewareAndCommands();
     } else {
       logger.info("TELEGRAM_BOT_TOKEN not configured; Telegram bot is inactive");

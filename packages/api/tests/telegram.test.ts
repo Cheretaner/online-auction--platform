@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { formatAuctionChannelMessage } from "./telegram-channel.service.js";
-import { processVoiceNote } from "./telegram-voice.service.js";
-import { telegramService } from "./telegram.service.js";
-import type { Auction } from "../auction/auction.types.js";
+import { formatAuctionChannelMessage } from "../src/telegram/telegram-channel.service.js";
+import { processVoiceNote } from "../src/telegram/telegram-voice.service.js";
+import { telegramService } from "../src/telegram/telegram.service.js";
+import type { Auction } from "../src/auction/auction.types.js";
 
 describe("Telegram Channel Message Formatting", () => {
   const sampleAuction: Auction = {
@@ -10,7 +10,7 @@ describe("Telegram Channel Message Formatting", () => {
     orgId: "org-1",
     title: "Surplus Toyota Land Cruiser 2022",
     description: "Well maintained government utility vehicle with complete service history.",
-    auctionType: "sealed_bid",
+    auctionType: "open_ascending",
     status: "live",
     startPrice: "1200000",
     reservePrice: "1500000",
@@ -39,7 +39,7 @@ describe("Telegram Channel Message Formatting", () => {
     updatedAt: new Date(),
   };
 
-  it("formats live auction card with rich HTML, key details, and interactive buttons", () => {
+  it("formats live open ascending auction card with rich HTML and displays current highest bid", () => {
     const card = formatAuctionChannelMessage(sampleAuction, "TestAuctionBot");
 
     expect(card.text).toContain("PUBLIC AUCTION NOTICE");
@@ -60,6 +60,15 @@ describe("Telegram Channel Message Formatting", () => {
     expect(buttons[1][0].url).toContain("https://t.me/TestAuctionBot?start=verify_");
   });
 
+  it("formats live sealed bid auction card hiding the current highest bid for secrecy", () => {
+    const sealedAuction = { ...sampleAuction, auctionType: "sealed_bid" as const };
+    const card = formatAuctionChannelMessage(sealedAuction, "TestAuctionBot");
+
+    expect(card.text).toContain("🔒 Sealed Bid Auction");
+    expect(card.text).not.toContain("Current Highest Bid");
+    expect(card.text).toContain("ETB 1,200,000.00");
+  });
+
   it("escapes special HTML characters in auction title and descriptions", () => {
     const dangerousAuction = {
       ...sampleAuction,
@@ -75,14 +84,14 @@ describe("Telegram Channel Message Formatting", () => {
 });
 
 describe("Telegram Voice Processing", () => {
-  it("returns fallback when running with stub/unconfigured Gemini audio", async () => {
+  it("returns fallback or parsed result when processing audio note", async () => {
     const fakeBuffer = Buffer.from("fake ogg opus audio data");
     const result = await processVoiceNote(fakeBuffer);
 
     expect(result).toHaveProperty("transcription");
     expect(result).toHaveProperty("intent");
     expect(typeof result.transcription).toBe("string");
-  });
+  }, 15000);
 });
 
 describe("Telegram Webhook Security", () => {
@@ -91,7 +100,7 @@ describe("Telegram Webhook Security", () => {
     const originalSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
     try {
       (telegramService as any).botService = {
-        getBotInstance: () => ({ handleUpdate: async () => {} }),
+        getBotInstance: () => ({ handleUpdate: async () => { } }),
       };
 
       // When secret header fails:

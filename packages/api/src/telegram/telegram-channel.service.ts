@@ -40,7 +40,7 @@ export function formatAuctionChannelMessage(auction: Auction, botUsername?: stri
       ? "🏁 <b>AUCTION CONCLUDED</b>"
       : "⏳ <b>UPCOMING AUCTION</b>";
 
-  const typeLabel = auction.auctionType === "sealed_bid" ? "🔒 Sealed Bid Auction" : "📈 English Ascending Auction";
+  const typeLabel = auction.auctionType === "sealed_bid" ? "🔒 Sealed Bid Auction" : "📈 Open Ascending Auction";
   const startPrice = formatMoney(auction.startPrice);
   const highestBid = formatMoney(auction.currentHighestBid);
   const deposit = formatMoney(auction.depositAmount);
@@ -49,7 +49,7 @@ export function formatAuctionChannelMessage(auction: Auction, botUsername?: stri
   const closesFormatted = new Date(auction.closesAt).toUTCString();
 
   const webUrl = `${env.WEB_BASE_URL.replace(/\/$/, "")}/auctions/${auction.id}`;
-  const botUser = botUsername || env.TELEGRAM_BOT_USERNAME || "auction_bot";
+  const botUser = (botUsername || env.TELEGRAM_BOT_USERNAME || "cheretanet_bot").replace(/^@/, "");
   const botBidUrl = `https://t.me/${botUser}?start=view_${auction.id}`;
   const botVerifyUrl = `https://t.me/${botUser}?start=verify_${auction.id}`;
 

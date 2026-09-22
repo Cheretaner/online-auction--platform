@@ -27,7 +27,7 @@ class TelegramService {
    */
   async createLinkToken(userId: string): Promise<{ token: string; deepLink: string; expiresAt: string }> {
     const token = await telegramRepo.createLinkToken(userId, 15);
-    const botUsername = env.TELEGRAM_BOT_USERNAME || "auction_bot";
+    const botUsername = (env.TELEGRAM_BOT_USERNAME || "cheretanet_bot").replace(/^@/, "");
     const deepLink = `https://t.me/${botUsername}?start=link_${token}`;
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 

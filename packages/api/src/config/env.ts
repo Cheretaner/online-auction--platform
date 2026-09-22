@@ -76,19 +76,17 @@ const envSchema = z
     GEMINI_MODEL: z.string().default("gemini-flash-latest"),
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
-    OPENROUTER_MODEL: z.string().default("google/gemini-2.0-flash-exp:free"),
+    OPENROUTER_MODEL: z.string().default("liquid/lfm-2.5-2.6b:free"),
     OPENROUTER_SITE_URL: z.string().default("http://localhost:3000"),
     OPENROUTER_SITE_NAME: z.string().default("AI-Powered Transparent Online Auction System"),
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
     REQUEST_BODY_LIMIT: z.string().default("2mb"),
-    TELEGRAM_BOT_TOKEN: z.string().transform((v) => v.trim() || undefined).optional(),
-    TELEGRAM_BOT_USERNAME: z.string().transform((v) => v.trim() || undefined).optional(),
-    TELEGRAM_CHANNEL_ID: z.string().transform((v) => v.trim() || undefined).optional(),
-    TELEGRAM_WEBHOOK_URL: z
-      .string()
-      .transform((v) => v.trim() || undefined)
-      .pipe(z.string().url().optional()),
-    TELEGRAM_WEBHOOK_SECRET: z.string().transform((v) => v.trim() || undefined).optional(),
+    TELEGRAM_BOT_TOKEN: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TELEGRAM_BOT_USERNAME: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TELEGRAM_CHANNEL_ID: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TELEGRAM_WEBHOOK_URL: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().url().optional()),
+    TELEGRAM_WEBHOOK_SECRET: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TELEGRAM_API_ROOT: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().url().optional()),
     TELEGRAM_POLLING: z
       .enum(["true", "false"])
       .default("false")
