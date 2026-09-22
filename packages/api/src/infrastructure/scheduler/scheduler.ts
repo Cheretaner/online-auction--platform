@@ -4,6 +4,8 @@ import { pruneExpiredIdempotencyKeys } from "../../shared/utils/idempotency.js";
 import { pruneExpiredIdempotencyKeys as pruneIdempotencyRows } from "../idempotency/idempotency.repository.js";
 import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
 import { closeDueAuctions, openDueAuctions } from "../../auction/auction.service.js";
+import { getPool } from "../database/pool.js";
+import { registerAutofetchJobs } from "../../autofetch/autofetch.scheduler.js";
 
 type ScheduledJob = {
   name: string;
@@ -39,6 +41,20 @@ export function scheduleJob(job: ScheduledJob): void {
 }
 
 export function startInfrastructureJobs(): void {
+  // Register autofetch jobs (must come before scheduleJob calls)
+  try {
+    const pool = getPool();
+    if (pool) {
+      // Provide the scheduleJob function to autofetch module
+      const { setScheduleJobFn } = require("../../autofetch/autofetch.scheduler.js");
+      setScheduleJobFn(scheduleJob);
+      registerAutofetchJobs(pool);
+      logger.debug("AutoFetch jobs registered");
+    }
+  } catch (error) {
+    logger.warn({ err: error }, "Could not register autofetch jobs");
+  }
+
   scheduleJob({
     name: "idempotency-prune",
     intervalMs: 5 * 60 * 1000,

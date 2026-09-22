@@ -28,9 +28,20 @@ import { requestIdMiddleware } from "./shared/middleware/requestId.middleware.js
 import { requireAuth } from "./shared/middleware/auth.middleware.js";
 import { getAuth } from "./shared/types/request.js";
 import { logger } from "./shared/utils/logger.js";
+import { registerBuiltInAdapters } from "./autofetch/adapters/index.js";
+import { createAutofetchRouter } from "./autofetch/autofetch.routes.js";
+import { getPool } from "./infrastructure/database/pool.js";
 
 export function createApp(): express.Express {
   const app = express();
+
+  // Register autofetch adapters at startup
+  try {
+    registerBuiltInAdapters();
+    logger.debug("AutoFetch adapters registered");
+  } catch (error) {
+    logger.warn({ err: error }, "Could not register autofetch adapters");
+  }
 
   // A specific hop count, never `true`: express-rate-limit refuses a
   // permissive trust-proxy setting because it lets a client spoof
@@ -77,6 +88,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/disputes", disputeRouter);
   app.use("/api/v1/reports", reportingRouter);
   app.use("/api/v1/telegram", telegramRouter);
+  app.use("/api/v1/autofetch", createAutofetchRouter(getPool()));
 
   // Server-sent events for live bid/auction updates. Channels look like
   // `auction:<id>` or `user:<id>`; a user may only subscribe to their own
