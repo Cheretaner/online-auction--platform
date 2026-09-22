@@ -15,3 +15,6 @@ export * from './conflict/index.js';
 // Services
 export { AutoFetchService } from './autofetch.service.js';
 export { AutoFetchRepository } from './autofetch.repository.js';
+
+// Telegram Integration
+export * from './autofetch.telegram.js';
