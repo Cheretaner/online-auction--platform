@@ -9,14 +9,28 @@ import { routeParam } from "../shared/types/request.js";
 import * as repo from "./category.repository.js";
 import type { CreateCategoryRequest as CreateCategoryBody } from "@auction/shared";
 
+import { cacheService } from "../infrastructure/cache/cache.service.js";
+
 export const categoryRouter = Router();
 
 const getCategories: RequestHandler = async (_req, res) => {
-  res.json({ items: await repo.getCategories() });
+  const items = await cacheService.getOrSet(
+    "categories:all",
+    300,
+    () => repo.getCategories(),
+    ["categories"],
+  );
+  res.json({ items });
 };
 
 const getCategory: RequestHandler = async (req, res) => {
-  const category = await repo.getCategoryById(routeParam(req.params.id));
+  const id = routeParam(req.params.id);
+  const category = await cacheService.getOrSet(
+    `categories:${id}`,
+    300,
+    () => repo.getCategoryById(id),
+    ["categories"],
+  );
   if (!category) {
     throw new AppError("Category not found", HttpStatus.NOT_FOUND);
   }
@@ -25,6 +39,7 @@ const getCategory: RequestHandler = async (req, res) => {
 
 const createCategory: RequestHandler = async (req, res) => {
   const category = await repo.createCategory(req.body as CreateCategoryBody);
+  cacheService.invalidateTag("categories");
   res.status(HttpStatus.CREATED).json(category);
 };
 
@@ -33,6 +48,7 @@ const updateCategory: RequestHandler = async (req, res) => {
     routeParam(req.params.id),
     req.body as Partial<CreateCategoryBody>,
   );
+  cacheService.invalidateTag("categories");
   res.json(category);
 };
 

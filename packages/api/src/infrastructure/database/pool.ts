@@ -63,6 +63,15 @@ export function getPool(): pg.Pool {
     pool.on("error", (err) => {
       logger.error({ err }, "Idle database client error");
     });
+
+    // When a client is connected or checked out, network glitches or pooler drops
+    // can emit 'error' on the client itself. Attaching a listener prevents
+    // Node.js from treating it as an uncaught exception.
+    pool.on("connect", (client) => {
+      client.on("error", (err) => {
+        logger.warn({ err }, "Database client socket error (handled)");
+      });
+    });
   }
 
   return pool;
