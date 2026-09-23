@@ -13,7 +13,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["favicon.svg", "icons.svg", "apple-touch-icon.svg"],
+      includeAssets: [
+        "favicon.svg",
+        "favicon-192.png",
+        "favicon-512.png",
+        "icons.svg",
+        "apple-touch-icon.png",
+      ],
       manifest: {
         name: "Cheretanet Auctions",
         short_name: "Cheretanet",
@@ -32,10 +38,21 @@ export default defineConfig({
             purpose: "any",
           },
           {
-            src: "/apple-touch-icon.svg",
-            sizes: "180x180",
-            type: "image/svg+xml",
+            src: "/favicon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "any",
+          },
+          {
+            src: "/favicon-512.png",
+            sizes: "512x512",
+            type: "image/png",
             purpose: "any maskable",
+          },
+          {
+            src: "/apple-touch-icon.png",
+            sizes: "180x180",
+            type: "image/png",
           },
         ],
       },
@@ -46,7 +63,8 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") || url.pathname.startsWith("/health"),
+              url.pathname.startsWith("/api/") ||
+              url.pathname.startsWith("/health"),
             handler: "NetworkOnly",
           },
           {
@@ -59,7 +77,9 @@ export default defineConfig({
           },
           {
             urlPattern: ({ request }) =>
-              request.destination === "style" || request.destination === "script" || request.destination === "worker",
+              request.destination === "style" ||
+              request.destination === "script" ||
+              request.destination === "worker",
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "assets",

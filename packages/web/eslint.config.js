@@ -22,6 +22,7 @@ export default defineConfig([
   {
     files: [
       "src/app/router.tsx",
+      "src/main.tsx",
       "src/components/feedback/confirm-dialog.tsx",
       "src/components/ui/button.tsx",
       "src/features/auth/auth-provider.tsx",
