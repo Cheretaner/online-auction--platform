@@ -1,12 +1,24 @@
+import type { LucideIcon } from "lucide-react";
+import { Activity, ArrowRight, Bell, CheckCircle2, Gavel } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
-import { QueryState } from "@/components/feedback/query-state";
 import { useAuth } from "@/features/auth/auth-provider";
 import { usePublicAuctions } from "@/features/auctions/queries";
-import { useMyDeposits, useMyVerification, useUnreadCount } from "@/features/operations/queries";
-import { canManageAuctions } from "@/lib/format";
+import {
+  useMyDeposits,
+  useMyVerification,
+  useUnreadCount,
+} from "@/features/operations/queries";
+import { canManageAuctions, statusLabel } from "@/lib/format";
 
 export default function DashboardPage() {
   const { session, roles, organizationId } = useAuth();
@@ -16,68 +28,163 @@ export default function DashboardPage() {
   const unread = useUnreadCount();
 
   return (
-    <div>
+    <div className="space-y-8">
       <PageHeader
         title={`Welcome, ${session?.user.fullName ?? "there"}`}
-        description="This workspace talks only to the production API. Organization-scoped actions require an org context on your access token."
+        description="Your account, eligibility, and activity across Cheretanet auctions."
         actions={
           canManageAuctions(roles) ? (
             <Button asChild>
-              <Link to="/app/auctions/new">New auction</Link>
+              <Link to="/app/auctions/new">Create auction</Link>
             </Button>
           ) : null
         }
       />
+
       {!organizationId && (session?.organizations.length ?? 0) > 1 ? (
-        <p className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-          Select an organization in the header. The API returns 403 ORG_CONTEXT_REQUIRED until you do.
-        </p>
-      ) : null}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat title="Public lots" value={String(auctions.data?.items.length ?? "—")} />
-        <Stat title="KYC" value={verification.data?.status ?? session?.user.verificationStatus ?? "—"} />
-        <Stat title="My deposits" value={String(deposits.data?.items.length ?? "—")} />
-        <Stat title="Unread" value={String(unread.data?.count ?? 0)} />
-      </div>
-      <QueryState isLoading={auctions.isLoading} isError={auctions.isError} error={auctions.error} isEmpty={false}>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Roles on this token</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2 text-sm">
-              {roles.length ? roles.map((role) => <span key={role} className="rounded-md bg-muted px-2 py-1">{role}</span>) : "No roles"}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick links</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 text-sm">
-              <Link className="text-primary underline" to="/auctions">
-                Public catalogue
-              </Link>
-              <Link className="text-primary underline" to="/app/kyc">
-                Verification
-              </Link>
-              <Link className="text-primary underline" to="/app/notifications">
-                Notifications
-              </Link>
-            </CardContent>
-          </Card>
+        <div className="rounded-xl border border-accent bg-accent/40 px-4 py-3 text-sm text-accent-foreground">
+          Select an organization above to manage its auctions and complete
+          organization-scoped actions.
         </div>
-      </QueryState>
+      ) : null}
+
+      <section
+        aria-label="Account overview"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        <Stat
+          title="Public auctions"
+          value={auctions.data ? String(auctions.data.items.length) : "—"}
+          hint="Browse the catalogue"
+          icon={Gavel}
+          href="/auctions"
+          loading={auctions.isLoading}
+        />
+        <Stat
+          title="Identity check"
+          value={statusLabel(
+            verification.data?.status ??
+              session?.user.verificationStatus ??
+              "unverified",
+          )}
+          hint="Review your verification"
+          icon={CheckCircle2}
+          href="/app/kyc"
+          loading={verification.isLoading}
+        />
+        <Stat
+          title="My deposits"
+          value={deposits.data ? String(deposits.data.items.length) : "—"}
+          hint="Review deposit records"
+          icon={Activity}
+          href="/app/deposits"
+          loading={deposits.isLoading}
+        />
+        <Stat
+          title="Unread messages"
+          value={unread.data ? String(unread.data.count) : "—"}
+          hint="Open notifications"
+          icon={Bell}
+          href="/app/notifications"
+          loading={unread.isLoading}
+        />
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Your access</CardTitle>
+            <CardDescription>
+              Permissions available to your current account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {roles.length ? (
+              <div className="flex flex-wrap gap-2">
+                {roles.map((role) => (
+                  <Badge key={role} variant="secondary">
+                    {statusLabel(role)}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No organization roles are assigned to this account yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>Quick links</CardTitle>
+            <CardDescription>Pick up where you need to.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <QuickLink to="/auctions" label="Browse public auctions" />
+            <QuickLink to="/app/kyc" label="Identity verification" />
+            <QuickLink to="/app/notifications" label="Notifications" />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function Stat({ title, value }: { title: string; value: string }) {
+function Stat({
+  title,
+  value,
+  hint,
+  icon: Icon,
+  href,
+  loading,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  icon: LucideIcon;
+  href: string;
+  loading: boolean;
+}) {
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-xs uppercase text-muted-foreground">{title}</p>
-        <p className="mt-1 text-2xl font-semibold capitalize">{value}</p>
-      </CardContent>
-    </Card>
+    <Link to={href} className="group rounded-2xl focus-visible:outline-none">
+      <Card
+        aria-busy={loading}
+        className="h-full transition-colors group-hover:border-primary/40 group-focus-visible:border-primary"
+      >
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">{title}</p>
+              <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
+                {value}
+              </p>
+            </div>
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <Icon className="size-5" aria-hidden="true" />
+            </span>
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
+            <span>{hint}</span>
+            <ArrowRight
+              className="size-4 transition-transform group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function QuickLink({ to, label }: { to: string; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex min-h-11 items-center justify-between rounded-lg px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:bg-muted"
+    >
+      <span>{label}</span>
+      <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
+    </Link>
   );
 }

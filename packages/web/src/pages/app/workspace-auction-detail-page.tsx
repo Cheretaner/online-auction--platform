@@ -11,9 +11,11 @@ import {
 } from "@/features/auctions/queries";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { toast } from "sonner";
+import { useAuth } from "@/features/auth/auth-provider";
 
 export default function WorkspaceAuctionDetailPage() {
   const { id } = useParams();
+  const { session } = useAuth();
   const auction = useAuction(id);
   const items = useAuctionItems(id);
   const action = useAuctionAction(id ?? "");
@@ -94,7 +96,7 @@ export default function WorkspaceAuctionDetailPage() {
                 </Button>
               ) : null}
               {record.status === "pending_review" &&
-              record.createdBy !== record.approvedBy ? (
+              record.createdBy !== session?.user.id ? (
                 <Button
                   disabled={action.approve.isPending}
                   onClick={() =>

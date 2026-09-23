@@ -75,34 +75,34 @@ function recordId(value: unknown): string | undefined {
 
 function ResourceRecord({ value }: { value: unknown }) {
   if (!value || typeof value !== "object") return null;
+  const hiddenField =
+    /^(id|.*Id|email|phone|documentNumber|nationalId|tinNumber|token|hash|checksum|storagePath|uploadedBy|createdBy|reviewedBy|actorId|assignedTo|openedBy)$/i;
   const entries = Object.entries(value as Record<string, unknown>).filter(
-    ([, item]) =>
-      item == null || ["string", "number", "boolean"].includes(typeof item),
+    ([key, item]) =>
+      !hiddenField.test(key) &&
+      item != null &&
+      ["string", "number", "boolean"].includes(typeof item),
   );
-  const titleEntry = entries.find(([key]) =>
-    /title|name|email|type/i.test(key),
-  );
+  const titleEntry = entries.find(([key]) => /title|name|type/i.test(key));
   const statusEntry = entries.find(([key]) => /status/i.test(key));
   return (
     <Card>
-      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+      <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0">
-          <p className="font-medium">
-            {titleEntry
-              ? String(titleEntry[1] ?? "Untitled")
-              : String(recordId(value) ?? "Record")}
+          <p className="font-medium leading-snug">
+            {titleEntry ? String(titleEntry[1] ?? "Untitled") : "Record"}
           </p>
-          <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+          <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs text-muted-foreground sm:grid-cols-2">
             {entries
               .filter(
                 ([key]) => key !== titleEntry?.[0] && key !== statusEntry?.[0],
               )
-              .slice(0, 6)
+              .slice(0, 4)
               .map(([key, item]) => (
-                <div className="truncate" key={key}>
-                  <dt className="inline capitalize">{humanize(key)}: </dt>
-                  <dd className="inline">
-                    {item == null ? "—" : String(item)}
+                <div className="min-w-0" key={key}>
+                  <dt className="capitalize">{humanize(key)}</dt>
+                  <dd className="mt-0.5 truncate font-medium text-foreground">
+                    {formatRecordValue(key, item)}
                   </dd>
                 </div>
               ))}
@@ -122,4 +122,20 @@ function humanize(value: string) {
   return value
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (char) => char.toUpperCase());
+}
+
+function formatRecordValue(key: string, value: unknown) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return new Intl.NumberFormat().format(value);
+  if (
+    typeof value === "string" &&
+    key.endsWith("At") &&
+    !Number.isNaN(Date.parse(value))
+  ) {
+    return new Intl.DateTimeFormat("en-GB", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  }
+  return typeof value === "string" ? value.replaceAll("_", " ") : String(value);
 }
