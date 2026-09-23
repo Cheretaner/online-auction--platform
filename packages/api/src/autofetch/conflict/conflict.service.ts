@@ -118,7 +118,7 @@ export class ConflictDetectionService {
     const skuMatch = matchSku(pendingItem.externalId, existingItem);
     const locationMatch = matchLocation(pendingItem, existingItem, auction);
     const temporalMatch = matchTemporal(pendingItem, auction);
-    const valueMatch = matchValue(pendingItem.estimatedValue, existingItem.estimatedValue);
+    const valueMatch = matchValue(pendingItem.estimatedValue, existingItem.estimatedValue ?? undefined);
     const categoryMatch = matchCategory(
       pendingItem.categoryName,
       existingItem.categorySource

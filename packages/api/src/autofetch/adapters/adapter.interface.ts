@@ -13,6 +13,9 @@ import {
 } from '../types/index.js';
 
 export interface ISourceAdapter {
+  /** Return an isolated adapter instance when configuration is stateful. */
+  create?(): ISourceAdapter;
+  configure?(config: Record<string, unknown>): void;
   /**
    * Adapter metadata (name, version, default config)
    */

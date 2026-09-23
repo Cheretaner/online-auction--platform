@@ -27,7 +27,7 @@ export class AutoFetchRepository {
    */
   async createSource(
     organizationId: string,
-    config: Omit<SourceConfig, 'id' | 'createdAt' | 'updatedAt'>
+    config: Omit<SourceConfig, 'id' | 'organizationId' | 'createdAt' | 'updatedAt'>
   ): Promise<SourceConfig> {
     try {
       const query = `
@@ -80,6 +80,14 @@ export class AutoFetchRepository {
       });
       throw error;
     }
+  }
+
+  async getSourceForOrganization(sourceId: string, organizationId: string): Promise<SourceConfig | null> {
+    const result = await this.pool.query(
+      'SELECT * FROM autofetch_sources WHERE id = $1 AND organization_id = $2',
+      [sourceId, organizationId],
+    );
+    return result.rows[0] ? this.mapRowToSourceConfig(result.rows[0]) : null;
   }
 
   /**
@@ -333,6 +341,14 @@ export class AutoFetchRepository {
       });
       throw error;
     }
+  }
+
+  async getPendingItemForOrganization(pendingItemId: string, organizationId: string): Promise<PendingItem | null> {
+    const result = await this.pool.query(
+      'SELECT * FROM autofetch_pending_items WHERE id = $1 AND organization_id = $2',
+      [pendingItemId, organizationId],
+    );
+    return result.rows[0] ? this.mapRowToPendingItem(result.rows[0]) : null;
   }
 
   /**

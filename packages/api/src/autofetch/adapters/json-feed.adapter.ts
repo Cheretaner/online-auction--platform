@@ -25,6 +25,14 @@ interface JsonFeedConfig {
 export class JsonFeedAdapter implements ISourceAdapter {
   private config: JsonFeedConfig = {};
 
+  configure(config: Record<string, unknown>): void {
+    this.config = config as JsonFeedConfig;
+  }
+
+  create(): ISourceAdapter {
+    return new JsonFeedAdapter();
+  }
+
   getMetadata(): SourceMetadata {
     return {
       name: 'json-feed',
@@ -39,7 +47,7 @@ export class JsonFeedAdapter implements ISourceAdapter {
   }
 
   async validateConfig(config: Record<string, unknown>): Promise<void> {
-    const jsonConfig = config as JsonFeedConfig;
+    const jsonConfig = config as unknown as JsonFeedConfig;
 
     if (!jsonConfig.url) {
       throw new Error('url is required for json-feed adapter');
@@ -47,7 +55,13 @@ export class JsonFeedAdapter implements ISourceAdapter {
 
     // Try to validate URL format
     try {
-      new URL(jsonConfig.url);
+      const url = new URL(jsonConfig.url);
+      const host = url.hostname.toLowerCase();
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+          host === 'localhost' || host.endsWith('.localhost') ||
+          /^(127\.|10\.|192\.168\.|169\.254\.|0\.|::1$|fc|fd)/i.test(host)) {
+        throw new Error('URL must be a public HTTP(S) endpoint');
+      }
     } catch {
       throw new Error(`Invalid URL: ${jsonConfig.url}`);
     }
@@ -98,15 +112,18 @@ export class JsonFeedAdapter implements ISourceAdapter {
         );
       }
 
-      return items.map((item, index) => ({
-        id: `json-feed:${index}:${item.id || index}`,
-        externalId: String(item.id || index),
-        title: String(item.title || `Item ${index}`),
-        description: item.description,
-        metadata: item,
+      return items.map((item, index) => {
+        const record = this.asRecord(item);
+        return {
+        id: `json-feed:${index}:${record.id ?? index}`,
+        externalId: String(record.id ?? index),
+        title: String(record.title ?? `Item ${index}`),
+        description: typeof record.description === 'string' ? record.description : undefined,
+        metadata: record,
         source: 'json-feed',
         fetchedAt: new Date(),
-      }));
+        };
+      });
     } catch (error) {
       if (error instanceof AdapterError) throw error;
 
@@ -252,6 +269,13 @@ export class JsonFeedAdapter implements ISourceAdapter {
     if (Array.isArray(obj.results)) return obj.results;
 
     return [];
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new AdapterError('Feed items must be JSON objects', 'INVALID_FORMAT');
+    }
+    return value as Record<string, unknown>;
   }
 
   private applyMappings(

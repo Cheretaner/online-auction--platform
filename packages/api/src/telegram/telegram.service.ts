@@ -22,6 +22,10 @@ class TelegramService {
     await this.botService.stop();
   }
 
+  getBotInstance() {
+    return this.botService.getBotInstance();
+  }
+
   /**
    * Generates an 8-character connection code for a user to link their Telegram account.
    */

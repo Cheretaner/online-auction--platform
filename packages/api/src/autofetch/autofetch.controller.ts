@@ -5,6 +5,7 @@
 
 import type { RequestHandler } from 'express';
 import type { AuthenticatedRequest } from '../shared/types/request.js';
+import { getAuth, routeParam } from '../shared/types/request.js';
 import { AutoFetchService } from './autofetch.service.js';
 import type { Pool } from 'pg';
 
@@ -20,7 +21,7 @@ export function createAutofetchController(pool: Pool) {
    * List all sources for the user's organization
    */
   const listSources: RequestHandler = async (req, res) => {
-    const { organizationId } = (req as AuthenticatedRequest).auth!;
+    const organizationId = getAuth(req).organizationId!;
 
     const sources = await service.getSourcesByOrg(organizationId);
 
@@ -42,7 +43,7 @@ export function createAutofetchController(pool: Pool) {
    * }
    */
   const createSource: RequestHandler = async (req, res) => {
-    const { organizationId } = (req as AuthenticatedRequest).auth!;
+    const organizationId = getAuth(req).organizationId!;
     const { name, adapterType, sourceUrl, adapterConfig } = req.body;
 
     const source = await service.createSource(organizationId, {
@@ -63,8 +64,8 @@ export function createAutofetchController(pool: Pool) {
    * Manually trigger fetch from a source
    */
   const manualFetch: RequestHandler = async (req, res) => {
-    const { organizationId } = (req as AuthenticatedRequest).auth!;
-    const { sourceId } = req.params;
+    const organizationId = getAuth(req).organizationId!;
+    const sourceId = routeParam(req.params.sourceId);
 
     const result = await service.fetchAndQueue(sourceId, organizationId);
 
@@ -89,14 +90,15 @@ export function createAutofetchController(pool: Pool) {
    * - sourceId: filter by source
    */
   const getPendingQueue: RequestHandler = async (req, res) => {
-    const { organizationId } = (req as AuthenticatedRequest).auth!;
-    const limit = Math.min(parseInt(req.query.limit as string) || 50, 500);
-    const offset = parseInt(req.query.offset as string) || 0;
+    const organizationId = getAuth(req).organizationId!;
+    const query = req.query as { limit?: number; offset?: number; status?: string; sourceId?: string; severityMin?: string };
+    const limit = query.limit ?? 50;
+    const offset = query.offset ?? 0;
 
     const filters = {
-      status: req.query.status as string | undefined,
-      sourceId: req.query.sourceId as string | undefined,
-      severityMin: req.query.severityMin as string | undefined,
+      status: query.status,
+      sourceId: query.sourceId,
+      severityMin: query.severityMin,
     };
 
     const result = await service.getPendingQueue(organizationId, filters, limit, offset);
@@ -112,13 +114,14 @@ export function createAutofetchController(pool: Pool) {
    * Get a specific pending item with conflicts
    */
   const getPendingItem: RequestHandler = async (req, res) => {
-    const { pendingItemId } = req.params;
-
+    const pendingItemId = routeParam(req.params.pendingItemId);
+    const item = await service.getPendingItem(pendingItemId, getAuth(req).organizationId!);
     const conflicts = await service.getConflictFlags(pendingItemId);
 
     res.json({
       success: true,
       data: {
+        item,
         conflicts,
       },
     });
@@ -129,8 +132,8 @@ export function createAutofetchController(pool: Pool) {
    * Get conflicts for a pending item
    */
   const getConflicts: RequestHandler = async (req, res) => {
-    const { pendingItemId } = req.params;
-
+    const pendingItemId = routeParam(req.params.pendingItemId);
+    await service.getPendingItem(pendingItemId, getAuth(req).organizationId!);
     const conflicts = await service.getConflictFlags(pendingItemId);
 
     res.json({
@@ -159,8 +162,8 @@ export function createAutofetchController(pool: Pool) {
    * }
    */
   const approvePendingItem: RequestHandler = async (req, res) => {
-    const { userId } = (req as AuthenticatedRequest).auth!;
-    const { pendingItemId } = req.params;
+    const actor = getAuth(req);
+    const pendingItemId = routeParam(req.params.pendingItemId);
     const { auctionId } = req.body;
 
     if (!auctionId) {
@@ -171,11 +174,12 @@ export function createAutofetchController(pool: Pool) {
       return;
     }
 
-    await service.approveAndPublish(pendingItemId, userId, auctionId);
+    const item = await service.approveAndPublish(pendingItemId, actor, auctionId);
 
     res.json({
       success: true,
       message: 'Pending item approved and published',
+      data: item,
     });
   };
 
@@ -188,8 +192,8 @@ export function createAutofetchController(pool: Pool) {
    * }
    */
   const rejectPendingItem: RequestHandler = async (req, res) => {
-    const { userId } = (req as AuthenticatedRequest).auth!;
-    const { pendingItemId } = req.params;
+    const actor = getAuth(req);
+    const pendingItemId = routeParam(req.params.pendingItemId);
     const { reason } = req.body;
 
     if (!reason) {
@@ -200,7 +204,7 @@ export function createAutofetchController(pool: Pool) {
       return;
     }
 
-    await service.reject(pendingItemId, userId, reason);
+    await service.reject(pendingItemId, actor, reason);
 
     res.json({
       success: true,
@@ -217,7 +221,7 @@ export function createAutofetchController(pool: Pool) {
    * Get autofetch statistics for org
    */
   const getStats: RequestHandler = async (req, res) => {
-    const { organizationId } = (req as AuthenticatedRequest).auth!;
+    const organizationId = getAuth(req).organizationId!;
 
     const stats = await service.getConflictStats(organizationId);
 

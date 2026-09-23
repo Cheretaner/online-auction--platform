@@ -5,7 +5,7 @@
  */
 
 import { Pool } from 'pg';
-import { ConflictFlag } from '../types/index.js';
+import { ConflictFlag, type ConflictSeverity } from '../types/index.js';
 import type { Auction } from '../../auction/auction.types.js';
 import type { AuctionItemRecord } from '../../auction/auction-item.types.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -217,8 +217,9 @@ export class ConflictRepository {
 
       for (const row of result.rows) {
         stats.total += row.count_by_severity;
-        stats.bySeverity[row.severity] = row.count_by_severity;
-        stats.avgConfidenceScore = row.avg_confidence;
+        const severity = row.severity as ConflictSeverity;
+        stats.bySeverity[severity] = Number(row.count_by_severity);
+        stats.avgConfidenceScore = Number(row.avg_confidence) || 0;
       }
 
       return stats;

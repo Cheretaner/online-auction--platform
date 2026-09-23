@@ -3,6 +3,10 @@
  * Interface, registry, and concrete adapter implementations
  */
 
+import { adapterRegistry } from './adapter.registry.js';
+import { JsonFeedAdapter } from './json-feed.adapter.js';
+import { CsvUploadAdapter } from './csv-upload.adapter.js';
+
 export { ISourceAdapter } from './adapter.interface.js';
 export { AdapterRegistry, adapterRegistry } from './adapter.registry.js';
 

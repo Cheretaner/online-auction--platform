@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatAuctionChannelMessage } from "../src/telegram/telegram-channel.service.js";
 import { processVoiceNote } from "../src/telegram/telegram-voice.service.js";
 import { telegramService } from "../src/telegram/telegram.service.js";
@@ -84,7 +84,17 @@ describe("Telegram Channel Message Formatting", () => {
 });
 
 describe("Telegram Voice Processing", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("returns fallback or parsed result when processing audio note", async () => {
+    // Tests must never spend an API key, depend on network access, or send
+    // test audio to an external provider.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({ transcription: "test", intent: "help" }) }] } }],
+      }),
+    }));
     const fakeBuffer = Buffer.from("fake ogg opus audio data");
     const result = await processVoiceNote(fakeBuffer);
 

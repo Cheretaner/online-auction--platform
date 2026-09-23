@@ -55,7 +55,10 @@ export function createApp(): express.Express {
   app.use(
     cors({
       origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",").map((o) => o.trim()),
-      credentials: true,
+      // Bearer-token clients do not need cross-origin cookies. Never pair a
+      // wildcard allow-list with credentials, which otherwise reflects every
+      // arbitrary Origin and permits credentialed browser requests.
+      credentials: env.CORS_ORIGIN !== "*",
       exposedHeaders: ["x-request-id"],
     }),
   );

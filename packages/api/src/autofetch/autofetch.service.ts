@@ -12,12 +12,17 @@ import { AutoFetchRepository } from './autofetch.repository.js';
 import { NormalizedItem, PendingQueueResult, ReviewAction } from './types/index.js';
 import type { Pool } from 'pg';
 import type { AuctionItemRecord } from '../auction/auction-item.types.js';
+import * as auctionItemService from '../auction/auction-item.service.js';
+import { AppError } from '../shared/errors/index.js';
+import type { Role } from '@auction/shared';
 
 export class AutoFetchService {
+  private pool: Pool;
   private autofetchRepo: AutoFetchRepository;
   private conflictService: ConflictDetectionService;
 
   constructor(pool: Pool) {
+    this.pool = pool;
     this.autofetchRepo = new AutoFetchRepository(pool);
     const conflictRepo = new ConflictRepository(pool);
     this.conflictService = new ConflictDetectionService(conflictRepo);
@@ -41,9 +46,9 @@ export class AutoFetchService {
       });
 
       // Get source config
-      const source = await this.autofetchRepo.getSource(sourceId);
+      const source = await this.autofetchRepo.getSourceForOrganization(sourceId, organizationId);
       if (!source) {
-        throw new Error(`Source ${sourceId} not found`);
+        throw AppError.notFound('Source not found');
       }
 
       if (!source.isActive) {
@@ -55,7 +60,11 @@ export class AutoFetchService {
       }
 
       // Get adapter
-      const adapter = adapterRegistry.get(source.adapterType);
+      const registeredAdapter = adapterRegistry.get(source.adapterType);
+      // Source configuration is stateful for some adapters. Isolate each
+      // fetch so concurrent sources cannot overwrite URL or API-key state.
+      const adapter = registeredAdapter.create?.() ?? registeredAdapter;
+      adapter.configure?.({ ...source.adapterConfig, url: source.sourceUrl ?? source.adapterConfig.url });
 
       // Fetch from external source
       const fetchedItems = await adapter.fetchItems('', {
@@ -114,7 +123,7 @@ export class AutoFetchService {
           title: item.title,
           description: item.description,
           rawMetadata: raw as Record<string, unknown>,
-          normalizedMetadata: item as Record<string, unknown>,
+          normalizedMetadata: { ...item },
           aiConfidence: confidence.overall,
           estimatedValue: item.estimatedValue,
           categorySuggestion: item.categoryName,
@@ -205,7 +214,7 @@ export class AutoFetchService {
    */
   async approveAndPublish(
     pendingItemId: string,
-    reviewedById: string,
+    actor: { userId: string; organizationId?: string; roles: Role[] },
     auctionId: string
   ): Promise<AuctionItemRecord> {
     try {
@@ -216,17 +225,29 @@ export class AutoFetchService {
       });
 
       // Get pending item
-      const pending = await this.autofetchRepo.getPendingItemWithConflicts(pendingItemId);
+      const pending = actor.organizationId
+        ? await this.autofetchRepo.getPendingItemForOrganization(pendingItemId, actor.organizationId)
+        : actor.roles.includes('super_admin') ? await this.autofetchRepo.getPendingItemWithConflicts(pendingItemId) : null;
       if (!pending) {
-        throw new Error(`Pending item ${pendingItemId} not found`);
+        throw AppError.notFound('Pending item not found');
       }
+      if (pending.status !== 'pending') throw AppError.conflict('Pending item has already been reviewed');
 
-      // TODO: Create AuctionItem from normalized metadata
-      // This will integrate with auction-item.repository.ts
-      // For now, we'll just update the status and log the review
+      const metadata = pending.normalizedMetadata;
+      const item = await auctionItemService.createAuctionItem(actor, auctionId, {
+        title: metadata.title,
+        description: metadata.description,
+        quantity: metadata.quantity,
+        unit: metadata.unit,
+        estimatedValue: metadata.estimatedValue === undefined ? undefined : metadata.estimatedValue.toFixed(2),
+        categoryId: metadata.categoryId,
+        categorySource: 'manual',
+        region: metadata.region,
+        city: metadata.city,
+      });
 
       // Record review
-      await this.autofetchRepo.createReview(pendingItemId, reviewedById, 'approve', '');
+      await this.autofetchRepo.createReview(pendingItemId, actor.userId, 'approve', '');
 
       // Update pending item status
       await this.autofetchRepo.updatePendingItemStatus(pendingItemId, 'approved');
@@ -237,7 +258,7 @@ export class AutoFetchService {
       // Log to audit
       await this.autofetchRepo.logAuditEvent(pendingItemId, pending.sourceId, 'approved', {
         auctionId,
-        reviewedBy: reviewedById,
+        reviewedBy: actor.userId,
       });
 
       logger.info({
@@ -246,9 +267,7 @@ export class AutoFetchService {
         auctionId,
       });
 
-      // Placeholder: return mock AuctionItem
-      // In real implementation, this would return the created item
-      throw new Error('Integration with auction-item.repository pending');
+      return item;
     } catch (error) {
       logger.error({
         event: 'autofetch:approval_error',
@@ -264,7 +283,7 @@ export class AutoFetchService {
    */
   async reject(
     pendingItemId: string,
-    reviewedById: string,
+    actor: { userId: string; organizationId?: string; roles: Role[] },
     reason: string
   ): Promise<void> {
     try {
@@ -274,13 +293,16 @@ export class AutoFetchService {
       });
 
       // Get pending item
-      const pending = await this.autofetchRepo.getPendingItemWithConflicts(pendingItemId);
+      const pending = actor.organizationId
+        ? await this.autofetchRepo.getPendingItemForOrganization(pendingItemId, actor.organizationId)
+        : actor.roles.includes('super_admin') ? await this.autofetchRepo.getPendingItemWithConflicts(pendingItemId) : null;
       if (!pending) {
-        throw new Error(`Pending item ${pendingItemId} not found`);
+        throw AppError.notFound('Pending item not found');
       }
+      if (pending.status !== 'pending') throw AppError.conflict('Pending item has already been reviewed');
 
       // Record review
-      await this.autofetchRepo.createReview(pendingItemId, reviewedById, 'reject', reason);
+      await this.autofetchRepo.createReview(pendingItemId, actor.userId, 'reject', reason);
 
       // Update pending item status
       await this.autofetchRepo.updatePendingItemStatus(pendingItemId, 'rejected');
@@ -291,7 +313,7 @@ export class AutoFetchService {
       // Log to audit
       await this.autofetchRepo.logAuditEvent(pendingItemId, pending.sourceId, 'rejected', {
         reason,
-        rejectedBy: reviewedById,
+        rejectedBy: actor.userId,
       });
 
       logger.info({
@@ -354,12 +376,18 @@ export class AutoFetchService {
     }
   }
 
+  async getPendingItem(pendingItemId: string, organizationId: string) {
+    const item = await this.autofetchRepo.getPendingItemForOrganization(pendingItemId, organizationId);
+    if (!item) throw AppError.notFound('Pending item not found');
+    return item;
+  }
+
   /**
    * Get conflict statistics for org
    */
   async getConflictStats(organizationId: string) {
     try {
-      const conflictRepo = new ConflictRepository(this['pool']);
+      const conflictRepo = new ConflictRepository(this.pool);
       return await conflictRepo.getConflictStats(organizationId);
     } catch (error) {
       logger.error({
@@ -406,7 +434,7 @@ export class AutoFetchService {
       // Validate adapter-specific config if adapter provides validator
       const adapter = adapterRegistry.get(config.adapterType);
       if (adapter.validateConfig) {
-        await adapter.validateConfig(config.adapterConfig);
+        await adapter.validateConfig({ ...config.adapterConfig, url: config.sourceUrl ?? config.adapterConfig.url });
       }
 
       const source = await this.autofetchRepo.createSource(organizationId, {

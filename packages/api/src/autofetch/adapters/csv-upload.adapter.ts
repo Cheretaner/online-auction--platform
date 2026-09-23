@@ -39,7 +39,7 @@ export class CsvUploadAdapter implements ISourceAdapter {
   }
 
   async validateConfig(config: Record<string, unknown>): Promise<void> {
-    const csvConfig = config as CsvUploadConfig;
+    const csvConfig = config as unknown as CsvUploadConfig;
 
     if (!csvConfig.headers || !Array.isArray(csvConfig.headers)) {
       throw new Error('headers array is required for csv-upload adapter');
@@ -81,7 +81,7 @@ export class CsvUploadAdapter implements ISourceAdapter {
         id: `csv-upload:${index}`,
         externalId: String(index),
         title: String(row.title || `Row ${index}`),
-        description: row.description,
+        description: typeof row.description === 'string' ? row.description : undefined,
         metadata: row,
         source: 'csv-upload',
         fetchedAt: new Date(),
