@@ -676,6 +676,10 @@ export class TelegramBotService {
         this.isPolling = true;
         logger.info("Telegram bot polling started");
       });
+    } else {
+      logger.warn(
+        "Telegram bot is configured but no inbound transport is enabled; set TELEGRAM_WEBHOOK_URL or TELEGRAM_POLLING=true",
+      );
     }
   }
 

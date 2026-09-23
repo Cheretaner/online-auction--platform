@@ -4,7 +4,7 @@
  * Maps external JSON structure to internal AuctionItem model
  */
 
-import { ISourceAdapter } from './adapter.interface.js';
+import type { ISourceAdapter } from './adapter.interface.js';
 import {
   SourceFetch,
   NormalizedItem,

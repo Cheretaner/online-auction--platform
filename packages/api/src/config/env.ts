@@ -115,6 +115,13 @@ const envSchema = z
         message: "is required in production",
       });
     }
+    if (value.NODE_ENV === "production" && value.TELEGRAM_BOT_TOKEN && !value.TELEGRAM_WEBHOOK_URL && !value.TELEGRAM_POLLING) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TELEGRAM_WEBHOOK_URL"],
+        message: "or TELEGRAM_POLLING=true is required when TELEGRAM_BOT_TOKEN is configured in production",
+      });
+    }
   });
 
 export type Env = z.infer<typeof envSchema>;

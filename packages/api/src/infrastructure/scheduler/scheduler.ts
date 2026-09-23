@@ -5,7 +5,7 @@ import { pruneExpiredIdempotencyKeys as pruneIdempotencyRows } from "../idempote
 import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
 import { closeDueAuctions, openDueAuctions } from "../../auction/auction.service.js";
 import { getPool } from "../database/pool.js";
-import { registerAutofetchJobs } from "../../autofetch/autofetch.scheduler.js";
+import { registerAutofetchJobs, setScheduleJobFn } from "../../autofetch/autofetch.scheduler.js";
 
 type ScheduledJob = {
   name: string;
@@ -45,8 +45,9 @@ export function startInfrastructureJobs(): void {
   try {
     const pool = getPool();
     if (pool) {
-      // Provide the scheduleJob function to autofetch module
-      const { setScheduleJobFn } = require("../../autofetch/autofetch.scheduler.js");
+      // Use a static ESM import. `require` is unavailable in this package's
+      // NodeNext/"type": "module" runtime and previously prevented every
+      // auto-fetch job from registering at startup.
       setScheduleJobFn(scheduleJob);
       registerAutofetchJobs(pool);
       logger.debug("AutoFetch jobs registered");

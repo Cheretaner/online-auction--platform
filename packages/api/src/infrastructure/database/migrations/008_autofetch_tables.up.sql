@@ -84,7 +84,9 @@ CREATE INDEX IF NOT EXISTS idx_autofetch_conflicts_severity ON autofetch_conflic
 CREATE TABLE IF NOT EXISTS autofetch_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     pending_item_id UUID NOT NULL REFERENCES autofetch_pending_items(id) ON DELETE CASCADE,
-    reviewed_by_id UUID NOT NULL REFERENCES identities(id),
+    -- The application uses self-managed identities in profiles (see 001 and
+    -- 003_schema_alignment); there is no identities table in this schema.
+    reviewed_by_id UUID NOT NULL REFERENCES profiles(id),
     action VARCHAR(50) NOT NULL,
     -- Actions: approve, reject, flag_for_manual_review
     CHECK (action IN ('approve', 'reject', 'flag_for_manual_review')),

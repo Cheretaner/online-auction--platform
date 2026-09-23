@@ -3,7 +3,7 @@
  * Exported from types/index.ts but re-exported here for convenience
  */
 
-export {
+export type {
   ConflictType,
   ConflictSeverity,
   ConflictFlag,

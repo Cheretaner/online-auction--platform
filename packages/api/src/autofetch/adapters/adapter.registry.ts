@@ -4,7 +4,7 @@
  * Enables pluggable architecture: register adapters, retrieve by name, list all
  */
 
-import { ISourceAdapter } from './adapter.interface.js';
+import type { ISourceAdapter } from './adapter.interface.js';
 
 export class AdapterRegistry {
   private adapters: Map<string, ISourceAdapter> = new Map();
