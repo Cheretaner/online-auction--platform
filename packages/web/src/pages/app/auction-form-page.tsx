@@ -6,11 +6,28 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/page-header";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useAuction, useCreateAuction, useUpdateAuction } from "@/features/auctions/queries";
+import {
+  useAuction,
+  useCreateAuction,
+  useUpdateAuction,
+} from "@/features/auctions/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/format";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -70,7 +87,9 @@ export default function AuctionFormPage() {
     <div>
       <PageHeader title={isEdit ? "Amend auction" : "Create auction"} />
       {!organizationId ? (
-        <p className="text-sm text-destructive">Organization context is required.</p>
+        <p className="text-sm text-destructive">
+          Organization context is required.
+        </p>
       ) : (
         <Form {...form}>
           <form
@@ -82,8 +101,12 @@ export default function AuctionFormPage() {
                 description: values.description || undefined,
                 eligibilityRules: values.eligibilityRules || undefined,
                 region: values.region || undefined,
-                opensAt: values.opensAt.includes("T") ? fromDatetimeLocalValue(values.opensAt) : values.opensAt,
-                closesAt: values.closesAt.includes("T") ? fromDatetimeLocalValue(values.closesAt) : values.closesAt,
+                opensAt: values.opensAt.includes("T")
+                  ? fromDatetimeLocalValue(values.opensAt)
+                  : values.opensAt,
+                closesAt: values.closesAt.includes("T")
+                  ? fromDatetimeLocalValue(values.closesAt)
+                  : values.closesAt,
               };
               try {
                 if (isEdit && id) {
@@ -97,7 +120,7 @@ export default function AuctionFormPage() {
                 }
               } catch (error) {
                 if (!applyApiFieldErrors(error, form.setError)) {
-                  toast.error(apiMessage(error, getErrorMessage(error)));
+                  toast.error(getErrorMessage(error));
                 }
               }
             })}
@@ -135,14 +158,20 @@ export default function AuctionFormPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange} disabled={isEdit}>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={isEdit}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="open_ascending">Open ascending</SelectItem>
+                        <SelectItem value="open_ascending">
+                          Open ascending
+                        </SelectItem>
                         <SelectItem value="sealed_bid">Sealed bid</SelectItem>
                       </SelectContent>
                     </Select>
@@ -229,7 +258,11 @@ export default function AuctionFormPage() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="sm:col-span-2" disabled={create.isPending || update.isPending}>
+            <Button
+              type="submit"
+              className="sm:col-span-2"
+              disabled={create.isPending || update.isPending}
+            >
               {isEdit ? "Save changes" : "Create auction"}
             </Button>
           </form>

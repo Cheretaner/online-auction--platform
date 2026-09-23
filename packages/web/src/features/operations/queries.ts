@@ -19,13 +19,13 @@ import {
   disputesApi,
   documentsApi,
   notificationsApi,
-  organizationsApi,
   reportsApi,
   telegramApi,
   verificationApi,
   autofetchApi,
   aiApi,
 } from "@/lib/api/resources";
+import { organizationsApi } from "@/lib/api/organizations";
 import { queryKeys } from "@/lib/query/keys";
 
 export function useOrganizations() {
@@ -55,16 +55,22 @@ export function useOrgMembers(id: string | undefined, enabled = true) {
 export function useCreateOrganization() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateOrganizationRequest) => organizationsApi.create(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+    mutationFn: (body: CreateOrganizationRequest) =>
+      organizationsApi.create(body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
   });
 }
 
 export function useAddOrgMember(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: AddOrganizationMemberRequest) => organizationsApi.addMember(id, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.organizations.members(id) }),
+    mutationFn: (body: AddOrganizationMemberRequest) =>
+      organizationsApi.addMember(id, body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.organizations.members(id),
+      }),
   });
 }
 
@@ -72,7 +78,10 @@ export function useRemoveOrgMember(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => organizationsApi.removeMember(id, userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.organizations.members(id) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.organizations.members(id),
+      }),
   });
 }
 
@@ -87,8 +96,10 @@ export function useCategories() {
 export function useCreateCategory() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateCategoryRequest) => catalogApi.createCategory(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
+    mutationFn: (body: CreateCategoryRequest) =>
+      catalogApi.createCategory(body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
   });
 }
 
@@ -110,17 +121,27 @@ export function usePendingVerifications(enabled = true) {
 export function useSubmitVerification() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: SubmitVerificationRequest) => verificationApi.submit(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.verification.mine }),
+    mutationFn: (body: SubmitVerificationRequest) =>
+      verificationApi.submit(body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.verification.mine }),
   });
 }
 
 export function useReviewVerification() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: ReviewVerificationRequest }) =>
-      verificationApi.review(id, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.verification.pending }),
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: ReviewVerificationRequest;
+    }) => verificationApi.review(id, body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.verification.pending,
+      }),
   });
 }
 
@@ -131,7 +152,10 @@ export function useMyDeposits() {
   });
 }
 
-export function useAuctionDeposits(auctionId: string | undefined, enabled = true) {
+export function useAuctionDeposits(
+  auctionId: string | undefined,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.deposits.auction(auctionId ?? ""),
     queryFn: () => depositsApi.listByAuction(auctionId!),
@@ -143,15 +167,18 @@ export function useCreateDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateDepositRequest) => depositsApi.create(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.deposits.mine }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.deposits.mine }),
   });
 }
 
 export function useReviewDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: ReviewDepositRequest }) => depositsApi.review(id, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.deposits.mine }),
+    mutationFn: ({ id, body }: { id: string; body: ReviewDepositRequest }) =>
+      depositsApi.review(id, body),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.deposits.mine }),
   });
 }
 
@@ -162,7 +189,10 @@ export function useMyDocuments() {
   });
 }
 
-export function useAuctionDocuments(auctionId: string | undefined, enabled = true) {
+export function useAuctionDocuments(
+  auctionId: string | undefined,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.auctions.documents(auctionId ?? ""),
     queryFn: () => documentsApi.listByAuction(auctionId!),
@@ -174,7 +204,8 @@ export function useUploadDocument() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (form: FormData) => documentsApi.upload(form),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.documents.mine }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.documents.mine }),
   });
 }
 
@@ -210,7 +241,8 @@ export function useMarkAllNotificationsRead() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => notificationsApi.markAllRead(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 }
 
@@ -277,7 +309,10 @@ export function useAuditVerify(enabled = true) {
   });
 }
 
-export function useComplianceChecks(auctionId: string | undefined, enabled = true) {
+export function useComplianceChecks(
+  auctionId: string | undefined,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.compliance.checks(auctionId ?? ""),
     queryFn: () => complianceApi.listChecks(auctionId!),
@@ -291,7 +326,9 @@ export function useRunCompliance() {
     mutationFn: ({ auctionId, notes }: { auctionId: string; notes?: string }) =>
       complianceApi.runCheck(auctionId, { notes }),
     onSuccess: (_data, vars) =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.compliance.checks(vars.auctionId) }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.compliance.checks(vars.auctionId),
+      }),
   });
 }
 

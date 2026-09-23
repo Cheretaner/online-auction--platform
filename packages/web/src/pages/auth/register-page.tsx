@@ -1,13 +1,32 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RegisterRequest } from "@auction/shared";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRegisterMutation } from "@/features/auth/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -29,14 +48,17 @@ export default function RegisterPage() {
       region: "",
     },
   });
-  const accountType = form.watch("accountType");
+  const accountType = useWatch({ control: form.control, name: "accountType" });
 
   return (
     <div className="mx-auto max-w-lg">
       <Card>
         <CardHeader>
           <CardTitle>Create an account</CardTitle>
-          <CardDescription>Registration creates a bidder by default unless the API bootstraps a platform admin.</CardDescription>
+          <CardDescription>
+            Registration creates a bidder by default unless the API bootstraps a
+            platform admin.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -93,7 +115,11 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" autoComplete="new-password" {...field} />
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,7 +216,11 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="sm:col-span-2" disabled={register.isPending}>
+              <Button
+                type="submit"
+                className="sm:col-span-2"
+                disabled={register.isPending}
+              >
                 {register.isPending ? "Creating account…" : "Create account"}
               </Button>
             </form>
