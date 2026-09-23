@@ -1,75 +1,43 @@
-# React + TypeScript + Vite
+# Cheretanet web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React, TypeScript, Vite and Tailwind CSS frontend for the auction API. Routes and feature modules live under `src/`; API requests go through `src/lib/api`, and server state uses TanStack Query.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+From the repository root:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```sh
+pnpm install
+pnpm --filter @auction/shared build
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+The Vite server proxies `/api` and `/health` to `http://localhost:3000`. Start the API separately with `pnpm dev:api`. Copy `packages/web/.env.example` to `packages/web/.env.local` to set local overrides.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Environment
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Variable                 | Purpose                                                                           |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`      | Optional API origin. Leave blank in local development to use the Vite proxy.      |
+| `VITE_APP_NAME`          | Public application name.                                                          |
+| `VITE_VOXIDE_PUBLIC_KEY` | Optional Voxide publishable key (`vox_pub_…`). Leave blank to omit the assistant. |
 
+Vite variables are bundled into browser code. Never put server secrets in `VITE_*` variables.
+
+## Voxide voice assistant
+
+Create a Voxide project and copy its publishable key into `VITE_VOXIDE_PUBLIC_KEY`. `localhost` is permitted for development. Before deployment, add each frontend origin to that project's domain whitelist. Voice requires microphone permission and HTTPS outside localhost.
+
+The global widget is mounted next to the router so it stays mounted through route changes. Its only data capabilities read the API's public auction catalogue and open a listed public auction. It does not expose account, bidder, or organization data, and it has no voice-triggered mutation tools. Voxide processes voice and text conversations through its hosted service. Tell visitors when they are using an AI assistant and review Voxide's [privacy and redaction documentation](https://voxide.app/docs/privacy) and your application's privacy notice before enabling it for users.
+
+See the [Voxide React quickstart](https://voxide.app/docs/quickstart), [actions guide](https://voxide.app/docs/actions), and [security guide](https://voxide.app/docs/security) for project configuration and domain restrictions.
+
+## Validation
+
+```sh
+pnpm --filter web typecheck
+pnpm --filter web lint
+pnpm --filter web build
 ```
+
+The service worker precaches versioned frontend assets. API requests use network-only caching so offline data cannot be mistaken for current auction state.
