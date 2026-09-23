@@ -116,3 +116,52 @@
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 }
+
+/* Design tokens taken from the Cheretanet Figma prototype. */
+@theme {
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+  --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-amharic: "FreeSerif", "Noto Serif Ethiopic", serif;
+
+  --color-ink: #000308;
+  --color-ink-soft: #44474c;
+  --color-ink-strong: #1a1b21;
+  --color-line: #c4c6cc;
+  --color-line-strong: #74777d;
+  --color-canvas: #f9f9ff;
+  --color-panel: #f3f3fa;
+  --color-panel-2: #ededf5;
+  --color-panel-3: #e8e7ef;
+  --color-panel-4: #e2e2e9;
+  --color-forest: #3b674f;
+  --color-danger: #ba1a1a;
+  --color-danger-tint: #ffdad6;
+  --color-navy: #0e1e2e;
+  --color-navy-ink: #0c1d2d;
+
+  --text-label-11: 11px;
+  --text-label-11--line-height: 14px;
+  --text-label-11--letter-spacing: 0.55px;
+  --text-label-12: 12px;
+  --text-label-12--line-height: 16px;
+  --text-label-12--letter-spacing: 0.6px;
+  --text-body-13: 13px;
+  --text-body-13--line-height: 18px;
+  --text-body-13--letter-spacing: 0.065px;
+
+  --drop-shadow-panel: 0 1px 1px rgb(0 0 0 / 0.05);
+}
+
+@layer base {
+  /* Unrounded glyph advances so text widths match the Figma metrics (hinted rounding widens mono text ~6%).
+     Form controls are listed because the browser stylesheet resets text-rendering on them. */
+  html,
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    text-rendering: geometricPrecision;
+  }
+}
