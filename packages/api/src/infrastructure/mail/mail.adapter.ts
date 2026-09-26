@@ -15,7 +15,10 @@ export interface MailAdapter {
 
 export class ConsoleMailAdapter implements MailAdapter {
   async send(message: MailMessage): Promise<void> {
-    logger.info({ mail: { to: message.to, subject: message.subject } }, "Mail sent (console adapter)");
+    // Only local development prints the body (it can hold a password-reset
+    // link). Everywhere else the console adapter records that mail was due.
+    const body = env.NODE_ENV === "development" ? message.body : undefined;
+    logger.info({ mail: { to: message.to, subject: message.subject, body } }, "Mail sent (console adapter)");
   }
 }
 
@@ -37,6 +40,9 @@ export class SmtpMailAdapter implements MailAdapter {
 
 export function createMailAdapter(): MailAdapter {
   if (!env.SMTP_HOST) {
+    if (env.NODE_ENV === "production") {
+      logger.warn("SMTP_HOST is not set: email notifications and password-reset links will not be delivered");
+    }
     return new ConsoleMailAdapter();
   }
 

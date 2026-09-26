@@ -27,6 +27,8 @@ import { apiRateLimiter } from "./shared/middleware/rateLimit.middleware.js";
 import { requestIdMiddleware } from "./shared/middleware/requestId.middleware.js";
 import { requireAuth } from "./shared/middleware/auth.middleware.js";
 import { getAuth } from "./shared/types/request.js";
+import { asyncHandler } from "./shared/middleware/asyncHandler.js";
+import { authorizeEventChannel } from "./auction/auction-events.js";
 import { logger } from "./shared/utils/logger.js";
 import { registerBuiltInAdapters } from "./autofetch/adapters/index.js";
 import { createAutofetchRouter } from "./autofetch/autofetch.routes.js";
@@ -93,29 +95,34 @@ export function createApp(): express.Express {
   app.use("/api/v1/telegram", telegramRouter);
   app.use("/api/v1/autofetch", createAutofetchRouter(getPool()));
 
-  // Server-sent events for live bid/auction updates. Channels look like
-  // `auction:<id>` or `user:<id>`; a user may only subscribe to their own
-  // personal channel.
-  app.get("/api/v1/events", requireAuth(), (req, res) => {
-    const auth = getAuth(req);
-    const channel = typeof req.query.channel === "string" ? req.query.channel : "*";
+  // Server-sent events for live bid/auction updates. Clients subscribe to
+  // exactly one channel: their own `user:<id>` feed or an `auction:<id>` they
+  // can see. See auction/auction-events.ts for the access and redaction rules.
+  app.get(
+    "/api/v1/events",
+    requireAuth(),
+    asyncHandler(async (req, res) => {
+      const auth = getAuth(req);
+      const channel = typeof req.query.channel === "string" ? req.query.channel : undefined;
+      const access = await authorizeEventChannel(channel, auth);
+      if (!access.allowed) {
+        const code = access.status === 403 ? "FORBIDDEN" : access.status === 404 ? "NOT_FOUND" : "BAD_REQUEST";
+        res.status(access.status).json({ error: { message: access.message, code } });
+        return;
+      }
 
-    if (channel.startsWith("user:") && channel !== `user:${auth.userId}`) {
-      res.status(403).json({ error: { message: "Forbidden", code: "FORBIDDEN" } });
-      return;
-    }
+      const unsubscribe = attachSseStream(res, channel!, access.filter);
 
-    const unsubscribe = attachSseStream(res, channel);
+      // Without a keepalive, idle proxies drop the connection after ~60s.
+      const keepAlive = setInterval(() => res.write(": ping\n\n"), 25_000);
+      keepAlive.unref();
 
-    // Without a keepalive, idle proxies drop the connection after ~60s.
-    const keepAlive = setInterval(() => res.write(": ping\n\n"), 25_000);
-    keepAlive.unref();
-
-    req.on("close", () => {
-      clearInterval(keepAlive);
-      unsubscribe();
-    });
-  });
+      req.on("close", () => {
+        clearInterval(keepAlive);
+        unsubscribe();
+      });
+    }),
+  );
 
   app.use(notFoundMiddleware);
   app.use(errorMiddleware);

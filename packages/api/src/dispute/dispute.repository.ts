@@ -71,7 +71,19 @@ export async function findDispute(id: string): Promise<DisputeRecord | null> {
 export async function listDisputes(input: {
   auctionId?: string;
   raisedBy?: string;
+  orgId?: string;
 }): Promise<DisputeRecord[]> {
+  if (input.orgId) {
+    const rows = await queryAll<DbDispute>(
+      `SELECT d.* FROM disputes d
+         JOIN auctions a ON a.id = d.auction_id
+        WHERE a.org_id = $1
+        ORDER BY d.created_at DESC
+        LIMIT 200`,
+      [input.orgId],
+    );
+    return rows.map(mapDispute);
+  }
   if (input.auctionId) {
     const rows = await queryAll<DbDispute>(
       `SELECT * FROM disputes WHERE auction_id = $1 ORDER BY created_at DESC`,

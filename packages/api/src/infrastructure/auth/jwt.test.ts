@@ -11,10 +11,11 @@ describe("jwt", () => {
   });
 
   it("signs and verifies refresh tokens", () => {
-    const token = signRefreshToken("user-1");
+    const { token, jti, expiresAt } = signRefreshToken("user-1");
     const payload = verifyRefreshToken(token);
     expect(payload.sub).toBe("user-1");
-    expect(payload.jti).toBeTruthy();
+    expect(payload.jti).toBe(jti);
+    expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
     expect(payload.typ).toBe("refresh");
   });
 });

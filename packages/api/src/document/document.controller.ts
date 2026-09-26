@@ -47,8 +47,7 @@ export const getById: RequestHandler = async (req, res) => {
   const doc = await service.getDocument(routeParam(req.params.id));
   if (!doc) throw AppError.notFound("Document not found");
 
-  const isOfficer = auth.roles.some((role) => OFFICER_ROLES.includes(role));
-  if (doc.isPrivate && doc.uploadedBy !== auth.userId && !isOfficer) {
+  if (!(await service.canReadDocument(doc, auth))) {
     throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
 
@@ -57,10 +56,7 @@ export const getById: RequestHandler = async (req, res) => {
 
 export const download: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
-  const result = await service.readDocument(routeParam(req.params.id), {
-    userId: auth.userId,
-    roles: auth.roles,
-  });
+  const result = await service.readDocument(routeParam(req.params.id), auth);
 
   res.setHeader("Content-Type", result.document.mimeType);
   res.setHeader("Content-Length", String(result.document.fileSizeBytes));

@@ -6,6 +6,11 @@ import * as notifications from "../notification/notification.service.js";
 import * as repo from "./ai.repository.js";
 import { evaluateAuctionAnomalies } from "./anomaly.rules.js";
 import type { AnomalyFlag } from "./ai.repository.js";
+import type { Role } from "@auction/shared";
+import * as audit from "../audit/audit.service.js";
+import { withTransaction } from "../infrastructure/database/tx.js";
+import { primaryActorRole } from "../kernel/roles.js";
+import { AppError, HttpStatus } from "../shared/errors/index.js";
 
 export async function evaluateAuction(auctionId: string): Promise<AnomalyFlag | null> {
   const auction = await biddingRepo.findAuction(auctionId);
@@ -59,20 +64,41 @@ export async function evaluateAuction(auctionId: string): Promise<AnomalyFlag | 
   return flag;
 }
 
-export async function listAnomalies(auctionId?: string): Promise<AnomalyFlag[]> {
-  return repo.listFlags(auctionId);
+export async function listAnomalies(input: {
+  auctionId?: string;
+  orgId?: string;
+}): Promise<AnomalyFlag[]> {
+  return repo.listFlags(input);
 }
 
+export async function getAnomaly(id: string): Promise<AnomalyFlag> {
+  const flag = await repo.findFlag(id);
+  if (!flag) throw new AppError("Anomaly not found", HttpStatus.NOT_FOUND);
+  return flag;
+}
+
+/** Records a compliance decision on a flag. The decision and the audit event
+ * are written in one transaction, as for every other state change. */
 export async function reviewAnomaly(input: {
   id: string;
   reviewerId: string;
+  roles: Role[];
   status: "reviewed" | "dismissed" | "escalated";
   decisionNote: string;
 }): Promise<AnomalyFlag> {
-  const updated = await repo.reviewFlag(input);
-  if (!updated) {
-    const { AppError, HttpStatus } = await import("../shared/errors/index.js");
-    throw new AppError("Anomaly not found", HttpStatus.NOT_FOUND);
-  }
-  return updated;
+  return withTransaction(async () => {
+    const updated = await repo.reviewFlag(input);
+    if (!updated) throw new AppError("Anomaly not found", HttpStatus.NOT_FOUND);
+
+    await audit.appendAuditEvent({
+      auctionId: updated.auctionId,
+      actorId: input.reviewerId,
+      actorRole: primaryActorRole(input.roles),
+      entityType: "anomaly_flag",
+      entityId: updated.id,
+      action: "anomaly.reviewed",
+      payload: { status: input.status, severity: updated.severity, score: updated.score },
+    });
+    return updated;
+  }, { userId: input.reviewerId });
 }

@@ -35,11 +35,15 @@ export function signAccessToken(
   });
 }
 
-export function signRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId, jti: randomUUID(), typ: "refresh" }, refreshSecret(), {
+/** Signs a refresh token. `jti` identifies it in the refresh_tokens table,
+ * which is what makes it revocable and single-use. */
+export function signRefreshToken(userId: string, jti: string = randomUUID()): { token: string; jti: string; expiresAt: Date } {
+  const token = jwt.sign({ sub: userId, jti, typ: "refresh" }, refreshSecret(), {
     ...signOptions,
     expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
+  const { exp } = jwt.decode(token) as { exp: number };
+  return { token, jti, expiresAt: new Date(exp * 1000) };
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
@@ -65,5 +69,16 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
   } catch (error) {
     if (error instanceof AppError) throw error;
     throw new AppError("Invalid or expired refresh token", HttpStatus.UNAUTHORIZED);
+  }
+}
+
+/** Reads an expired-but-genuine refresh token's ids, for logout only. The
+ * signature is still checked; only the expiry is ignored. */
+export function decodeRefreshTokenUnverified(token: string): { sub: string; jti: string } | null {
+  try {
+    const payload = jwt.verify(token, refreshSecret(), { ...signOptions, ignoreExpiration: true }) as RefreshTokenPayload;
+    return payload.typ === "refresh" && payload.sub && payload.jti ? { sub: payload.sub, jti: payload.jti } : null;
+  } catch {
+    return null;
   }
 }

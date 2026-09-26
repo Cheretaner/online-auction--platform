@@ -14,8 +14,21 @@ export const create: RequestHandler = async (req, res) => {
   res.status(HttpStatus.CREATED).json(deposit);
 };
 
+/** Reviewing or releasing a deposit is an act on behalf of the auction's
+ * organization, so the caller must be an officer of that organization
+ * (or a super admin), not merely an officer somewhere. */
+async function assertDepositOrgAccess(depositId: string, auth: ReturnType<typeof getAuth>): Promise<void> {
+  const deposit = await service.getDeposit(depositId);
+  await assertAuctionAccess(deposit.auctionId, {
+    userId: auth.userId,
+    roles: auth.roles,
+    organizationId: auth.organizationId,
+  });
+}
+
 export const review: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
+  await assertDepositOrgAccess(routeParam(req.params.id), auth);
   const deposit = await service.reviewDeposit(
     routeParam(req.params.id),
     { userId: auth.userId, roles: auth.roles },
@@ -26,6 +39,7 @@ export const review: RequestHandler = async (req, res) => {
 
 export const release: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
+  await assertDepositOrgAccess(routeParam(req.params.id), auth);
   const deposit = await service.releaseDeposit(routeParam(req.params.id), {
     userId: auth.userId,
     roles: auth.roles,
@@ -38,12 +52,18 @@ export const getById: RequestHandler = async (req, res) => {
   const deposit = await service.getDeposit(routeParam(req.params.id));
 
   // A deposit carries bank instrument details, so a bidder may only read
-  // their own; officers may read any.
-  const isOfficer = auth.roles.some((role) =>
-    ["auction_officer", "org_admin", "compliance_officer", "super_admin"].includes(role),
-  );
-  if (!isOfficer && deposit.bidderId !== auth.userId) {
-    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+  // their own; otherwise the caller must be an officer of the auction's
+  // organization.
+  if (deposit.bidderId !== auth.userId) {
+    const isOfficer = auth.roles.some((role) =>
+      ["auction_officer", "org_admin", "compliance_officer", "super_admin"].includes(role),
+    );
+    if (!isOfficer) throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+    await assertAuctionAccess(deposit.auctionId, {
+      userId: auth.userId,
+      roles: auth.roles,
+      organizationId: auth.organizationId,
+    });
   }
 
   res.json(deposit);

@@ -56,6 +56,9 @@ export const ERROR_CODES = [
   "VALIDATION_FAILED",
   "ORG_CONTEXT_REQUIRED",
   "FORBIDDEN",
+  "REFRESH_TOKEN_INVALID",
+  "REFRESH_TOKEN_REUSED",
+  "RESET_TOKEN_INVALID",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

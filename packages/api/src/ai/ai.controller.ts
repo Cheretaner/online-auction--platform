@@ -7,6 +7,7 @@ import type {
   ReviewAnomalyRequest,
 } from "@auction/shared";
 import { getAuth, routeParam } from "../shared/types/request.js";
+import { assertAuctionAccess } from "../shared/authz/auction-access.js";
 import * as anomalyService from "./anomaly.service.js";
 import * as assistantService from "./assistant.service.js";
 import * as categorizationService from "./categorization.service.js";
@@ -19,22 +20,46 @@ export const categorize: RequestHandler = async (req, res) => {
 
 export const detectAnomaly: RequestHandler = async (req, res) => {
   const { auctionId } = req.body as DetectAnomalyRequest;
+  await assertAuctionAccess(auctionId, actorOf(getAuth(req)));
   const flag = await anomalyService.evaluateAuction(auctionId);
   res.json({ flagged: Boolean(flag), flag });
 };
 
+function actorOf(auth: ReturnType<typeof getAuth>) {
+  return { userId: auth.userId, roles: auth.roles, organizationId: auth.organizationId };
+}
+
 export const listAnomalies: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
   const { auctionId } = req.query as unknown as OptionalAuctionScopedQuery;
-  const items = await anomalyService.listAnomalies(auctionId);
-  res.json({ items });
+  // Flags name accounts under suspicion, so officers see their own
+  // organization's flags only; super admins see everything.
+  if (auctionId) {
+    await assertAuctionAccess(auctionId, actorOf(auth));
+    res.json({ items: await anomalyService.listAnomalies({ auctionId }) });
+    return;
+  }
+  if (auth.roles.includes("super_admin")) {
+    res.json({ items: await anomalyService.listAnomalies({}) });
+    return;
+  }
+  if (!auth.organizationId) {
+    res.json({ items: [] });
+    return;
+  }
+  res.json({ items: await anomalyService.listAnomalies({ orgId: auth.organizationId }) });
 };
 
 export const reviewAnomaly: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
   const body = req.body as ReviewAnomalyRequest;
+  const id = routeParam(req.params.id);
+  const existing = await anomalyService.getAnomaly(id);
+  await assertAuctionAccess(existing.auctionId, actorOf(auth));
   const flag = await anomalyService.reviewAnomaly({
-    id: routeParam(req.params.id),
+    id,
     reviewerId: auth.userId,
+    roles: auth.roles,
     status: body.status,
     decisionNote: body.decisionNote,
   });

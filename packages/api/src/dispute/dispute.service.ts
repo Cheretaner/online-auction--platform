@@ -3,6 +3,7 @@ import { isUniqueViolation } from "../kernel/pg.js";
 import { primaryActorRole } from "../kernel/roles.js";
 import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
+import { assertAuctionAccess } from "../shared/authz/auction-access.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import * as audit from "../audit/audit.service.js";
 import * as auctionService from "../auction/auction.service.js";
@@ -82,12 +83,26 @@ export async function openDispute(input: {
 export async function listDisputes(input: {
   viewerId: string;
   roles: import("@auction/shared").Role[];
+  organizationId?: string;
   auctionId?: string;
 }): Promise<DisputeRecord[]> {
+  if (input.roles.includes("super_admin")) return repo.listDisputes({ auctionId: input.auctionId });
+
   const officer = input.roles.some((role) =>
-    ["compliance_officer", "org_admin", "auction_officer", "super_admin"].includes(role),
+    ["compliance_officer", "org_admin", "auction_officer"].includes(role),
   );
-  if (officer) return repo.listDisputes({ auctionId: input.auctionId });
+  // Officers see disputes on their own organization's auctions only.
+  if (officer && input.organizationId) {
+    if (input.auctionId) {
+      await assertAuctionAccess(input.auctionId, {
+        userId: input.viewerId,
+        roles: input.roles,
+        organizationId: input.organizationId,
+      });
+      return repo.listDisputes({ auctionId: input.auctionId });
+    }
+    return repo.listDisputes({ orgId: input.organizationId });
+  }
   return repo.listDisputes({ raisedBy: input.viewerId });
 }
 

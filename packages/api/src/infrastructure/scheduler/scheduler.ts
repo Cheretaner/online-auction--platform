@@ -5,6 +5,7 @@ import { pruneExpiredIdempotencyKeys as pruneIdempotencyRows } from "../idempote
 import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
 import { closeDueAuctions, openDueAuctions } from "../../auction/auction.service.js";
 import { getPool } from "../database/pool.js";
+import { pruneExpiredRefreshTokens } from "../../identity/session.repository.js";
 import { registerAutofetchJobs, setScheduleJobFn } from "../../autofetch/autofetch.scheduler.js";
 
 type ScheduledJob = {
@@ -66,6 +67,7 @@ export function startInfrastructureJobs(): void {
       pruneExpiredIdempotencyKeys();
       if (env.DATABASE_URL) {
         await pruneIdempotencyRows();
+        await pruneExpiredRefreshTokens();
       }
     },
   });

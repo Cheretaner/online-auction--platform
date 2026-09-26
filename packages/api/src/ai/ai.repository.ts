@@ -78,13 +78,26 @@ export async function insertFlag(input: {
   return mapFlag(result.rows[0]);
 }
 
-export async function listFlags(auctionId?: string): Promise<AnomalyFlag[]> {
-  const rows = auctionId
-    ? await queryAll<DbFlag>(
-        `SELECT * FROM anomaly_flags WHERE auction_id = $1 ORDER BY created_at DESC`,
-        [auctionId],
-      )
-    : await queryAll<DbFlag>(`SELECT * FROM anomaly_flags ORDER BY created_at DESC LIMIT 200`);
+export async function listFlags(filter: { auctionId?: string; orgId?: string } = {}): Promise<AnomalyFlag[]> {
+  if (filter.auctionId) {
+    const rows = await queryAll<DbFlag>(
+      `SELECT * FROM anomaly_flags WHERE auction_id = $1 ORDER BY created_at DESC`,
+      [filter.auctionId],
+    );
+    return rows.map(mapFlag);
+  }
+  if (filter.orgId) {
+    const rows = await queryAll<DbFlag>(
+      `SELECT f.* FROM anomaly_flags f
+         JOIN auctions a ON a.id = f.auction_id
+        WHERE a.org_id = $1
+        ORDER BY f.created_at DESC
+        LIMIT 200`,
+      [filter.orgId],
+    );
+    return rows.map(mapFlag);
+  }
+  const rows = await queryAll<DbFlag>(`SELECT * FROM anomaly_flags ORDER BY created_at DESC LIMIT 200`);
   return rows.map(mapFlag);
 }
 

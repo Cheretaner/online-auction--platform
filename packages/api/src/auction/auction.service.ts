@@ -9,8 +9,11 @@ import * as audit from "../audit/audit.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import * as AuctionRepo from "./auction.repository.js";
+import * as anomalyRepo from "../ai/ai.repository.js";
 import { canTransition } from "./auction.stateMachine.js";
 import type { Auction } from "./auction.types.js";
+import type { AuthContext } from "../shared/types/request.js";
+import { canViewAuction } from "./auction.visibility.js";
 
 export interface AuctionActor {
   userId: string;
@@ -63,16 +66,18 @@ export async function createAuction(
   );
 }
 
-export async function getAuction(id: string): Promise<Auction> {
+export async function getAuction(id: string, viewer?: AuthContext): Promise<Auction> {
   const auction = await AuctionRepo.findById(id);
-  if (!auction) {
+  // A draft or pending auction is answered with the same 404 as a missing
+  // one, so outsiders cannot probe which ids exist.
+  if (!auction || !(await canViewAuction(auction, viewer))) {
     throw new AppError("Auction not found", HttpStatus.NOT_FOUND, "AUCTION_NOT_FOUND");
   }
   return auction;
 }
 
-export async function listPublicAuctions(): Promise<Auction[]> {
-  return AuctionRepo.listPublicAuctions();
+export async function listPublicAuctions(filters: AuctionRepo.PublicAuctionFilters) {
+  return AuctionRepo.listPublicAuctions(filters);
 }
 
 export async function listByOrg(orgId: string): Promise<Auction[]> {
@@ -181,6 +186,14 @@ export async function transitionAuction(
       // Awarding is the terminal, publishable outcome, so it must not be
       // reachable while the audit ledger for this auction is broken.
       if (status === "awarded") {
+        // FR15: an unresolved high-severity anomaly keeps the outcome
+        // provisional until compliance has reviewed it.
+        const openHigh = await anomalyRepo.countOpenHigh(auction.id);
+        if (openHigh > 0) {
+          throw AppError.unprocessable(
+            "Cannot award while a high-severity anomaly flag is still open. Review it first.",
+          );
+        }
         const chain = await audit.verifyAuditChain(auction.id);
         if (!chain.intact) {
           throw AppError.unprocessable(

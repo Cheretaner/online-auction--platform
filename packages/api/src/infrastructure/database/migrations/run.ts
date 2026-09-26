@@ -39,7 +39,35 @@ async function ensureMigrationTable(): Promise<void> {
  * Applies pending migrations.
  * Returns the number of migrations that were newly applied.
  */
+/** Arbitrary constant key for the migration advisory lock. */
+const MIGRATION_LOCK_KEY = 7_311_842_001;
+
+/**
+ * Applies pending migrations.
+ * Returns the number of migrations that were newly applied.
+ *
+ * Holds a session-level advisory lock for the whole run, so two processes
+ * starting at once (several API instances with RUN_MIGRATIONS_ON_BOOT, or a
+ * deploy step racing a booting server) apply each migration exactly once
+ * instead of failing half-way with duplicate-object errors.
+ */
 export async function runMigrations(): Promise<number> {
+  const pool = getPool();
+  const lockClient = await pool.connect();
+
+  try {
+    await lockClient.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    return await applyPendingMigrations();
+  } finally {
+    try {
+      await lockClient.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);
+    } finally {
+      lockClient.release();
+    }
+  }
+}
+
+async function applyPendingMigrations(): Promise<number> {
   const pool = getPool();
 
   await ensureMigrationTable();
@@ -57,7 +85,7 @@ export async function runMigrations(): Promise<number> {
 
   for (const migration of migrations) {
     if (appliedIds.has(migration.id)) {
-      logger.info({ file: migration.filename }, "Migration already applied");
+      logger.debug({ file: migration.filename }, "Migration already applied");
       continue;
     }
 
