@@ -27,6 +27,21 @@ export const upload: RequestHandler = async (req, res) => {
     throw AppError.badRequest(`docType must be one of: ${DOCUMENT_TYPES.join(", ")}`);
   }
 
+  // Default to private: a document is only public once someone says so.
+  let keepPrivate = isPrivate !== "false";
+  if (auctionId) {
+    const owner = await findAuctionOwner(auctionId);
+    if (!owner) throw AppError.notFound("Auction not found");
+    // Only the auction's own organization may add to its public document
+    // pack. Anyone else (a bidder attaching a deposit proof or dispute
+    // evidence) can attach a document, but it stays private: visible to the
+    // uploader and to that organization's officers.
+    const isStaff =
+      auth.roles.includes("super_admin") ||
+      (auth.roles.some((role) => OFFICER_ROLES.includes(role)) && auth.organizationId === owner.orgId);
+    if (!isStaff) keepPrivate = true;
+  }
+
   const document = await service.uploadDocument({
     auctionId: auctionId || undefined,
     uploadedBy: auth.userId,
@@ -35,8 +50,7 @@ export const upload: RequestHandler = async (req, res) => {
     fileName: file.originalname,
     mimeType: file.mimetype,
     data: file.buffer,
-    // Default to private: a document is only public once someone says so.
-    isPrivate: isPrivate !== "false",
+    isPrivate: keepPrivate,
   });
 
   res.status(HttpStatus.CREATED).json(document);

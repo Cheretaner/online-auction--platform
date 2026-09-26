@@ -74,6 +74,26 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
     expect(own.body.status).toBe("verified");
   });
 
+  it("keeps outsider uploads private and limits them to the auction's organization", async () => {
+    const form = new FormData();
+    form.set("file", new Blob(["CPO scan"], { type: "text/plain" }), "cpo.txt");
+    form.set("docType", "other");
+    form.set("auctionId", auctionA);
+    form.set("isPrivate", "false");
+    const res = await fetch(`${ctx.baseUrl}/api/v1/documents`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${bidderToken}` },
+      body: form,
+    });
+    expect(res.status).toBe(201);
+    const doc = (await res.json()) as { id: string; isPrivate: boolean };
+    expect(doc.isPrivate).toBe(true);
+
+    expect((await api(ctx, "GET", `/api/v1/documents/${doc.id}`, { token: tokenB })).status).toBe(403);
+    expect((await api(ctx, "GET", `/api/v1/documents/${doc.id}`, { token: tokenA })).status).toBe(200);
+    expect((await api(ctx, "GET", `/api/v1/documents/${doc.id}`, { token: bidderToken })).status).toBe(200);
+  });
+
   it("keeps disputes inside the organization that runs the auction", async () => {
     const opened = await api(ctx, "POST", "/api/v1/disputes", {
       token: bidderToken,
