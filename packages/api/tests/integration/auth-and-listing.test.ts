@@ -121,6 +121,11 @@ describe.skipIf(!TEST_DATABASE_URL)("sessions, password reset and catalogue pagi
       const region = await api(ctx, "GET", `/api/v1/auctions?q=${tag}&region=oromia&status=live`);
       expect(region.body.total).toBe(5);
 
+      const byOrg = await api(ctx, "GET", `/api/v1/auctions?q=${tag}&orgId=${orgId}`);
+      expect(byOrg.body.total).toBe(5);
+      const otherOrg = await api(ctx, "GET", `/api/v1/auctions?q=${tag}&orgId=${randomUUID()}`);
+      expect(otherOrg.body.total).toBe(0);
+
       const bad = await api(ctx, "GET", `/api/v1/auctions?status=draft`);
       expect(bad.status).toBe(400);
     });

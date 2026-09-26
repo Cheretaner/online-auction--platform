@@ -185,6 +185,7 @@ export interface PublicAuctionFilters {
   q?: string;
   status?: AuctionStatus;
   categoryId?: string;
+  orgId?: string;
   region?: string;
   limit: number;
   offset: number;
@@ -204,6 +205,7 @@ export async function listPublicAuctions(
   };
 
   if (filters.status) where.push(`a.status = ${param(filters.status)}`);
+  if (filters.orgId) where.push(`a.org_id = ${param(filters.orgId)}`);
   if (filters.region) where.push(`a.region ILIKE ${param(filters.region)}`);
   if (filters.q) {
     const pattern = param(`%${filters.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);

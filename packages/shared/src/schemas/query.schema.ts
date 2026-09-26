@@ -20,6 +20,7 @@ export const PublicAuctionListQuery = z.object({
   q: z.string().trim().min(1).max(200).optional(),
   status: z.enum(PUBLIC_AUCTION_FILTER_STATUSES).optional(),
   categoryId: z.string().uuid().optional(),
+  orgId: z.string().uuid().optional(),
   region: z.string().trim().min(1).max(80).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(24),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
