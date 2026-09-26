@@ -24,6 +24,16 @@ export async function openDispute(input: {
     const auction = await biddingRepo.findAuction(input.auctionId);
     if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
 
+    // Only people who took part (a bid or a deposit) may contest an auction;
+    // otherwise any account could file disputes against any auction.
+    if (!(await repo.isParticipant(auction.id, input.raisedBy))) {
+      throw new AppError(
+        "Only participants in this auction can raise a dispute about it",
+        HttpStatus.FORBIDDEN,
+        "FORBIDDEN",
+      );
+    }
+
     let dispute: DisputeRecord;
     try {
       dispute = await repo.insertDispute({
@@ -49,12 +59,18 @@ export async function openDispute(input: {
       payload: { reason: input.reason },
     });
 
-    await auctionService.markUnderReviewIfNeeded({
-      auctionId: auction.id,
-      actorId: input.raisedBy,
-      actorRole: primaryActorRole(input.roles),
-      reason: `Dispute ${dispute.id} opened`,
-    });
+    // A dispute holds the outcome of a closed auction until it is decided.
+    // It must not stop a live one: under_review has no way back to live, so
+    // a single complaint during bidding would end the auction for everyone.
+    // Officers are notified below and can cancel if the complaint warrants it.
+    if (auction.status === "closed") {
+      await auctionService.markUnderReviewIfNeeded({
+        auctionId: auction.id,
+        actorId: input.raisedBy,
+        actorRole: primaryActorRole(input.roles),
+        reason: `Dispute ${dispute.id} opened`,
+      });
+    }
 
     await enqueueOutbox({
       aggregateType: "auction",

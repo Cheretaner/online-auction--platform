@@ -113,6 +113,31 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
     expect(listA.body.items.map((d: { id: string }) => d.id)).toContain(disputeId);
   });
 
+  it("lets only participants raise disputes and never freezes a live auction", async () => {
+    const live = await createAuction(ctx, { orgId: orgA, createdBy: officerA, status: "live" });
+    const outsiderId = await createUser(ctx, { verified: true });
+    const outsider = ctx.sign(outsiderId, ["bidder"]);
+    const refused = await api(ctx, "POST", "/api/v1/disputes", {
+      token: outsider,
+      body: { auctionId: live, reason: "I never took part but want to stop this auction." },
+    });
+    expect(refused.status).toBe(403);
+
+    const bid = await api(ctx, "POST", `/api/v1/auctions/${live}/bids`, {
+      token: bidderToken,
+      body: { amount: "1000.00" },
+      headers: { "Idempotency-Key": randomUUID() },
+    });
+    expect(bid.status).toBe(201);
+    const opened = await api(ctx, "POST", "/api/v1/disputes", {
+      token: bidderToken,
+      body: { auctionId: live, reason: "The increment shown differs from the tender notice." },
+    });
+    expect(opened.status).toBe(201);
+    const { rows } = await ctx.pool.query(`SELECT status FROM auctions WHERE id = $1`, [live]);
+    expect(rows[0].status).toBe("live");
+  });
+
   it("scopes anomaly flags, audits reviews and blocks award while a high flag is open", async () => {
     const closed = await createAuction(ctx, { orgId: orgA, createdBy: officerA, status: "live" });
     await ctx.pool.query(`UPDATE auctions SET status = 'under_review' WHERE id = $1`, [closed]);

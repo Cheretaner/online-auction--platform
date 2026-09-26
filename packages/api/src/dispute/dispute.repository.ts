@@ -128,3 +128,13 @@ export async function resolveDispute(input: {
   );
   return mapDispute(result.rows[0]);
 }
+
+/** A participant has placed a bid or registered a deposit on the auction. */
+export async function isParticipant(auctionId: string, userId: string): Promise<boolean> {
+  const row = await queryOne<{ ok: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM bids WHERE auction_id = $1 AND bidder_id = $2)
+         OR EXISTS (SELECT 1 FROM deposits WHERE auction_id = $1 AND bidder_id = $2) AS ok`,
+    [auctionId, userId],
+  );
+  return Boolean(row?.ok);
+}
