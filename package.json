@@ -7,13 +7,14 @@
   },
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "pnpm --parallel --filter \"./packages/**\" dev",
+    "dev": "pnpm build:shared && pnpm --parallel --filter \"./packages/**\" dev",
     "dev:api": "pnpm --filter @auction/api dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm build:shared && pnpm -r test",
+    "typecheck": "pnpm build:shared && pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "migrate": "pnpm --filter @auction/api migrate"
+    "migrate": "pnpm --filter @auction/api migrate",
+    "build:shared": "pnpm --filter @auction/shared build"
   },
   "devDependencies": {
     "prettier": "^3.3.0",
