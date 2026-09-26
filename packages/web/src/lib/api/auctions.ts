@@ -9,10 +9,31 @@ import type {
   WithdrawBidRequest,
 } from "@auction/shared";
 import { apiRequest, v1 } from "@/lib/api/client";
-import type { Auction, AuctionItem, BidRecord, ItemList } from "@/lib/api/types";
+import type { Auction, AuctionItem, AuctionPage, BidRecord, ItemList } from "@/lib/api/types";
+
+export interface PublicAuctionParams {
+  q?: string;
+  status?: string;
+  categoryId?: string;
+  orgId?: string;
+  region?: string;
+  limit?: number;
+  offset?: number;
+}
+
+function toQuery(params: PublicAuctionParams): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === "") continue;
+    search.set(key, String(value));
+  }
+  const encoded = search.toString();
+  return encoded ? `?${encoded}` : "";
+}
 
 export const auctionsApi = {
-  listPublic: () => apiRequest<ItemList<Auction>>(v1("/auctions")),
+  listPublic: (params: PublicAuctionParams = {}) =>
+    apiRequest<AuctionPage>(v1(`/auctions${toQuery(params)}`)),
   getById: (id: string) => apiRequest<Auction>(v1(`/auctions/${id}`)),
   create: (body: CreateAuctionRequest) =>
     apiRequest<Auction>(v1("/auctions"), { method: "POST", body }),

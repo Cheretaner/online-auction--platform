@@ -23,4 +23,24 @@ export const authApi = {
   switchContext: (organizationId: string) =>
     apiRequest<AuthSession>(v1("/auth/context"), { method: "POST", body: { organizationId } }),
   getUser: (id: string) => apiRequest<PublicProfile>(v1(`/auth/users/${id}`)),
+  logout: (refreshToken: string) =>
+    apiRequest<void>(v1("/auth/logout"), {
+      method: "POST",
+      body: { refreshToken },
+      skipAuth: true,
+      parse: "void",
+    }),
+  requestPasswordReset: (email: string) =>
+    apiRequest<{ message: string }>(v1("/auth/password-reset/request"), {
+      method: "POST",
+      body: { email },
+      skipAuth: true,
+    }),
+  confirmPasswordReset: (token: string, password: string) =>
+    apiRequest<void>(v1("/auth/password-reset/confirm"), {
+      method: "POST",
+      body: { token, password },
+      skipAuth: true,
+      parse: "void",
+    }),
 };

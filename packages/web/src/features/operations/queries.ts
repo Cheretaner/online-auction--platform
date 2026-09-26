@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AddOrganizationMemberRequest,
+  AssignDisputeRequest,
+  ResolveDisputeRequest,
+  ReviewAnomalyRequest,
   CreateCategoryRequest,
   CreateDepositRequest,
   CreateOrganizationRequest,
@@ -138,10 +141,15 @@ export function useReviewVerification() {
       id: string;
       body: ReviewVerificationRequest;
     }) => verificationApi.review(id, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.verification.pending,
-      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["verification"] }),
+  });
+}
+
+export function useVerificationDuplicates(userId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.verification.duplicates(userId ?? ""),
+    queryFn: () => verificationApi.duplicates(userId!),
+    enabled: Boolean(userId) && enabled,
   });
 }
 
@@ -167,8 +175,7 @@ export function useCreateDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateDepositRequest) => depositsApi.create(body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.deposits.mine }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
   });
 }
 
@@ -177,8 +184,15 @@ export function useReviewDeposit() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: ReviewDepositRequest }) =>
       depositsApi.review(id, body),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.deposits.mine }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
+  });
+}
+
+export function useReleaseDeposit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => depositsApi.release(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
   });
 }
 
@@ -204,8 +218,7 @@ export function useUploadDocument() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (form: FormData) => documentsApi.upload(form),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.documents.mine }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
   });
 }
 
@@ -257,6 +270,22 @@ export function useCreateDispute() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: OpenDisputeRequest) => disputesApi.create(body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["disputes"] }),
+  });
+}
+
+export function useAssignDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: AssignDisputeRequest }) => disputesApi.assign(id, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["disputes"] }),
+  });
+}
+
+export function useResolveDispute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ResolveDisputeRequest }) => disputesApi.resolve(id, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["disputes"] }),
   });
 }
@@ -369,6 +398,17 @@ export function useAiAnomalies(auctionId?: string, enabled = true) {
     queryKey: queryKeys.ai.anomalies(auctionId),
     queryFn: () => aiApi.listAnomalies(auctionId),
     enabled,
+  });
+}
+
+export function useReviewAnomaly() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: ReviewAnomalyRequest }) => aiApi.reviewAnomaly(id, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["ai"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
+    },
   });
 }
 

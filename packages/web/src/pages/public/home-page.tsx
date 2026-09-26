@@ -6,8 +6,8 @@ import { QueryState } from "@/components/feedback/query-state";
 import { APP_NAME } from "@/config/env";
 
 export default function HomePage() {
-  const auctions = usePublicAuctions();
-  const live = auctions.data?.items.filter((item) => item.status === "live").slice(0, 6) ?? [];
+  const auctions = usePublicAuctions({ status: "live", limit: 6 });
+  const live = auctions.data?.items ?? [];
 
   return (
     <div className="space-y-10">

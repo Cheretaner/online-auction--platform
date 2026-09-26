@@ -1,74 +1,113 @@
 import chevronDownIcon from '../../assets/icons/chevron-down.svg'
 import cpoProtectedIcon from '../../assets/icons/cpo-protected.svg'
-import selectArrowIcon from '../../assets/icons/select-arrow.svg'
 import verifiedFilterIcon from '../../assets/icons/verified-filter.svg'
+import { useCategories, useOrganizations } from '@/features/operations/queries'
 import { Icon } from '../ui/Icon'
+import { ETHIOPIAN_REGIONS, STATUS_TABS, useDiscoveryFilters } from './use-discovery-filters'
 
-const tabs = [
-  { label: 'All Tenders (42)', active: true },
-  { label: 'Live Auctions (8)', active: false },
-  { label: 'Sealed Tenders (21)', active: false },
-  { label: 'Upcoming (9)', active: false },
-  { label: 'Closed (4)', active: false },
-]
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+}) {
+  return (
+    <label className="relative min-w-0 flex-1">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="block w-full appearance-none truncate border border-line bg-panel py-[8px] pr-[32px] pl-[12px] text-left text-body-13 text-ink-strong"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <Icon
+        src={chevronDownIcon}
+        width={9}
+        height={5.45625}
+        className="pointer-events-none absolute top-1/2 right-[12px] -translate-y-1/2"
+      />
+    </label>
+  )
+}
 
-const dropdowns = ['Category: All Categories', 'Issuer: All Organizations', 'Location: All Regions']
+export function SearchFilterBar({ total }: { total: number | undefined }) {
+  const { filters, update } = useDiscoveryFilters()
+  const categories = useCategories()
+  const organizations = useOrganizations()
 
-export function SearchFilterBar() {
   return (
     <section className="flex flex-col gap-[12px] border border-line bg-white p-[12px] drop-shadow-panel">
-      <div className="flex items-center justify-between border-b border-line/60 pb-[8px]">
-        <div className="flex items-center gap-[4px]">
-          {tabs.map(({ label, active }) => (
-            <button
-              key={label}
-              type="button"
-              className={`px-[12px] py-[6px] font-label text-label-11 font-medium whitespace-nowrap uppercase ${
-                active ? 'border border-ink bg-ink text-white' : 'text-ink-soft'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="flex flex-col gap-2 border-b border-line/60 pb-[8px] lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-[4px] overflow-x-auto" role="tablist" aria-label="Auction status">
+          {STATUS_TABS.map(({ value, label }) => {
+            const active = filters.status === value
+            return (
+              <button
+                key={label}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => update({ status: value })}
+                className={`px-[12px] py-[6px] font-label text-label-11 font-medium whitespace-nowrap uppercase ${
+                  active ? 'border border-ink bg-ink text-white' : 'text-ink-soft hover:text-ink'
+                }`}
+              >
+                {label}
+                {active && total !== undefined ? ` (${total})` : ''}
+              </button>
+            )
+          })}
         </div>
         <div className="flex items-center gap-[8px]">
           <Icon src={verifiedFilterIcon} width={16.2} height={15.3} />
-          <span className="text-sm whitespace-nowrap text-ink-soft">Verified Government &amp; Public Tenders</span>
+          <span className="text-sm text-ink-soft">Only auctions approved under the two-person rule are listed</span>
         </div>
       </div>
 
-      <div className="flex items-start justify-center gap-[8px]">
-        {dropdowns.map((label) => (
-          <div key={label} className="relative min-w-px flex-1">
-            <button
-              type="button"
-              className="flex w-full items-center border border-line bg-panel py-[8px] pr-[32px] pl-[12px] text-left text-body-13 text-ink-strong"
-            >
-              {label}
-            </button>
-            {/* Two stacked chevrons, as in the design: the native select arrow plus a custom one. */}
-            <Icon
-              src={selectArrowIcon}
-              width={19.5}
-              height={19.5}
-              className="pointer-events-none absolute top-1/2 right-[9px] -translate-y-1/2"
-            />
-            <Icon
-              src={chevronDownIcon}
-              width={9}
-              height={5.45625}
-              className="pointer-events-none absolute top-[9px] right-[10px]"
-            />
-          </div>
-        ))}
-        <div className="flex min-w-px flex-1 items-center justify-between border border-line bg-panel px-[12px] py-[8px]">
+      <div className="flex flex-col gap-[8px] md:flex-row md:items-start">
+        <FilterSelect
+          label="Category"
+          value={filters.categoryId}
+          onChange={(categoryId) => update({ categoryId })}
+          options={[
+            { value: '', label: 'Category: All Categories' },
+            ...(categories.data?.items ?? []).map((category) => ({ value: category.id, label: category.name })),
+          ]}
+        />
+        <FilterSelect
+          label="Issuer"
+          value={filters.orgId}
+          onChange={(orgId) => update({ orgId })}
+          options={[
+            { value: '', label: 'Issuer: All Organizations' },
+            ...(organizations.data?.items ?? []).map((org) => ({ value: org.id, label: org.name })),
+          ]}
+        />
+        <FilterSelect
+          label="Region"
+          value={filters.region}
+          onChange={(region) => update({ region })}
+          options={[
+            { value: '', label: 'Location: All Regions' },
+            ...ETHIOPIAN_REGIONS.map((region) => ({ value: region, label: region })),
+          ]}
+        />
+        <div className="flex min-w-0 flex-1 items-center justify-between border border-line bg-panel px-[12px] py-[8px]">
           <div className="flex items-center gap-[6px]">
             <Icon src={cpoProtectedIcon} width={10.4} height={12.8} />
             <span className="text-body-13 whitespace-nowrap text-ink-soft">CPO Bond Protected</span>
           </div>
-          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-forest uppercase">
-            Active
-          </span>
+          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-forest uppercase">Active</span>
         </div>
       </div>
     </section>

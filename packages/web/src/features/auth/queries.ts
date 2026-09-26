@@ -96,6 +96,10 @@ export function useSwitchOrgMutation() {
 export function useLogout() {
   const queryClient = useQueryClient();
   return () => {
+    // Revoke the session on the server too. Fire and forget: signing out
+    // locally must work even when the network or API is down.
+    const refreshToken = tokenStore.getRefreshToken();
+    if (refreshToken) void authApi.logout(refreshToken).catch(() => undefined);
     tokenStore.clear();
     queryClient.setQueryData(queryKeys.session, null);
     queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "auctions" && query.queryKey[0] !== "categories" && query.queryKey[0] !== "organizations" && query.queryKey[0] !== "health" });
@@ -104,4 +108,15 @@ export function useLogout() {
 
 export function sessionRoles(session: AuthSession | null | undefined): Role[] {
   return session?.roles ?? [];
+}
+
+export function useRequestPasswordReset() {
+  return useMutation({ mutationFn: (email: string) => authApi.requestPasswordReset(email) });
+}
+
+export function useConfirmPasswordReset() {
+  return useMutation({
+    mutationFn: ({ token, password }: { token: string; password: string }) =>
+      authApi.confirmPasswordReset(token, password),
+  });
 }

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CancelAuctionRequest,
   CreateAuctionItemRequest,
@@ -10,14 +10,15 @@ import type {
   WithdrawBidRequest,
 } from "@auction/shared";
 import { QUERY_STALE_TIMES } from "@/config/constants";
-import { auctionsApi } from "@/lib/api/auctions";
+import { auctionsApi, type PublicAuctionParams } from "@/lib/api/auctions";
 import { queryKeys } from "@/lib/query/keys";
 
-export function usePublicAuctions() {
+export function usePublicAuctions(params: PublicAuctionParams = {}) {
   return useQuery({
-    queryKey: queryKeys.auctions.public(),
-    queryFn: () => auctionsApi.listPublic(),
+    queryKey: queryKeys.auctions.public(params),
+    queryFn: () => auctionsApi.listPublic(params),
     staleTime: QUERY_STALE_TIMES.catalog,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -120,11 +121,16 @@ export function useDeleteAuctionItem(auctionId: string) {
   });
 }
 
+/**
+ * Places a bid. The caller supplies the Idempotency-Key and must reuse the
+ * same key when retrying the same bid (for example after a timeout); a new
+ * key per attempt would let a retry place a second bid.
+ */
 export function usePlaceBid(auctionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: PlaceBidRequest) =>
-      auctionsApi.placeBid(auctionId, body, crypto.randomUUID()),
+    mutationFn: ({ body, idempotencyKey }: { body: PlaceBidRequest; idempotencyKey: string }) =>
+      auctionsApi.placeBid(auctionId, body, idempotencyKey),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.detail(auctionId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.bids(auctionId) });

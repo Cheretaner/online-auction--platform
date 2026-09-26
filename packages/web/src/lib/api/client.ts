@@ -46,7 +46,12 @@ async function refreshSession(): Promise<boolean> {
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!response.ok) return false;
+    if (!response.ok) {
+      // Another tab may have rotated the shared refresh token a moment ago.
+      // The one we sent is then spent, but the stored one is fresh.
+      const current = tokenStore.getRefreshToken();
+      return Boolean(current && current !== refreshToken);
+    }
     const session = (await response.json()) as AuthSession;
     tokenStore.setSession(session);
     return true;

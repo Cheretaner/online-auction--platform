@@ -25,7 +25,7 @@ export default function LoginPage() {
       <Card>
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Use the email and password registered with the API.</CardDescription>
+          <CardDescription>Sign in to bid, track deposits and manage auctions.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -61,7 +61,12 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      <Link to="/forgot-password" className="text-xs text-primary underline">
+                        Forgot password?
+                      </Link>
+                    </div>
                     <FormControl>
                       <Input type="password" autoComplete="current-password" {...field} />
                     </FormControl>

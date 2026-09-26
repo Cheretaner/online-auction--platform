@@ -4,7 +4,7 @@ export const queryKeys = {
   session: ["auth", "session"] as const,
   auctions: {
     all: ["auctions"] as const,
-    public: () => ["auctions", "public"] as const,
+    public: (params: object = {}) => ["auctions", "public", params] as const,
     detail: (id: string) => ["auctions", "detail", id] as const,
     org: (orgId: string) => ["auctions", "org", orgId] as const,
     items: (auctionId: string) => ["auctions", auctionId, "items"] as const,
@@ -34,6 +34,7 @@ export const queryKeys = {
   verification: {
     mine: ["verification", "me"] as const,
     pending: ["verification", "pending"] as const,
+    duplicates: (userId: string) => ["verification", "duplicates", userId] as const,
   },
   notifications: {
     list: (unread?: boolean) => ["notifications", { unread }] as const,

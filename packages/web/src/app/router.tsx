@@ -7,7 +7,7 @@ import { GuestOnly, RequireAuth, RequireRole } from "@/features/auth/guards";
 import { AppProviders } from "@/app/providers";
 
 const HomePage = lazy(() => import("@/pages/public/home-page"));
-const AuctionListPage = lazy(() => import("@/pages/public/auction-list-page"));
+const AuctionDiscoveryPage = lazy(() => import("@/pages/AuctionDiscoveryPage"));
 const AuctionDetailPage = lazy(
   () => import("@/pages/public/auction-detail-page"),
 );
@@ -16,6 +16,9 @@ const ReportPublicPage = lazy(
 );
 const LoginPage = lazy(() => import("@/pages/auth/login-page"));
 const RegisterPage = lazy(() => import("@/pages/auth/register-page"));
+const ForgotPasswordPage = lazy(() => import("@/pages/auth/forgot-password-page"));
+const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password-page"));
+const VerificationReviewPage = lazy(() => import("@/pages/app/verification-review-page"));
 const DashboardPage = lazy(() => import("@/pages/app/dashboard-page"));
 const WorkspaceAuctionsPage = lazy(
   () => import("@/pages/app/workspace-auctions-page"),
@@ -61,18 +64,21 @@ export const router = createBrowserRouter([
   {
     element: <RootProviders />,
     children: [
+      // The discovery page carries its own header and footer (Figma design).
+      { path: "/auctions", element: <AuctionDiscoveryPage /> },
       {
         element: <PublicShell />,
         children: [
           { path: "/", element: <HomePage /> },
-          { path: "/auctions", element: <AuctionListPage /> },
           { path: "/auctions/:id", element: <AuctionDetailPage /> },
           { path: "/reports/:id", element: <ReportPublicPage /> },
+          { path: "/reset-password", element: <ResetPasswordPage /> },
           {
             element: <GuestOnly />,
             children: [
               { path: "/login", element: <LoginPage /> },
               { path: "/register", element: <RegisterPage /> },
+              { path: "/forgot-password", element: <ForgotPasswordPage /> },
             ],
           },
         ],
@@ -91,8 +97,23 @@ export const router = createBrowserRouter([
               { path: "documents", element: <DocumentsPage /> },
               { path: "notifications", element: <NotificationsPage /> },
               { path: "disputes", element: <DisputesPage /> },
-              { path: "ai", element: <AiPage /> },
               { path: "telegram", element: <TelegramPage /> },
+              {
+                // Compliance officers work inside the auction workspace too
+                // (deposits, anomalies, disputes, reports) but cannot edit.
+                element: (
+                  <RequireRole
+                    roles={["auction_officer", "org_admin", "compliance_officer", "super_admin"]}
+                  />
+                ),
+                children: [
+                  { path: "auctions", element: <WorkspaceAuctionsPage /> },
+                  {
+                    path: "auctions/:id",
+                    element: <WorkspaceAuctionDetailPage />,
+                  },
+                ],
+              },
               {
                 element: (
                   <RequireRole
@@ -100,14 +121,17 @@ export const router = createBrowserRouter([
                   />
                 ),
                 children: [
-                  { path: "auctions", element: <WorkspaceAuctionsPage /> },
                   { path: "auctions/new", element: <AuctionFormPage /> },
-                  {
-                    path: "auctions/:id",
-                    element: <WorkspaceAuctionDetailPage />,
-                  },
                   { path: "auctions/:id/edit", element: <AuctionFormPage /> },
                 ],
+              },
+              {
+                element: (
+                  <RequireRole
+                    roles={["compliance_officer", "org_admin", "super_admin"]}
+                  />
+                ),
+                children: [{ path: "kyc/review", element: <VerificationReviewPage /> }],
               },
               {
                 element: (
@@ -123,6 +147,7 @@ export const router = createBrowserRouter([
                 children: [
                   { path: "reports", element: <ReportsPage /> },
                   { path: "audit", element: <AuditPage /> },
+                  { path: "ai", element: <AiPage /> },
                 ],
               },
               {
@@ -138,11 +163,12 @@ export const router = createBrowserRouter([
                 children: [{ path: "autofetch", element: <AutofetchPage /> }],
               },
               {
+                element: <RequireRole roles={["org_admin", "super_admin"]} />,
+                children: [{ path: "organizations", element: <OrganizationsPage /> }],
+              },
+              {
                 element: <RequireRole roles={["super_admin"]} />,
-                children: [
-                  { path: "organizations", element: <OrganizationsPage /> },
-                  { path: "categories", element: <CategoriesPage /> },
-                ],
+                children: [{ path: "categories", element: <CategoriesPage /> }],
               },
             ],
           },
