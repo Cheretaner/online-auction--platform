@@ -17,15 +17,60 @@ type ScheduledJob = {
 
 const timers = new Map<string, NodeJS.Timeout>();
 
+interface JobState {
+  intervalMs: number;
+  registeredAt: number;
+  lastSuccessAt?: number;
+  lastFailureAt?: number;
+  lastError?: string;
+}
+
+const jobState = new Map<string, JobState>();
+
+/** Jobs whose absence breaks the product, not just housekeeping. /health/ready
+ * reports not-ready when one of them stops succeeding, so an uptime monitor
+ * catches a stuck scheduler instead of it failing silently in the logs. */
+const CRITICAL_JOBS = ["auction-lifecycle", "outbox-dispatch"];
+
+export interface JobHealth {
+  healthy: boolean;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+}
+
+export function criticalJobHealth(now = Date.now()): Record<string, JobHealth> {
+  const result: Record<string, JobHealth> = {};
+  for (const name of CRITICAL_JOBS) {
+    const state = jobState.get(name);
+    if (!state) continue;
+    // Allow a few missed ticks (and a minute of boot) before calling it stuck.
+    const tolerance = Math.max(60_000, state.intervalMs * 5);
+    const reference = state.lastSuccessAt ?? state.registeredAt;
+    result[name] = {
+      healthy: now - reference <= tolerance,
+      lastSuccessAt: state.lastSuccessAt ? new Date(state.lastSuccessAt).toISOString() : null,
+      lastError: state.lastError ?? null,
+    };
+  }
+  return result;
+}
+
 export function scheduleJob(job: ScheduledJob): void {
   if (timers.has(job.name)) return;
+  jobState.set(job.name, { intervalMs: job.intervalMs, registeredAt: Date.now() });
 
   const execute = async (): Promise<void> => {
     const started = Date.now();
+    const state = jobState.get(job.name);
     try {
       await job.run();
+      if (state) state.lastSuccessAt = Date.now();
       logger.debug({ job: job.name, ms: Date.now() - started }, "Scheduled job completed");
     } catch (error) {
+      if (state) {
+        state.lastFailureAt = Date.now();
+        state.lastError = error instanceof Error ? error.message : String(error);
+      }
       logger.error({ err: error, job: job.name }, "Scheduled job failed");
     }
   };
@@ -121,4 +166,5 @@ export function stopAllJobs(): void {
     clearInterval(timer);
   }
   timers.clear();
+  jobState.clear();
 }
