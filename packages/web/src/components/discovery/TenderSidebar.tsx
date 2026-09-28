@@ -94,12 +94,12 @@ export function TenderSidebar({ auction, issuer }: { auction: Auction | undefine
                 Tender Overview
               </h3>
             </div>
-            <span className="bg-ink px-[8px] py-[2px] font-label text-xs font-medium whitespace-nowrap text-white">
+            <span className="bg-primary px-[8px] py-[2px] font-label text-xs font-medium whitespace-nowrap text-primary-foreground">
               TOP RESULT
             </span>
           </div>
 
-          <div className="flex flex-col gap-[20px] border border-line bg-white p-[20px] drop-shadow-panel">
+          <div className="flex flex-col gap-[20px] border border-line bg-card p-[20px] drop-shadow-panel">
             <div className="flex flex-col gap-[4px] border-b border-line pb-[12px]">
               <h3 className="font-display text-xl font-medium text-ink">{auction.title}</h3>
               <p className="text-body-13 text-ink-soft">
@@ -134,7 +134,7 @@ export function TenderSidebar({ auction, issuer }: { auction: Auction | undefine
             <div className="flex flex-col gap-[8px] border-t border-line pt-[4px]">
               <Link
                 to={`/auctions/${auction.id}`}
-                className="flex items-center justify-center gap-[8px] border border-ink bg-ink py-[10px] font-label text-label-12 font-medium whitespace-nowrap text-white uppercase"
+                className="flex items-center justify-center gap-[8px] border border-primary bg-primary py-[10px] font-label text-label-12 font-medium whitespace-nowrap text-primary-foreground uppercase"
               >
                 <Icon src={submitBidIcon} width={12.6} height={13.5} />
                 Open Auction
@@ -144,7 +144,7 @@ export function TenderSidebar({ auction, issuer }: { auction: Auction | undefine
         </>
       ) : null}
 
-      <div className="border border-line bg-white p-[20px] drop-shadow-panel">
+      <div className="border border-line bg-card p-[20px] drop-shadow-panel">
         <Section id="how-to-participate" title="How to Participate">
           <ol className={`${insetBox} gap-[6px]`}>
             {steps.map((step, index) => (

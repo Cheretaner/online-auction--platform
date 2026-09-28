@@ -46,7 +46,7 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
   const organizations = useOrganizations()
 
   return (
-    <section className="flex flex-col gap-[12px] border border-line bg-white p-[12px] drop-shadow-panel">
+    <section className="flex flex-col gap-[12px] border border-line bg-card p-[12px] drop-shadow-panel">
       <div className="flex flex-col gap-2 border-b border-line/60 pb-[8px] lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-[4px] overflow-x-auto" role="tablist" aria-label="Auction status">
           {STATUS_TABS.map(({ value, label }) => {
@@ -59,7 +59,7 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
                 aria-selected={active}
                 onClick={() => update({ status: value })}
                 className={`px-[12px] py-[6px] font-label text-label-11 font-medium whitespace-nowrap uppercase ${
-                  active ? 'border border-ink bg-ink text-white' : 'text-ink-soft hover:text-ink'
+                  active ? 'border border-primary bg-primary text-primary-foreground' : 'text-ink-soft hover:text-ink'
                 }`}
               >
                 {label}
