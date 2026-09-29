@@ -45,3 +45,12 @@ export const CancelAuctionRequest = z.object({
   reason: z.string().min(4).max(2000).optional(),
 });
 export type CancelAuctionRequest = z.infer<typeof CancelAuctionRequest>;
+
+export const ListAuctionsQuery = z.object({
+  q: z.string().optional(),
+  status: z.string().optional(),
+  region: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.string().optional(),
+});
+export type ListAuctionsQuery = z.infer<typeof ListAuctionsQuery>;
