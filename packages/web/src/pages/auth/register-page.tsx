@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RegisterRequest } from "@auction/shared";
 import { toast } from "sonner";
@@ -31,17 +31,63 @@ import { useRegisterMutation } from "@/features/auth/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
 
+type RegisterFormValues = {
+  email: string;
+  password: string;
+  fullName: string;
+  phone: string;
+  accountType: "individual" | "business";
+  businessName: string;
+  nationalId: string;
+  tinNumber: string;
+  region: string;
+};
+
+
+function cleanRegisterValues(values: RegisterFormValues) {
+  const blankToUndefined = (v: string) => {
+    const trimmed = v?.trim();
+    return trimmed ? trimmed : undefined;
+  };
+  const isBusiness = values.accountType === "business";
+  return {
+    email: values.email.trim(),
+    password: values.password,
+    fullName: values.fullName.trim(),
+    accountType: values.accountType,
+    phone: blankToUndefined(values.phone),
+    region: blankToUndefined(values.region),
+    businessName: isBusiness ? blankToUndefined(values.businessName) : undefined,
+    tinNumber: isBusiness ? blankToUndefined(values.tinNumber) : undefined,
+    nationalId: isBusiness ? undefined : blankToUndefined(values.nationalId),
+  };
+}
+
+const registerResolver: Resolver<RegisterFormValues> = async (values, context, options) => {
+  const result = await zodResolver(RegisterRequest)(
+    cleanRegisterValues(values) as never,
+    context as never,
+    options as never,
+  );
+  if (result.errors && Object.keys(result.errors).length > 0) {
+    return { values: {}, errors: result.errors } as never;
+  }
+  // Keep the raw form values so react-hook-form state is untouched; the
+  // submit handler cleans them again before sending.
+  return { values, errors: {} };
+};
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const register = useRegisterMutation();
-  const form = useForm({
-    resolver: zodResolver(RegisterRequest),
+  const form = useForm<RegisterFormValues>({
+    resolver: registerResolver,
     defaultValues: {
       email: "",
       password: "",
       fullName: "",
       phone: "",
-      accountType: "individual" as const,
+      accountType: "individual",
       businessName: "",
       nationalId: "",
       tinNumber: "",
@@ -66,14 +112,7 @@ export default function RegisterPage() {
               className="grid gap-4 sm:grid-cols-2"
               onSubmit={form.handleSubmit(async (values) => {
                 try {
-                  await register.mutateAsync({
-                    ...values,
-                    phone: values.phone || undefined,
-                    businessName: values.businessName || undefined,
-                    nationalId: values.nationalId || undefined,
-                    tinNumber: values.tinNumber || undefined,
-                    region: values.region || undefined,
-                  });
+                  await register.mutateAsync(cleanRegisterValues(values));
                   navigate("/app", { replace: true });
                 } catch (error) {
                   if (!applyApiFieldErrors(error, form.setError)) {
