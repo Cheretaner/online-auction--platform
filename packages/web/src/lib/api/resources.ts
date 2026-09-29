@@ -17,7 +17,10 @@ import type {
 } from "@auction/shared";
 import { apiRequest, v1 } from "@/lib/api/client";
 import type {
+  AnomalyFlagRecord,
   AuditEvent,
+  ComplianceCheckRecord,
+  DuplicateCheckResult,
   AutofetchPendingItem,
   AutofetchSource,
   CategoryRecord,
@@ -80,7 +83,8 @@ export const verificationApi = {
   pending: () => apiRequest<ItemList<VerificationRecord>>(v1("/verifications/pending")),
   review: (id: string, body: ReviewVerificationRequest) =>
     apiRequest<VerificationRecord>(v1(`/verifications/${id}/review`), { method: "POST", body }),
-  duplicates: (userId: string) => apiRequest(v1(`/verifications/users/${userId}/duplicates`)),
+  duplicates: (userId: string) =>
+    apiRequest<DuplicateCheckResult>(v1(`/verifications/users/${userId}/duplicates`)),
 };
 
 export const notificationsApi = {
@@ -124,17 +128,18 @@ export const auditApi = {
 
 export const complianceApi = {
   runCheck: (auctionId: string, body: RunComplianceRequest) =>
-    apiRequest(v1(`/compliance/auctions/${auctionId}/checks`), { method: "POST", body }),
-  listChecks: (auctionId: string) => apiRequest(v1(`/compliance/auctions/${auctionId}/checks`)),
+    apiRequest<ComplianceCheckRecord>(v1(`/compliance/auctions/${auctionId}/checks`), { method: "POST", body }),
+  listChecks: (auctionId: string) =>
+    apiRequest<ItemList<ComplianceCheckRecord>>(v1(`/compliance/auctions/${auctionId}/checks`)),
 };
 
 export const aiApi = {
   categorize: (body: CategorizeRequest) => apiRequest(v1("/ai/categorize"), { method: "POST", body }),
   detectAnomaly: (body: DetectAnomalyRequest) => apiRequest(v1("/ai/anomaly"), { method: "POST", body }),
   listAnomalies: (auctionId?: string) =>
-    apiRequest(v1(`/ai/anomalies${queryString({ auctionId })}`)),
+    apiRequest<ItemList<AnomalyFlagRecord>>(v1(`/ai/anomalies${queryString({ auctionId })}`)),
   reviewAnomaly: (id: string, body: ReviewAnomalyRequest) =>
-    apiRequest(v1(`/ai/anomalies/${id}/review`), { method: "POST", body }),
+    apiRequest<AnomalyFlagRecord>(v1(`/ai/anomalies/${id}/review`), { method: "POST", body }),
   assist: (body: AssistRequest) => apiRequest(v1("/ai/assist"), { method: "POST", body }),
 };
 

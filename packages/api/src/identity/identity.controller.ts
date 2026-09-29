@@ -1,6 +1,8 @@
 import type { RequestHandler } from "express";
 import type {
   LoginRequest,
+  PasswordResetConfirm,
+  PasswordResetRequest,
   RefreshTokenRequest,
   RegisterRequest,
   UpdateProfileRequest,
@@ -25,6 +27,24 @@ export const refresh: RequestHandler = async (req, res) => {
   const body = req.body as RefreshTokenRequest;
   const session = await service.refresh(body.refreshToken);
   res.json(session);
+};
+
+export const requestPasswordReset: RequestHandler = async (req, res) => {
+  const body = req.body as PasswordResetRequest;
+  await service.requestPasswordReset(body.email);
+  res.status(202).json({ message: "If that address has an account, a reset link is on its way." });
+};
+
+export const confirmPasswordReset: RequestHandler = async (req, res) => {
+  const body = req.body as PasswordResetConfirm;
+  await service.confirmPasswordReset(body.token, body.password);
+  res.status(204).end();
+};
+
+export const logout: RequestHandler = async (req, res) => {
+  const body = req.body as RefreshTokenRequest;
+  await service.logout(body.refreshToken);
+  res.status(204).end();
 };
 
 export const switchContext: RequestHandler = async (req, res) => {

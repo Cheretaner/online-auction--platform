@@ -1,7 +1,8 @@
 import type { RequestHandler } from "express";
 import type { CreateAuctionItemRequest, UpdateAuctionItemRequest } from "@auction/shared";
-import { HttpStatus } from "../shared/errors/index.js";
-import { getAuth, routeParam } from "../shared/types/request.js";
+import { AppError, HttpStatus } from "../shared/errors/index.js";
+import { getAuth, routeParam, type AuthenticatedRequest } from "../shared/types/request.js";
+import { getAuction } from "./auction.service.js";
 import * as service from "./auction-item.service.js";
 
 function actorOf(req: Parameters<RequestHandler>[0]) {
@@ -19,14 +20,23 @@ export const createAuctionItem: RequestHandler = async (req, res) => {
 };
 
 export const getAuctionItems: RequestHandler = async (req, res) => {
-  const items = await service.getAuctionItems(routeParam(req.params.auctionId));
+  const auctionId = routeParam(req.params.auctionId);
+  // Lots of an unpublished auction follow the auction's own visibility.
+  await getAuction(auctionId, (req as AuthenticatedRequest).auth);
+  const items = await service.getAuctionItems(auctionId);
   // Wrapped in { items } to match every other list endpoint; this one used
   // to return a bare array, which meant clients needed a special case.
   res.json({ items });
 };
 
 export const getAuctionItem: RequestHandler = async (req, res) => {
-  res.json(await service.getAuctionItemById(routeParam(req.params.id)));
+  const auctionId = routeParam(req.params.auctionId);
+  await getAuction(auctionId, (req as AuthenticatedRequest).auth);
+  const item = await service.getAuctionItemById(routeParam(req.params.id));
+  if (item.auctionId !== auctionId) {
+    throw new AppError("Auction item not found", HttpStatus.NOT_FOUND);
+  }
+  res.json(item);
 };
 
 export const updateAuctionItem: RequestHandler = async (req, res) => {

@@ -4,6 +4,7 @@ import { storageAdapter } from "../infrastructure/storage/storage.adapter.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import * as audit from "../audit/audit.service.js";
+import { findAuctionOwner } from "../shared/authz/auction-access.js";
 import * as repo from "./document.repository.js";
 import type { DocumentRecord } from "./document.types.js";
 
@@ -89,15 +90,40 @@ export async function getDocument(id: string): Promise<DocumentRecord | null> {
  * means the blob was altered outside the application, which is exactly the
  * kind of tampering the platform is meant to surface rather than serve.
  */
+export interface DocumentViewer {
+  userId: string;
+  roles: Role[];
+  organizationId?: string;
+}
+
+/**
+ * Who may open a private document (deposit proofs, inspection notes):
+ * the uploader, a super admin, or an officer of the organization that owns
+ * the document's auction. Holding an officer role in some other
+ * organization is not enough. A private document with no auction (e.g. an
+ * identity document) is limited to the uploader, super admins and
+ * compliance officers.
+ */
+export async function canReadDocument(document: DocumentRecord, viewer: DocumentViewer): Promise<boolean> {
+  if (!document.isPrivate) return true;
+  if (document.uploadedBy === viewer.userId) return true;
+  if (viewer.roles.includes("super_admin")) return true;
+  if (!document.auctionId) return viewer.roles.includes("compliance_officer");
+
+  const isOfficer = viewer.roles.some((role) => OFFICER_ROLES.includes(role));
+  if (!isOfficer || !viewer.organizationId) return false;
+  const owner = await findAuctionOwner(document.auctionId);
+  return owner?.orgId === viewer.organizationId;
+}
+
 export async function readDocument(
   id: string,
-  viewer: { userId: string; roles: Role[] },
+  viewer: DocumentViewer,
 ): Promise<{ document: DocumentRecord; data: Buffer }> {
   const document = await repo.findById(id);
   if (!document) throw AppError.notFound("Document not found");
 
-  const isOfficer = viewer.roles.some((role) => OFFICER_ROLES.includes(role));
-  if (document.isPrivate && document.uploadedBy !== viewer.userId && !isOfficer) {
+  if (!(await canReadDocument(document, viewer))) {
     throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
 

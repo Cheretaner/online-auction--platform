@@ -27,7 +27,7 @@ export async function generateReport(input: {
     const chain = await audit.verifyAuditChain(auction.id);
     const version = await repo.nextVersion(auction.id);
     const bids = await biddingRepo.listBids(auction.id);
-    const anomalies = await anomalyRepo.listFlags(auction.id);
+    const anomalies = await anomalyRepo.listFlags({ auctionId: auction.id });
     const checks = await complianceRepo.listByAuction(auction.id);
     const disputes = await disputeRepo.listDisputes({ auctionId: auction.id });
 

@@ -22,7 +22,7 @@ import { canManageAuctions, statusLabel } from "@/lib/format";
 
 export default function DashboardPage() {
   const { session, roles, organizationId } = useAuth();
-  const auctions = usePublicAuctions();
+  const auctions = usePublicAuctions({ status: "live", limit: 1 });
   const verification = useMyVerification();
   const deposits = useMyDeposits();
   const unread = useUnreadCount();
@@ -53,11 +53,11 @@ export default function DashboardPage() {
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
         <Stat
-          title="Public auctions"
-          value={auctions.data ? String(auctions.data.items.length) : "—"}
-          hint="Browse the catalogue"
+          title="Live auctions"
+          value={auctions.data ? String(auctions.data.total) : "—"}
+          hint="Open for bidding now"
           icon={Gavel}
-          href="/auctions"
+          href="/auctions?status=live"
           loading={auctions.isLoading}
         />
         <Stat

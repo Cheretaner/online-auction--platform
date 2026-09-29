@@ -1,0 +1,27 @@
+[Unit]
+Description=Cheretanet auction API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=auction
+Group=auction
+WorkingDirectory=/srv/auction/current/packages/api
+EnvironmentFile=/etc/auction/api.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=always
+RestartSec=3
+# Give in-flight requests and the scheduler time to finish (server.ts
+# handles SIGTERM with a graceful shutdown).
+TimeoutStopSec=30
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/auction
+
+[Install]
+WantedBy=multi-user.target

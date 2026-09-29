@@ -35,3 +35,14 @@ export const RefreshTokenRequest = z.object({
   refreshToken: z.string().min(10),
 });
 export type RefreshTokenRequest = z.infer<typeof RefreshTokenRequest>;
+
+export const PasswordResetRequest = z.object({
+  email: z.string().email(),
+});
+export type PasswordResetRequest = z.infer<typeof PasswordResetRequest>;
+
+export const PasswordResetConfirm = z.object({
+  token: z.string().min(20).max(200),
+  password: z.string().min(8),
+});
+export type PasswordResetConfirm = z.infer<typeof PasswordResetConfirm>;

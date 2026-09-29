@@ -209,6 +209,16 @@ export async function listBids(auctionId: string): Promise<BidRecord[]> {
   return rows.map(mapBid);
 }
 
+/** The most recent `limit` bids, newest first, for the bid-history feed.
+ * Scoring and reporting use the unbounded listBids above. */
+export async function listLatestBids(auctionId: string, limit: number): Promise<BidRecord[]> {
+  const rows = await queryAll<DbBid>(
+    `SELECT * FROM bids WHERE auction_id = $1 ORDER BY placed_at DESC, amount DESC LIMIT $2`,
+    [auctionId, limit],
+  );
+  return rows.map(mapBid);
+}
+
 export async function listRecentBids(auctionId: string, since: Date): Promise<BidRecord[]> {
   const rows = await queryAll<DbBid>(
     `SELECT * FROM bids WHERE auction_id = $1 AND placed_at >= $2 AND status = 'active'`,

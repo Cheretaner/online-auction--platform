@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
 import type {
+  PublicAuctionListQuery,
   CancelAuctionRequest,
   CreateAuctionRequest,
   TransitionAuctionRequest,
@@ -7,7 +8,7 @@ import type {
 } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
-import type { AuthContext } from "../shared/types/request.js";
+import type { AuthContext, AuthenticatedRequest } from "../shared/types/request.js";
 import * as AuctionService from "./auction.service.js";
 
 
@@ -44,12 +45,13 @@ export const create: RequestHandler = async (req, res) => {
 };
 
 export const getById: RequestHandler = async (req, res) => {
-  res.json(await AuctionService.getAuction(routeParam(req.params.id)));
+  res.json(await AuctionService.getAuction(routeParam(req.params.id), (req as AuthenticatedRequest).auth));
 };
 
-export const listPublic: RequestHandler = async (_req, res) => {
-  const items = await AuctionService.listPublicAuctions();
-  res.json({ items });
+export const listPublic: RequestHandler = async (req, res) => {
+  const filters = req.query as unknown as PublicAuctionListQuery;
+  const page = await AuctionService.listPublicAuctions(filters);
+  res.json({ items: page.items, total: page.total, limit: filters.limit, offset: filters.offset });
 };
 
 export const listByOrg: RequestHandler = async (req, res) => {

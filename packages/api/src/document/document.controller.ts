@@ -27,6 +27,21 @@ export const upload: RequestHandler = async (req, res) => {
     throw AppError.badRequest(`docType must be one of: ${DOCUMENT_TYPES.join(", ")}`);
   }
 
+  // Default to private: a document is only public once someone says so.
+  let keepPrivate = isPrivate !== "false";
+  if (auctionId) {
+    const owner = await findAuctionOwner(auctionId);
+    if (!owner) throw AppError.notFound("Auction not found");
+    // Only the auction's own organization may add to its public document
+    // pack. Anyone else (a bidder attaching a deposit proof or dispute
+    // evidence) can attach a document, but it stays private: visible to the
+    // uploader and to that organization's officers.
+    const isStaff =
+      auth.roles.includes("super_admin") ||
+      (auth.roles.some((role) => OFFICER_ROLES.includes(role)) && auth.organizationId === owner.orgId);
+    if (!isStaff) keepPrivate = true;
+  }
+
   const document = await service.uploadDocument({
     auctionId: auctionId || undefined,
     uploadedBy: auth.userId,
@@ -35,8 +50,7 @@ export const upload: RequestHandler = async (req, res) => {
     fileName: file.originalname,
     mimeType: file.mimetype,
     data: file.buffer,
-    // Default to private: a document is only public once someone says so.
-    isPrivate: isPrivate !== "false",
+    isPrivate: keepPrivate,
   });
 
   res.status(HttpStatus.CREATED).json(document);
@@ -47,8 +61,7 @@ export const getById: RequestHandler = async (req, res) => {
   const doc = await service.getDocument(routeParam(req.params.id));
   if (!doc) throw AppError.notFound("Document not found");
 
-  const isOfficer = auth.roles.some((role) => OFFICER_ROLES.includes(role));
-  if (doc.isPrivate && doc.uploadedBy !== auth.userId && !isOfficer) {
+  if (!(await service.canReadDocument(doc, auth))) {
     throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
 
@@ -57,10 +70,7 @@ export const getById: RequestHandler = async (req, res) => {
 
 export const download: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
-  const result = await service.readDocument(routeParam(req.params.id), {
-    userId: auth.userId,
-    roles: auth.roles,
-  });
+  const result = await service.readDocument(routeParam(req.params.id), auth);
 
   res.setHeader("Content-Type", result.document.mimeType);
   res.setHeader("Content-Length", String(result.document.fileSizeBytes));

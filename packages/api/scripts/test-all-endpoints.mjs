@@ -61,7 +61,8 @@ async function call(method, path, { token, body, isFormData, headers: customHead
   if (!isFormData && body !== undefined && !headers["content-type"]) {
     headers["content-type"] = "application/json";
   }
-  headers["Idempotency-Key"] = `test-${STAMP}-${Math.random().toString(36).slice(2)}`;
+  // Keep a caller-supplied key: the replay test depends on sending the same one twice.
+  headers["Idempotency-Key"] ??= `test-${STAMP}-${Math.random().toString(36).slice(2)}`;
 
   let fetchBody = undefined;
   if (isFormData) {
@@ -121,16 +122,17 @@ async function main() {
   // --------------------------------------------------------------------------
   domainHeader("2. Identity & Access Management (@cheretanet.org)");
 
-  const adminEmail = `admin.${STAMP}@cheretanet.org`;
+  // The platform admin must be the address in the API's
+  // BOOTSTRAP_SUPER_ADMIN_EMAIL (or, in development only, the very first
+  // account on an empty database). Set ADMIN_EMAIL to match the API.
+  const adminEmail = process.env.ADMIN_EMAIL ?? `admin.${STAMP}@cheretanet.org`;
   const officerEmail = `officer.${STAMP}@cheretanet.org`;
   const complianceEmail = `compliance.${STAMP}@cheretanet.org`;
   const bidder1Email = `solomon.bidder.${STAMP}@cheretanet.org`;
   const bidder2Email = `marta.bidder.${STAMP}@cheretanet.org`;
 
-  // Register Platform Admin
-  const adminReg = expectStatus(
-    "2. Identity & Access Management (@cheretanet.org)",
-    await call("POST", "/api/v1/auth/register", {
+  // Register Platform Admin (or log in if a previous run already created it)
+  let adminRegRes = await call("POST", "/api/v1/auth/register", {
       body: {
         email: adminEmail,
         password: PASSWORD,
@@ -139,7 +141,14 @@ async function main() {
         accountType: "individual",
         region: "Addis Ababa",
       },
-    }),
+    });
+  if (adminRegRes.status === 409) {
+    const relogin = await call("POST", "/api/v1/auth/login", { body: { email: adminEmail, password: PASSWORD } });
+    adminRegRes = { ...relogin, status: relogin.status === 200 ? 201 : relogin.status };
+  }
+  const adminReg = expectStatus(
+    "2. Identity & Access Management (@cheretanet.org)",
+    adminRegRes,
     201,
     `POST /api/v1/auth/register - Register Platform Admin (${adminEmail})`,
     "Registered with super_admin platform bootstrap privilege",
@@ -497,8 +506,15 @@ async function main() {
   expectStatus(
     "5. Auctions Lifecycle & Two-Person Rule",
     await call("GET", `/api/v1/auctions/${auctionId}`),
+    404,
+    "GET /api/v1/auctions/:id - Draft auction hidden from anonymous visitors",
+  );
+
+  expectStatus(
+    "5. Auctions Lifecycle & Two-Person Rule",
+    await call("GET", `/api/v1/auctions/${auctionId}`, { token: officerToken }),
     200,
-    "GET /api/v1/auctions/:id - Retrieve auction public card details",
+    "GET /api/v1/auctions/:id - Organization officer reads draft auction",
   );
 
   expectStatus(
@@ -573,7 +589,7 @@ async function main() {
 
   expectStatus(
     "6. Auction Items & Lots",
-    await call("GET", `/api/v1/auctions/${auctionId}/items`),
+    await call("GET", `/api/v1/auctions/${auctionId}/items`, { token: officerToken }),
     200,
     "GET /api/v1/auctions/:id/items - List lots cataloged in auction",
   );
@@ -581,7 +597,7 @@ async function main() {
   if (itemId1) {
     expectStatus(
       "6. Auction Items & Lots",
-      await call("GET", `/api/v1/auctions/${auctionId}/items/${itemId1}`),
+      await call("GET", `/api/v1/auctions/${auctionId}/items/${itemId1}`, { token: officerToken }),
       200,
       "GET /api/v1/auctions/:id/items/:itemId - Read single lot details",
     );

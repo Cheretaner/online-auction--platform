@@ -40,7 +40,11 @@ export function writeSse(res: Response, event: RealtimeEvent): void {
   res.write(`event: ${event.event}\ndata: ${JSON.stringify({ channel: event.channel, payload: event.payload })}\n\n`);
 }
 
-export function attachSseStream(res: Response, channel: string): () => void {
+export function attachSseStream(
+  res: Response,
+  channel: string,
+  filter: (event: RealtimeEvent) => RealtimeEvent | null = (event) => event,
+): () => void {
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
@@ -49,7 +53,8 @@ export function attachSseStream(res: Response, channel: string): () => void {
   res.write(": connected\n\n");
 
   return realtimeAdapter.subscribe(channel, (event) => {
-    writeSse(res, event);
+    const visible = filter(event);
+    if (visible) writeSse(res, visible);
   });
 }
 

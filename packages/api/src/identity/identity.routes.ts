@@ -1,5 +1,12 @@
 import { Router } from "express";
-import { LoginRequest, RefreshTokenRequest, RegisterRequest, UpdateProfileRequest } from "@auction/shared";
+import {
+  LoginRequest,
+  PasswordResetConfirm,
+  PasswordResetRequest,
+  RefreshTokenRequest,
+  RegisterRequest,
+  UpdateProfileRequest,
+} from "@auction/shared";
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
@@ -13,6 +20,19 @@ const router = Router();
 router.post("/register", authRateLimiter, validate(RegisterRequest), asyncHandler(controller.register));
 router.post("/login", authRateLimiter, validate(LoginRequest), asyncHandler(controller.login));
 router.post("/refresh", authRateLimiter, validate(RefreshTokenRequest), asyncHandler(controller.refresh));
+router.post("/logout", authRateLimiter, validate(RefreshTokenRequest), asyncHandler(controller.logout));
+router.post(
+  "/password-reset/request",
+  authRateLimiter,
+  validate(PasswordResetRequest),
+  asyncHandler(controller.requestPasswordReset),
+);
+router.post(
+  "/password-reset/confirm",
+  authRateLimiter,
+  validate(PasswordResetConfirm),
+  asyncHandler(controller.confirmPasswordReset),
+);
 
 router.get("/me", requireAuth(), asyncHandler(controller.getProfile));
 router.patch("/me", requireAuth(), validate(UpdateProfileRequest), asyncHandler(controller.updateProfile));

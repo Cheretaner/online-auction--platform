@@ -181,16 +181,63 @@ export async function updateStatus(
   return mapRowToAuction(row);
 }
 
-export async function listPublicAuctions(client?: Queryable): Promise<Auction[]> {
-  const sql = `
-    SELECT * FROM auctions
-    WHERE status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')
-    ORDER BY
-      CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END,
-      closes_at ASC
-  `;
-  const rows = await queryAll(sql, [], client);
-  return rows.map(mapRowToAuction);
+export interface PublicAuctionFilters {
+  q?: string;
+  status?: AuctionStatus;
+  categoryId?: string;
+  orgId?: string;
+  region?: string;
+  limit: number;
+  offset: number;
+}
+
+/** One page of the public catalogue plus the total match count, so clients
+ * can page without downloading every auction. */
+export async function listPublicAuctions(
+  filters: PublicAuctionFilters,
+  client?: Queryable,
+): Promise<{ items: Auction[]; total: number }> {
+  const where: string[] = [`a.status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')`];
+  const values: unknown[] = [];
+  const param = (value: unknown) => {
+    values.push(value);
+    return `$${values.length}`;
+  };
+
+  if (filters.status) where.push(`a.status = ${param(filters.status)}`);
+  if (filters.orgId) where.push(`a.org_id = ${param(filters.orgId)}`);
+  if (filters.region) where.push(`a.region ILIKE ${param(filters.region)}`);
+  if (filters.q) {
+    const pattern = param(`%${filters.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    where.push(`(a.title ILIKE ${pattern} OR a.description ILIKE ${pattern})`);
+  }
+  if (filters.categoryId) {
+    where.push(
+      `EXISTS (SELECT 1 FROM auction_items i WHERE i.auction_id = a.id AND i.category_id = ${param(filters.categoryId)})`,
+    );
+  }
+
+  const whereSql = where.join(" AND ");
+  const countRow = await queryOne<{ total: string }>(
+    `SELECT count(*)::text AS total FROM auctions a WHERE ${whereSql}`,
+    values,
+    client,
+  );
+
+  const limit = param(filters.limit);
+  const offset = param(filters.offset);
+  const rows = await queryAll(
+    `SELECT a.* FROM auctions a
+      WHERE ${whereSql}
+      ORDER BY
+        CASE a.status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END,
+        a.closes_at ASC,
+        a.id ASC
+      LIMIT ${limit} OFFSET ${offset}`,
+    values,
+    client,
+  );
+  return { items: rows.map(mapRowToAuction), total: Number(countRow?.total ?? 0) };
 }
 
 /** Locks a single auction row for the duration of the current transaction. */

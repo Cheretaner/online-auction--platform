@@ -78,6 +78,13 @@ export interface ItemList<T> {
   items: T[];
 }
 
+/** One page of GET /auctions. */
+export interface AuctionPage extends ItemList<Auction> {
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface CountResponse {
   count: number;
 }
@@ -87,7 +94,7 @@ export interface OrganizationRecord {
   name: string;
   slug: string;
   orgType: string;
-  tinNumber: string;
+  taxpayerId: string;
   region: string;
   contactEmail: string;
   contactPhone: string;
@@ -122,29 +129,33 @@ export interface AuctionItem {
   updatedAt: string;
 }
 
+/** A bid as GET /auctions/:id/bids returns it (bidding.visibility.ts):
+ * sealed amounts and other bidders' ids are hidden until bids are opened. */
 export interface BidRecord {
   id: string;
   auctionId: string;
   bidderId: string;
   amount: string | null;
+  status: "active" | "withdrawn" | "superseded";
   isSealed: boolean;
-  commitmentHash: string | null;
   placedAt: string;
-  withdrawnAt?: string | null;
+  redacted: boolean;
 }
 
 export interface DocumentRecord {
   id: string;
   auctionId: string | null;
   uploadedBy: string;
-  docType: DocumentType;
+  documentType: DocumentType;
   fileName: string;
   storagePath: string;
   mimeType: string;
-  sizeBytes: number;
-  checksum: string;
+  fileSizeBytes: number;
+  checksumSha256: string;
   isPrivate: boolean;
+  summary: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface DepositRecord {
@@ -155,8 +166,11 @@ export interface DepositRecord {
   referenceNumber: string;
   issuingBank: string;
   instrumentType: string;
-  status: string;
+  status: "pending" | "verified" | "rejected" | "released";
   documentId: string | null;
+  verifiedBy: string | null;
+  verifiedAt: string | null;
+  releasedAt: string | null;
   rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
@@ -179,12 +193,14 @@ export interface NotificationRecord {
 export interface DisputeRecord {
   id: string;
   auctionId: string;
-  openedBy: string;
+  raisedBy: string;
   reason: string;
-  status: string;
-  assignedTo: string | null;
+  evidence: Record<string, unknown>;
+  status: "open" | "under_review" | "resolved" | "rejected";
+  assignedReviewer: string | null;
   decision: string | null;
   decisionReason: string | null;
+  resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -192,11 +208,13 @@ export interface DisputeRecord {
 export interface ReportRecord {
   id: string;
   auctionId: string;
-  type: string;
-  status?: string;
+  reportType: string;
+  reportVersion: number;
+  chainHead: string | null;
+  chainVerified: boolean;
+  reportData: Record<string, unknown>;
   publishedAt: string | null;
   createdAt: string;
-  content?: unknown;
 }
 
 export interface CategoryRecord {
@@ -257,4 +275,35 @@ export interface AutofetchPendingItem {
   title?: string;
   payload?: unknown;
   createdAt?: string;
+}
+
+export interface AnomalyFlagRecord {
+  id: string;
+  auctionId: string;
+  subjectAccounts: string[];
+  score: string;
+  severity: "low" | "medium" | "high";
+  status: "open" | "reviewed" | "dismissed" | "escalated";
+  triggeredRules: string[];
+  featureValues: Record<string, unknown>;
+  explanation: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  decisionNote: string | null;
+  createdAt: string;
+}
+
+export interface ComplianceCheckRecord {
+  id: string;
+  auctionId: string;
+  checkedBy: string;
+  status: "pending" | "passed" | "failed";
+  findings: Array<{ code?: string; message?: string } | string>;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface DuplicateCheckResult {
+  hasDuplicates: boolean;
+  duplicates: Array<{ id: string; national_id: string | null; tin_number: string | null }>;
 }

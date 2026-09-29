@@ -108,6 +108,13 @@ const envSchema = z
         message: "must list explicit origins in production, not '*'",
       });
     }
+    if (value.NODE_ENV === "production" && !value.BOOTSTRAP_SUPER_ADMIN_EMAIL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["BOOTSTRAP_SUPER_ADMIN_EMAIL"],
+        message: "is required in production so the super_admin account cannot be claimed by the first sign-up",
+      });
+    }
     if (value.NODE_ENV === "production" && !value.DATABASE_URL) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

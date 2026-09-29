@@ -85,6 +85,24 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+
+  /* Figma prototype color names, mapped onto the app's green palette so the
+     public discovery pages match the rest of the app (and follow dark mode). */
+  --color-ink: var(--foreground);
+  --color-ink-soft: var(--muted-foreground);
+  --color-ink-strong: var(--foreground);
+  --color-line: var(--border);
+  --color-line-strong: var(--muted-foreground);
+  --color-canvas: var(--background);
+  --color-panel: var(--muted);
+  --color-panel-2: var(--secondary);
+  --color-panel-3: var(--secondary);
+  --color-panel-4: var(--accent);
+  --color-forest: var(--primary);
+  --color-danger: var(--destructive);
+  --color-danger-tint: color-mix(in oklch, var(--destructive) 15%, transparent);
+  --color-navy: var(--sidebar);
+  --color-navy-ink: var(--sidebar-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -114,5 +132,38 @@
 
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Design tokens taken from the Cheretanet Figma prototype. */
+@theme {
+  --font-display: "Newsreader", ui-serif, Georgia, serif;
+  --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-amharic: "FreeSerif", "Noto Serif Ethiopic", serif;
+
+  --text-label-11: 11px;
+  --text-label-11--line-height: 14px;
+  --text-label-11--letter-spacing: 0.55px;
+  --text-label-12: 12px;
+  --text-label-12--line-height: 16px;
+  --text-label-12--letter-spacing: 0.6px;
+  --text-body-13: 13px;
+  --text-body-13--line-height: 18px;
+  --text-body-13--letter-spacing: 0.065px;
+
+  --drop-shadow-panel: 0 1px 1px rgb(0 0 0 / 0.05);
+}
+
+@layer base {
+  /* Unrounded glyph advances so text widths match the Figma metrics (hinted rounding widens mono text ~6%).
+     Form controls are listed because the browser stylesheet resets text-rendering on them. */
+  html,
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    text-rendering: geometricPrecision;
   }
 }

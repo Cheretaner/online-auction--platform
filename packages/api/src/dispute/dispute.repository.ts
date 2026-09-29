@@ -71,7 +71,19 @@ export async function findDispute(id: string): Promise<DisputeRecord | null> {
 export async function listDisputes(input: {
   auctionId?: string;
   raisedBy?: string;
+  orgId?: string;
 }): Promise<DisputeRecord[]> {
+  if (input.orgId) {
+    const rows = await queryAll<DbDispute>(
+      `SELECT d.* FROM disputes d
+         JOIN auctions a ON a.id = d.auction_id
+        WHERE a.org_id = $1
+        ORDER BY d.created_at DESC
+        LIMIT 200`,
+      [input.orgId],
+    );
+    return rows.map(mapDispute);
+  }
   if (input.auctionId) {
     const rows = await queryAll<DbDispute>(
       `SELECT * FROM disputes WHERE auction_id = $1 ORDER BY created_at DESC`,
@@ -115,4 +127,14 @@ export async function resolveDispute(input: {
     [input.id, input.status, input.decision, input.decisionReason],
   );
   return mapDispute(result.rows[0]);
+}
+
+/** A participant has placed a bid or registered a deposit on the auction. */
+export async function isParticipant(auctionId: string, userId: string): Promise<boolean> {
+  const row = await queryOne<{ ok: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM bids WHERE auction_id = $1 AND bidder_id = $2)
+         OR EXISTS (SELECT 1 FROM deposits WHERE auction_id = $1 AND bidder_id = $2) AS ok`,
+    [auctionId, userId],
+  );
+  return Boolean(row?.ok);
 }

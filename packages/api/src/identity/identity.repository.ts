@@ -163,6 +163,13 @@ export class IdentityRepository {
     return Boolean(row?.ok);
   }
 
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await queryOne(`UPDATE profiles SET password_hash = $2, updated_at = now() WHERE id = $1 RETURNING id`, [
+      userId,
+      passwordHash,
+    ]);
+  }
+
   async countProfiles(): Promise<number> {
     const row = await queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM profiles`);
     return Number(row?.count ?? 0);

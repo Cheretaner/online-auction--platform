@@ -1,7 +1,7 @@
 # @auction/api
 
 Backend for the AI-Powered Transparent Online Auction System.
-Node 22 + Express 5 + PostgreSQL 16. No containers.
+Node 22 (>= 20.19) + Express 5 + PostgreSQL 16. No containers.
 
 ---
 
@@ -32,8 +32,9 @@ pnpm --filter @auction/api smoke       # walks the whole flow end to end
 
 ## Production deployment
 
-Three scripts in `deploy/`, meant to be run in this order on a fresh
-Ubuntu/Debian host.
+Scripts in the repository-root `deploy/` directory, meant to be run in this
+order on a fresh Ubuntu/Debian host. nginx serves the built web app and
+proxies `/api` to the API on the same origin (`deploy/nginx.conf`).
 
 ### 1. Provision (once)
 
@@ -47,8 +48,15 @@ creates the database role via `deploy/bootstrap-db.sql`.
 
 Then edit `/etc/auction/api.env` and set at minimum:
 
-- `BOOTSTRAP_SUPER_ADMIN_EMAIL` — whoever will run the platform
-- `CORS_ORIGIN` — your real front-end origin (`*` is refused in production)
+- `BOOTSTRAP_SUPER_ADMIN_EMAIL` — whoever will run the platform (the API
+  refuses to start in production without it)
+- `CORS_ORIGIN` and `WEB_BASE_URL` — your real front-end origin (`*` is
+  refused in production; `WEB_BASE_URL` is used in password-reset links)
+- `SMTP_*` — without it, password-reset links are never delivered
+
+It also installs a nightly backup (`deploy/backup.sh`: `pg_dump` plus the
+uploaded-documents directory, 14 days kept under `/var/backups/auction`).
+Copy those backups off the machine, and test a restore once before launch.
 
 Back that file up. Rotating `JWT_SECRET` signs out every existing session.
 
@@ -70,10 +78,10 @@ apply the matching `.down.sql` by hand.
 ### 3. TLS
 
 ```bash
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/auction-api
-sudo ln -s /etc/nginx/sites-available/auction-api /etc/nginx/sites-enabled/
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/auction
+sudo ln -s /etc/nginx/sites-available/auction /etc/nginx/sites-enabled/
 # edit server_name, then:
-sudo certbot --nginx -d api.example.com
+sudo certbot --nginx -d auction.example.et
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -97,30 +105,38 @@ sudo systemctl restart auction-api
 **Row-level security.** Migration 002 enables RLS on 14 tables and defines
 `SELECT` policies, but almost no `INSERT`/`UPDATE` policies. The API is
 designed to connect as the **owner of the schema**, which bypasses RLS; the
-policies are defence in depth for any read-only role you attach later.
+policies are defence in depth for any read-only role you attach later. This
+means authorization is enforced by the service layer only, which deviates
+from RFC-001 decision 3 (two independent layers) — an explicit launch
+decision is needed.
 `bootstrap-db.sql` sets this up correctly. If you repoint `DATABASE_URL` at a
 non-owner role, every write is denied and the failures look like unrelated
 application bugs.
 
-**Migration filenames are the primary key.** They apply in filename order:
-`001_core` → `002_security_foundation` → `003_operational` →
-`003_schema_alignment` → `004_add_estimated_value` → `004_hardening` →
-`005_role_alignment`. Two pairs share a numeric prefix; the sort is still
-deterministic, but never rename a migration that has been applied anywhere,
-because `schema_migrations` keys on the filename.
+**Migration filenames are the primary key.** They apply in filename order
+(`001_core` … `009_auth_sessions`). Two pairs share a numeric prefix; the sort
+is still deterministic, but never rename a migration that has been applied
+anywhere, because `schema_migrations` keys on the filename. The runner holds
+a Postgres advisory lock, so concurrent boots cannot apply one twice.
 
-**`tsc` does not emit `.sql`.** `deploy.sh` copies the migration files into
-`dist` explicitly. If you build by hand, do the same or the runner finds no
-migrations.
+**`tsc` does not emit `.sql`.** `pnpm build` copies the migration files into
+`dist` (`scripts/copy-migrations.mjs`).
 
 **Roles live in the access token.** Anyone granted a new role must log in
 again (or call `POST /api/v1/auth/refresh`) before it takes effect.
 
 **The scheduler is load-bearing.** The `auction-lifecycle` job is the only
-thing that opens scheduled auctions and closes live ones. If the process is
-not running, approved auctions never open. Running more than one instance is
-safe — every transition takes a row lock and re-checks under it — but at
-least one must be up.
+thing that opens scheduled auctions and closes live ones; `outbox-dispatch`
+is the only thing that delivers live updates and notifications.
+`/health/ready` returns 503 when either has not succeeded for several ticks,
+so point your uptime monitor at it, not at `/health`.
+
+**Run exactly one API instance for now.** Two things are per-process:
+live events go through an in-memory bus (a bid dispatched by instance A
+never reaches browsers connected to instance B), and uploaded documents are
+stored on the local disk (`STORAGE_DIR`). Lifecycle transitions themselves
+are row-locked and would be safe. Scaling out needs a shared event bus
+(Postgres LISTEN/NOTIFY or Redis) and object storage first.
 
 ---
 
@@ -128,8 +144,9 @@ least one must be up.
 
 `organization_members` only models roles *inside* an organization, so a fresh
 database has nobody who can create the first one. The account matching
-`BOOTSTRAP_SUPER_ADMIN_EMAIL` is promoted to `super_admin` when it registers;
-if that variable is unset, the first account ever registered is promoted.
+`BOOTSTRAP_SUPER_ADMIN_EMAIL` is promoted to `super_admin` when it registers.
+Production requires the variable; in development, leaving it unset promotes
+the first account ever registered. No other rule grants the role.
 
 ```bash
 # 1. Platform operator
@@ -196,10 +213,44 @@ GET /api/v1/audit/verify                        # global ledger
 GET /api/v1/audit/auctions/:auctionId/verify    # one auction
 ```
 
+## Sessions
+
+Access tokens last `JWT_EXPIRES_IN` (15 minutes) and cannot be revoked
+before then. Refresh tokens are recorded in `refresh_tokens`, single-use and
+rotated on every `POST /auth/refresh`; replaying a used one (outside a 30 s
+multi-tab grace window) revokes the whole family. `POST /auth/logout`
+revokes the session, and a password reset
+(`POST /auth/password-reset/request` then `/confirm`) revokes all of them.
+
+## Sealed bids
+
+A sealed bid carries `commitmentHash` = hex SHA-256 of
+`cheretanet-sealed-bid:v1|<auctionId>|<amount>|<nonce>`
+(`sealedBidCommitmentPreimage` in `@auction/shared`). The web app computes it
+in the browser and gives the bidder the nonce as a receipt, so after opening
+anyone can check the recorded amount against the commitment in the audit
+trail.
+
+## Public catalogue
+
+`GET /api/v1/auctions` takes `q`, `status`, `categoryId`, `orgId`, `region`,
+`limit` (1–100, default 24) and `offset`, and returns
+`{ items, total, limit, offset }`. Unpublished auctions (draft, pending
+review) return 404 to anyone outside the owning organization, on the detail,
+lots and live-event endpoints alike.
+
 ## Testing
 
-`pnpm test` runs the unit tests that exist (money, result, idempotency, jwt).
-There is **no integration coverage**. `scripts/smoke.mjs` is a harness, not a
-test suite — but it does exercise registration, org creation, role grants,
-KYC, auction creation, the two-person approval rule, public discovery, bid
-rejection before open, the audit chain, compliance and notifications.
+```bash
+pnpm test                                    # unit tests; integration tests skip
+TEST_DATABASE_URL=postgres://…/auction_test pnpm test   # plus integration tests
+```
+
+`tests/integration` runs against a real, disposable Postgres database
+(CI provides one): concurrent bidding, eligibility rules, the audit chain,
+visibility and event-stream authorization, organization boundaries, token
+rotation, password reset and catalogue paging. **Point it only at a
+database you can throw away.**
+
+`scripts/test-all-endpoints.mjs` walks every endpoint against a running API.
+Set `ADMIN_EMAIL` to the API's `BOOTSTRAP_SUPER_ADMIN_EMAIL`.

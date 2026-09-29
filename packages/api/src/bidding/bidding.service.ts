@@ -227,7 +227,7 @@ export async function listBids(input: {
   const auction = await repo.findAuction(input.auctionId);
   if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
   const officer = await repo.isOrgOfficer(auction.orgId, input.viewerId);
-  const bids = await repo.listBids(input.auctionId);
+  const bids = await repo.listLatestBids(input.auctionId, 200);
   return bids.map((bid) => toPublicBid(bid, auction, { viewerId: input.viewerId, isOfficer: officer }));
 }
 
