@@ -5,6 +5,12 @@ import type { AuctionStatus } from "@auction/shared";
 import type { CreateAuctionRequest, UpdateAuctionRequest } from "@auction/shared";
 import type { Queryable } from "../infrastructure/database/query.js";
 
+
+export interface PaginatedResult<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
 function mapRowToAuction(row: any): Auction {
   return {
     id: row.id,
@@ -60,7 +66,7 @@ export async function createAuction(
       $14, 'draft'
     ) RETURNING *
   `;
-  
+
   const values = [
     orgId,
     data.title,
@@ -356,9 +362,9 @@ export async function markAwarded(id: string, client?: Queryable): Promise<Aucti
 
 export async function listByOrgId(
   orgId: string,
-  limit: number,
+  limit = 50,
   cursor?: { c: string; i: string },
-  client?: Queryable
+  client?: Queryable,
 ): Promise<PaginatedResult<Auction>> {
   let sql = `SELECT * FROM auctions WHERE org_id = $1`;
   const values: any[] = [orgId];
@@ -375,12 +381,25 @@ export async function listByOrgId(
   const rows = await queryAll(sql, values, client);
   const items = rows.map(mapRowToAuction);
 
-  let nextCursor = null;
+  let nextCursor: string | null = null;
+
   if (items.length > limit) {
     items.pop();
+
     const lastItem = items[items.length - 1];
-    nextCursor = Buffer.from(JSON.stringify({ c: lastItem.createdAt, i: lastItem.id })).toString('base64url');
+
+    if (lastItem) {
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          c: lastItem.createdAt,
+          i: lastItem.id,
+        }),
+      ).toString("base64url");
+    }
   }
 
-  return { items, nextCursor };
+  return {
+    items,
+    nextCursor,
+  };
 }

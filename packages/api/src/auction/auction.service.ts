@@ -81,7 +81,8 @@ export async function listPublicAuctions(filters: AuctionRepo.PublicAuctionFilte
 }
 
 export async function listByOrg(orgId: string): Promise<Auction[]> {
-  return AuctionRepo.listByOrgId(orgId);
+  const result = await AuctionRepo.listByOrgId(orgId);
+  return result.items;
 }
 
 export async function submitForApproval(
