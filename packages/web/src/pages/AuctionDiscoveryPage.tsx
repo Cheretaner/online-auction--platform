@@ -11,7 +11,7 @@ import { useOrganizations } from '@/features/operations/queries'
 import { getErrorMessage } from '@/lib/api/errors'
 
 const pagerButton =
-  'border border-ink px-[12px] py-[6px] font-label text-label-12 font-medium uppercase text-ink disabled:border-line disabled:text-line'
+  'border border-primary px-[12px] py-[6px] font-label text-label-12 font-medium uppercase text-primary disabled:border-line disabled:text-line'
 
 export default function AuctionDiscoveryPage() {
   const { filters, update, apiParams } = useDiscoveryFilters()

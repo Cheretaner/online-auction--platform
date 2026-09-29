@@ -14,7 +14,7 @@ import { Icon } from '../ui/Icon'
 const buttonBase =
   'flex shrink-0 items-center justify-center font-label text-label-12 font-medium text-center uppercase'
 
-const standardCard = 'border border-line bg-white drop-shadow-panel'
+const standardCard = 'border border-line bg-card drop-shadow-panel'
 const cardHeader = 'flex flex-col gap-[8px] border-b border-line/60 pb-[4px]'
 const cardFooter = 'border-t border-line/60 pt-[4px]'
 const headline = 'font-display text-xl font-medium tracking-[-0.5px] text-ink'
@@ -110,7 +110,7 @@ function StatusChips({ auction }: { auction: Auction }) {
       {auction.auctionType === 'sealed_bid' ? (
         <span className="flex items-center gap-[4px] bg-navy px-[10px] py-[2px]">
           <Icon src={sealedLockIcon} width={7.8} height={11.05} />
-          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-white uppercase">Sealed Tender</span>
+          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-sidebar-foreground uppercase">Sealed Tender</span>
         </span>
       ) : null}
       <span className="border border-line bg-panel-2 px-[8px] py-[2px] font-label text-xs whitespace-nowrap text-ink-soft">
@@ -150,7 +150,7 @@ function PriceSummary({ auction }: { auction: Auction }) {
 
 function AuctionListing({ auction, issuer, featured }: { auction: Auction; issuer: string; featured: boolean }) {
   const cardClass = featured
-    ? 'border-2 border-ink bg-white drop-shadow-panel'
+    ? 'border-2 border-primary bg-card drop-shadow-panel'
     : auction.status === 'awarded' || auction.status === 'closed'
       ? 'border border-line bg-panel/70'
       : standardCard
@@ -210,7 +210,7 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
             )}
           </p>
         </div>
-        <Link to={`/auctions/${auction.id}`} className={`${buttonBase} gap-[6px] bg-ink px-[20px] py-[6px] text-white`}>
+        <Link to={`/auctions/${auction.id}`} className={`${buttonBase} gap-[6px] bg-primary px-[20px] py-[6px] text-primary-foreground hover:bg-primary/90`}>
           <Icon src={auctionGavelIcon} width={11.2} height={12} />
           {cta}
         </Link>
@@ -243,7 +243,7 @@ export function ListingFeed({
     body = (
       <div className={`${standardCard} flex flex-col items-start gap-2 p-[20px]`}>
         <p className="text-body-13 text-danger">{error}</p>
-        <button type="button" onClick={onRetry} className={`${buttonBase} border border-ink px-[12px] py-[6px] text-ink`}>
+        <button type="button" onClick={onRetry} className={`${buttonBase} border border-primary px-[12px] py-[6px] text-primary`}>
           Try again
         </button>
       </div>

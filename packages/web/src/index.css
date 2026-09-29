@@ -85,6 +85,24 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+
+  /* Figma prototype color names, mapped onto the app's green palette so the
+     public discovery pages match the rest of the app (and follow dark mode). */
+  --color-ink: var(--foreground);
+  --color-ink-soft: var(--muted-foreground);
+  --color-ink-strong: var(--foreground);
+  --color-line: var(--border);
+  --color-line-strong: var(--muted-foreground);
+  --color-canvas: var(--background);
+  --color-panel: var(--muted);
+  --color-panel-2: var(--secondary);
+  --color-panel-3: var(--secondary);
+  --color-panel-4: var(--accent);
+  --color-forest: var(--primary);
+  --color-danger: var(--destructive);
+  --color-danger-tint: color-mix(in oklch, var(--destructive) 15%, transparent);
+  --color-navy: var(--sidebar);
+  --color-navy-ink: var(--sidebar-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -123,22 +141,6 @@
   --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-label: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-amharic: "FreeSerif", "Noto Serif Ethiopic", serif;
-
-  --color-ink: #000308;
-  --color-ink-soft: #44474c;
-  --color-ink-strong: #1a1b21;
-  --color-line: #c4c6cc;
-  --color-line-strong: #74777d;
-  --color-canvas: #f9f9ff;
-  --color-panel: #f3f3fa;
-  --color-panel-2: #ededf5;
-  --color-panel-3: #e8e7ef;
-  --color-panel-4: #e2e2e9;
-  --color-forest: #3b674f;
-  --color-danger: #ba1a1a;
-  --color-danger-tint: #ffdad6;
-  --color-navy: #0e1e2e;
-  --color-navy-ink: #0c1d2d;
 
   --text-label-11: 11px;
   --text-label-11--line-height: 14px;

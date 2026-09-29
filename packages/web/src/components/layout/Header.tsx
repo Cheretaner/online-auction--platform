@@ -87,7 +87,7 @@ function SearchBox() {
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder="Search vehicles, machinery, property, government tenders..."
-        className="block h-[32px] w-full border border-line bg-white pr-[12px] pl-[36px] text-body-13 text-ink placeholder:text-ink-soft/70"
+        className="block h-[32px] w-full border border-line bg-card pr-[12px] pl-[36px] text-body-13 text-ink placeholder:text-ink-soft/70"
       />
       <Icon src={searchIcon} width={12.6} height={12.6} className="pointer-events-none absolute top-[10px] left-[12px]" />
     </div>
@@ -96,7 +96,7 @@ function SearchBox() {
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
   isActive
-    ? 'border-b-2 border-ink py-[8px] text-sm font-semibold whitespace-nowrap text-ink'
+    ? 'border-b-2 border-primary py-[8px] text-sm font-semibold whitespace-nowrap text-primary'
     : 'py-[8px] text-sm whitespace-nowrap text-ink-soft hover:text-ink'
 
 function MainNavigation() {
@@ -143,7 +143,7 @@ function MainNavigation() {
                 logout()
                 navigate('/auctions')
               }}
-              className="border border-ink px-[12px] py-[8px] font-label text-label-12 font-medium whitespace-nowrap text-ink uppercase"
+              className="border border-primary px-[12px] py-[8px] font-label text-label-12 font-medium whitespace-nowrap text-primary uppercase"
             >
               Sign Out
             </button>
@@ -159,7 +159,7 @@ function MainNavigation() {
             </Link>
             <Link
               to="/register"
-              className="border border-ink bg-ink px-[12px] py-[8px] font-label text-label-12 font-medium whitespace-nowrap text-white uppercase"
+              className="border border-primary bg-primary px-[12px] py-[8px] font-label text-label-12 font-medium whitespace-nowrap text-primary-foreground uppercase"
             >
               Register as Bidder
             </Link>
