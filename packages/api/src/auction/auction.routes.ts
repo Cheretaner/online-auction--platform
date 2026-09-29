@@ -4,6 +4,7 @@ import {
   CreateAuctionRequest,
   TransitionAuctionRequest,
   UpdateAuctionRequest,
+  ListAuctionsQuery,
 } from "@auction/shared";
 import { optionalAuth, requireAuth, requireOrganization } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
@@ -17,7 +18,7 @@ const APPROVERS = ["org_admin", "compliance_officer", "super_admin"] as const;
 
 // Public discovery (FR6). optionalAuth() is invoked — passing the bare
 // factory registered a middleware that never called next() and hung.
-auctionRouter.get("/", optionalAuth(), asyncHandler(controller.listPublic));
+auctionRouter.get("/", optionalAuth(), validate(ListAuctionsQuery, "query"), asyncHandler(controller.listPublic));
 auctionRouter.get("/:id", optionalAuth(), asyncHandler(controller.getById));
 
 auctionRouter.post(

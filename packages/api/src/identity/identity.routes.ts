@@ -1,5 +1,12 @@
 import { Router } from "express";
-import { LoginRequest, RefreshTokenRequest, RegisterRequest, UpdateProfileRequest } from "@auction/shared";
+import { 
+  LoginRequest, 
+  RefreshTokenRequest, 
+  RegisterRequest, 
+  UpdateProfileRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest
+} from "@auction/shared";
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
@@ -13,6 +20,10 @@ const router = Router();
 router.post("/register", authRateLimiter, validate(RegisterRequest), asyncHandler(controller.register));
 router.post("/login", authRateLimiter, validate(LoginRequest), asyncHandler(controller.login));
 router.post("/refresh", authRateLimiter, validate(RefreshTokenRequest), asyncHandler(controller.refresh));
+router.post("/logout", requireAuth(), asyncHandler(controller.logout));
+
+router.post("/forgot-password", authRateLimiter, validate(ForgotPasswordRequest), asyncHandler(controller.forgotPassword));
+router.post("/reset-password", authRateLimiter, validate(ResetPasswordRequest), asyncHandler(controller.resetPassword));
 
 router.get("/me", requireAuth(), asyncHandler(controller.getProfile));
 router.patch("/me", requireAuth(), validate(UpdateProfileRequest), asyncHandler(controller.updateProfile));

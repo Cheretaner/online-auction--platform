@@ -50,3 +50,21 @@ export const updateProfile: RequestHandler = async (req, res) => {
 export const getProfileById: RequestHandler = async (req, res) => {
   res.json(await service.getProfile(routeParam(req.params.id)));
 };
+
+export const logout: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  await service.logout(auth.userId);
+  res.status(HttpStatus.NO_CONTENT).send();
+};
+
+export const forgotPassword: RequestHandler = async (req, res) => {
+  const email = (req.body as { email: string }).email;
+  await service.forgotPassword(email);
+  res.status(HttpStatus.OK).json({ message: "If that email exists, a password reset link has been sent." });
+};
+
+export const resetPassword: RequestHandler = async (req, res) => {
+  const body = req.body as { token: string; newPassword: string };
+  await service.resetPassword(body.token, body.newPassword);
+  res.status(HttpStatus.OK).json({ message: "Password reset successful" });
+};

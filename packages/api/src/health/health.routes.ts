@@ -4,6 +4,8 @@ import { pingDatabase } from "../infrastructure/database/pool.js";
 import { HttpStatus } from "../shared/errors/index.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 
+import { getSchedulerHealth } from "../infrastructure/scheduler/scheduler.js";
+
 export const healthRouter = Router();
 
 healthRouter.get("/", (_req, res) => {
@@ -26,16 +28,21 @@ healthRouter.get(
       return;
     }
 
+    const schedulerHealth = getSchedulerHealth();
+
     try {
       const ok = await pingDatabase();
-      res.status(ok ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).json({
-        status: ok ? "ready" : "not_ready",
+      const isReady = ok && schedulerHealth.healthy;
+      res.status(isReady ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE).json({
+        status: isReady ? "ready" : "not_ready",
         database: ok ? "up" : "down",
+        scheduler: schedulerHealth,
       });
     } catch {
       res.status(HttpStatus.SERVICE_UNAVAILABLE).json({
         status: "not_ready",
         database: "down",
+        scheduler: schedulerHealth,
       });
     }
   }),

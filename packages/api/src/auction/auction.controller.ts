@@ -4,6 +4,7 @@ import type {
   CreateAuctionRequest,
   TransitionAuctionRequest,
   UpdateAuctionRequest,
+  ListAuctionsQuery,
 } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
@@ -47,9 +48,28 @@ export const getById: RequestHandler = async (req, res) => {
   res.json(await AuctionService.getAuction(routeParam(req.params.id)));
 };
 
-export const listPublic: RequestHandler = async (_req, res) => {
-  const items = await AuctionService.listPublicAuctions();
-  res.json({ items });
+function decodeCursor(cursor: string): any {
+  try {
+    return JSON.parse(Buffer.from(cursor, 'base64url').toString());
+  } catch {
+    return undefined;
+  }
+}
+
+export const listPublic: RequestHandler = async (req, res) => {
+  const query = req.query as unknown as ListAuctionsQuery;
+  const statuses = query.status ? query.status.split(",").map((s: string) => s.trim()) : undefined;
+  const limit = query.limit || 20;
+  const cursor = query.cursor ? decodeCursor(query.cursor) : undefined;
+
+  const result = await AuctionService.listPublicAuctions({
+    q: query.q,
+    statuses,
+    region: query.region,
+    limit,
+    cursor,
+  });
+  res.json(result);
 };
 
 export const listByOrg: RequestHandler = async (req, res) => {
@@ -58,8 +78,12 @@ export const listByOrg: RequestHandler = async (req, res) => {
   if (auth.organizationId !== orgId && !auth.roles.includes("super_admin")) {
     throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
-  const items = await AuctionService.listByOrg(orgId);
-  res.json({ items });
+  
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+  const cursor = req.query.cursor ? decodeCursor(req.query.cursor as string) : undefined;
+  
+  const result = await AuctionService.listByOrg(orgId, limit, cursor);
+  res.json(result);
 };
 
 export const submitForApproval: RequestHandler = async (req, res) => {

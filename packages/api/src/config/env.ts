@@ -115,6 +115,13 @@ const envSchema = z
         message: "is required in production",
       });
     }
+    if (value.NODE_ENV === "production" && !value.BOOTSTRAP_SUPER_ADMIN_EMAIL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["BOOTSTRAP_SUPER_ADMIN_EMAIL"],
+        message: "is required in production to control super-admin bootstrap",
+      });
+    }
     if (value.NODE_ENV === "production" && value.TELEGRAM_BOT_TOKEN && !value.TELEGRAM_WEBHOOK_URL && !value.TELEGRAM_POLLING) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

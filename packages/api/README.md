@@ -203,3 +203,64 @@ There is **no integration coverage**. `scripts/smoke.mjs` is a harness, not a
 test suite — but it does exercise registration, org creation, role grants,
 KYC, auction creation, the two-person approval rule, public discovery, bid
 rejection before open, the audit chain, compliance and notifications.
+
+---
+
+## Deployment & Docker Reference
+
+### Prerequisites
+- Node 24 (or via Docker)
+- pnpm
+- PostgreSQL 15+
+
+### Quick Start
+```bash
+git clone <repo>
+pnpm install
+cp .env.example .env
+# Edit .env with your configuration
+pnpm run dev
+```
+
+### Docker Deployment
+The monorepo includes a multi-stage `Dockerfile` at the root.
+
+```bash
+docker build -t auction-api .
+docker run -d \
+  --name auction-api \
+  -p 3000:3000 \
+  --env-file .env \
+  -v /var/lib/auction/storage:/data/storage \
+  auction-api
+```
+*Note: Ensure `STORAGE_DIR=/data/storage` is set in your `.env` to map to the persistent volume.*
+
+### Environment Variables
+A complete reference of environment variables is provided in `.env.example` at the repository root. Key groupings include Core, Database, Auth/JWT, CORS, Rate Limiting, Storage, SMTP, AI, and Telegram. Required production variables (like `DATABASE_URL`, `BOOTSTRAP_SUPER_ADMIN_EMAIL`) must be configured.
+
+---
+
+## Single-Instance Architecture & Operations
+
+### Single-Instance Constraint
+**For launch, the platform MUST run as a single API instance.**
+1. **Real-time Events:** The `realtime.adapter.ts` uses an in-memory `EventEmitter`. Real-time updates (bids, status changes) are broadcast to SSE connections only on the instance that processed the event.
+2. **Scheduler:** The auction lifecycle is managed by an in-process scheduler (`scheduler.ts`).
+
+Running multiple instances behind a load balancer will result in partitioned SSE broadcasts and duplicated (or race-condition) scheduler jobs.
+
+### Persistent Volume Configuration
+Uploaded files are stored locally by default (`STORAGE_DRIVER=filesystem`). You must configure a persistent volume for the container (e.g., `-v /your/host/path:/data/storage`) and set `STORAGE_DIR=/data/storage` to prevent data loss on container restart.
+
+### Backup Procedure
+- **Database:** Take regular backups using `pg_dump`:
+  `pg_dump -U postgres -h localhost auction > auction_backup.sql`
+- **Storage Volume:** Archive the storage directory using `tar`:
+  `tar -czvf storage_backup.tar.gz /var/lib/auction/storage`
+
+### Path to Scaling (Future)
+To scale horizontally (multiple API instances) in the future:
+1. **Real-time:** Replace the in-memory `EventEmitter` with Redis pub/sub for cross-instance SSE broadcasting.
+2. **Storage:** Migrate from the local filesystem to an S3-compatible Object Storage service.
+3. **Scheduler:** Extract background jobs into a dedicated worker or use a distributed lock (e.g., Redis) to ensure only one instance executes the lifecycle sweep.

@@ -93,15 +93,43 @@ export function createApp(): express.Express {
   app.use("/api/v1/telegram", telegramRouter);
   app.use("/api/v1/autofetch", createAutofetchRouter(getPool()));
 
-  // Server-sent events for live bid/auction updates. Channels look like
-  // `auction:<id>` or `user:<id>`; a user may only subscribe to their own
-  // personal channel.
+  // Server-sent events for live bid/auction updates. Clients must request
+  // an explicit channel; wildcard subscriptions are rejected (T02).
+  //
+  // Allowed channels:
+  //   user:<self>     — personal notifications
+  //   auction:<uuid>  — public auction activity (bid counts, extensions, closings)
   app.get("/api/v1/events", requireAuth(), (req, res) => {
     const auth = getAuth(req);
-    const channel = typeof req.query.channel === "string" ? req.query.channel : "*";
+    const channel = typeof req.query.channel === "string" ? req.query.channel.trim() : "";
 
-    if (channel.startsWith("user:") && channel !== `user:${auth.userId}`) {
-      res.status(403).json({ error: { message: "Forbidden", code: "FORBIDDEN" } });
+    // T02: reject wildcard and empty channels
+    if (!channel || channel === "*") {
+      res.status(400).json({
+        error: { message: "A specific channel is required (e.g. user:<id> or auction:<id>)", code: "CHANNEL_REQUIRED" },
+      });
+      return;
+    }
+
+    // user: channels — only your own
+    if (channel.startsWith("user:")) {
+      if (channel !== `user:${auth.userId}`) {
+        res.status(403).json({ error: { message: "Forbidden", code: "FORBIDDEN" } });
+        return;
+      }
+    } else if (channel.startsWith("auction:")) {
+      // auction: channels are allowed for any authenticated user.
+      // The outbox dispatcher strips bidderId from public payloads.
+      const auctionId = channel.slice("auction:".length);
+      if (!auctionId || auctionId.length < 10) {
+        res.status(400).json({ error: { message: "Invalid auction channel", code: "BAD_CHANNEL" } });
+        return;
+      }
+    } else {
+      // Unknown channel prefix
+      res.status(400).json({
+        error: { message: "Unknown channel type. Use user:<id> or auction:<id>", code: "BAD_CHANNEL" },
+      });
       return;
     }
 

@@ -293,9 +293,10 @@ export class TelegramBotService {
   }
 
   private async handleListAuctions(ctx: any): Promise<void> {
-    const auctions = await auctionRepo.listPublicAuctions();
-    const live = auctions.filter((a) => a.status === "live");
-    const upcoming = auctions.filter((a) => a.status === "scheduled");
+    const result = await auctionRepo.listPublicAuctions({ limit: 100 });
+    const auctions = result.items;
+    const live = auctions.filter((a: any) => a.status === "live");
+    const upcoming = auctions.filter((a: any) => a.status === "scheduled");
 
     if (live.length === 0 && upcoming.length === 0) {
       await ctx.reply("ℹ️ There are currently no active or scheduled public auctions. Check back soon!");
@@ -561,7 +562,7 @@ export class TelegramBotService {
 
         // If auction number was spoken (e.g. "auction 1" or "auction 2"), resolve from live list
         if (!targetAuctionId && result.auctionNumber) {
-          const live = (await auctionRepo.listPublicAuctions()).filter((a) => a.status === "live");
+          const live = (await auctionRepo.listPublicAuctions({ limit: 100 })).items.filter((a: any) => a.status === "live");
           const idx = Number(result.auctionNumber) - 1;
           if (idx >= 0 && idx < live.length) {
             targetAuctionId = live[idx].id;

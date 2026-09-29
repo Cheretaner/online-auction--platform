@@ -167,4 +167,90 @@ export class IdentityRepository {
     const row = await queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM profiles`);
     return Number(row?.count ?? 0);
   }
+
+  // Refresh token family methods
+  async createTokenFamily(userId: string, jti: string, expiresAt: Date): Promise<void> {
+    await queryOne(
+      `INSERT INTO refresh_token_families (user_id, current_jti, expires_at) VALUES ($1, $2, $3)`,
+      [userId, jti, expiresAt]
+    );
+  }
+
+  async findTokenFamily(jti: string): Promise<{ id: string; userId: string; currentJti: string; used: boolean; revoked: boolean; expiresAt: Date } | null> {
+    const row = await queryOne<{ id: string; user_id: string; current_jti: string; used: boolean; revoked: boolean; expires_at: Date }>(
+      `SELECT * FROM refresh_token_families WHERE current_jti = $1`,
+      [jti]
+    );
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      currentJti: row.current_jti,
+      used: row.used,
+      revoked: row.revoked,
+      expiresAt: row.expires_at,
+    };
+  }
+
+  async rotateTokenFamily(familyId: string, newJti: string): Promise<void> {
+    // Sets used=true on old, updates current_jti
+    await queryOne(
+      `UPDATE refresh_token_families SET used = true, current_jti = $2, updated_at = NOW() WHERE id = $1`,
+      [familyId, newJti]
+    ).catch(async () => {
+      // If no updated_at column, fallback to just updating fields
+      await queryOne(
+        `UPDATE refresh_token_families SET used = true, current_jti = $2 WHERE id = $1`,
+        [familyId, newJti]
+      );
+    });
+  }
+
+  async revokeAllFamilies(userId: string): Promise<void> {
+    await queryOne(
+      `UPDATE refresh_token_families SET revoked = true WHERE user_id = $1`,
+      [userId]
+    );
+  }
+
+  async revokeFamilyById(familyId: string): Promise<void> {
+    await queryOne(
+      `UPDATE refresh_token_families SET revoked = true WHERE id = $1`,
+      [familyId]
+    );
+  }
+
+  async cleanupExpiredFamilies(): Promise<void> {
+    await queryOne(`DELETE FROM refresh_token_families WHERE expires_at < NOW()`);
+  }
+
+  // Password reset methods
+  async createResetToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {
+    await queryOne(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+      [userId, tokenHash, expiresAt]
+    );
+  }
+
+  async findResetToken(tokenHash: string): Promise<{ id: string; userId: string; used: boolean; expiresAt: Date } | null> {
+    const row = await queryOne<{ id: string; user_id: string; used: boolean; expires_at: Date }>(
+      `SELECT * FROM password_reset_tokens WHERE token_hash = $1`,
+      [tokenHash]
+    );
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      used: row.used,
+      expiresAt: row.expires_at,
+    };
+  }
+
+  async markResetTokenUsed(tokenId: string): Promise<void> {
+    await queryOne(`UPDATE password_reset_tokens SET used = true WHERE id = $1`, [tokenId]);
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await queryOne(`UPDATE profiles SET password_hash = $2, updated_at = NOW() WHERE id = $1`, [userId, passwordHash]);
+  }
 }

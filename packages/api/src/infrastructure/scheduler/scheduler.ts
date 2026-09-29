@@ -40,6 +40,17 @@ export function scheduleJob(job: ScheduledJob): void {
   }
 }
 
+let auctionLifecycleConsecutiveFailures = 0;
+let auctionLifecycleLastRunAt: Date | null = null;
+
+export function getSchedulerHealth(): { healthy: boolean; consecutiveFailures: number; lastRunAt: Date | null } {
+  return {
+    healthy: auctionLifecycleConsecutiveFailures <= 3,
+    consecutiveFailures: auctionLifecycleConsecutiveFailures,
+    lastRunAt: auctionLifecycleLastRunAt,
+  };
+}
+
 export function startInfrastructureJobs(): void {
   // Register autofetch jobs (must come before scheduleJob calls)
   try {
@@ -79,11 +90,21 @@ export function startInfrastructureJobs(): void {
     runOnStart: true,
     run: async () => {
       if (!env.DATABASE_URL) return;
-      const now = new Date();
-      const opened = await openDueAuctions(now);
-      const closed = await closeDueAuctions(now);
-      if (opened > 0 || closed > 0) {
-        logger.info({ opened, closed }, "Auction lifecycle tick");
+      auctionLifecycleLastRunAt = new Date();
+      try {
+        const now = new Date();
+        const opened = await openDueAuctions(now);
+        const closed = await closeDueAuctions(now);
+        if (opened > 0 || closed > 0) {
+          logger.info({ opened, closed }, "Auction lifecycle tick");
+        }
+        auctionLifecycleConsecutiveFailures = 0;
+      } catch (error) {
+        auctionLifecycleConsecutiveFailures++;
+        if (auctionLifecycleConsecutiveFailures > 3) {
+          logger.error({ err: error, failures: auctionLifecycleConsecutiveFailures }, "Auction lifecycle failed consecutively");
+        }
+        throw error;
       }
     },
   });

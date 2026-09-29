@@ -181,16 +181,77 @@ export async function updateStatus(
   return mapRowToAuction(row);
 }
 
-export async function listPublicAuctions(client?: Queryable): Promise<Auction[]> {
-  const sql = `
+export interface ListAuctionsParams {
+  q?: string;
+  statuses?: string[];
+  region?: string;
+  limit: number;
+  cursor?: { s: number; c: string; i: string };
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export function encodeCursor(auction: Auction): string {
+  const statusRank = auction.status === 'live' ? 0 : auction.status === 'scheduled' ? 1 : 2;
+  return Buffer.from(JSON.stringify({ s: statusRank, c: auction.closesAt, i: auction.id })).toString('base64url');
+}
+
+export async function listPublicAuctions(params: ListAuctionsParams, client?: Queryable): Promise<PaginatedResult<Auction>> {
+  let sql = `
     SELECT * FROM auctions
-    WHERE status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')
-    ORDER BY
-      CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END,
-      closes_at ASC
+    WHERE 1=1
   `;
-  const rows = await queryAll(sql, [], client);
-  return rows.map(mapRowToAuction);
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (params.statuses && params.statuses.length > 0) {
+    sql += ` AND status = ANY($${paramIndex++})`;
+    values.push(params.statuses);
+  } else {
+    sql += ` AND status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')`;
+  }
+
+  if (params.q) {
+    sql += ` AND title ILIKE $${paramIndex++}`;
+    values.push(`%${params.q}%`);
+  }
+
+  if (params.region) {
+    sql += ` AND region = $${paramIndex++}`;
+    values.push(params.region);
+  }
+
+  if (params.cursor) {
+    sql += ` AND (
+      CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END,
+      closes_at,
+      id
+    ) > ($${paramIndex++}, $${paramIndex++}, $${paramIndex++})`;
+    values.push(params.cursor.s, params.cursor.c, params.cursor.i);
+  }
+
+  sql += `
+    ORDER BY
+      CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END ASC,
+      closes_at ASC,
+      id ASC
+    LIMIT $${paramIndex++}
+  `;
+  values.push(params.limit + 1);
+
+  const rows = await queryAll(sql, values, client);
+  const items = rows.map(mapRowToAuction);
+
+  let nextCursor = null;
+  if (items.length > params.limit) {
+    items.pop();
+    nextCursor = encodeCursor(items[items.length - 1]);
+  }
+
+  return { items, nextCursor };
 }
 
 /** Locks a single auction row for the duration of the current transaction. */
@@ -307,12 +368,33 @@ export async function markAwarded(id: string, client?: Queryable): Promise<Aucti
   return row ? mapRowToAuction(row) : null;
 }
 
-export async function listByOrgId(orgId: string, client?: Queryable): Promise<Auction[]> {
-  const sql = `
-    SELECT * FROM auctions 
-    WHERE org_id = $1
-    ORDER BY created_at DESC
-  `;
-  const rows = await queryAll(sql, [orgId], client);
-  return rows.map(mapRowToAuction);
+export async function listByOrgId(
+  orgId: string,
+  limit: number,
+  cursor?: { c: string; i: string },
+  client?: Queryable
+): Promise<PaginatedResult<Auction>> {
+  let sql = `SELECT * FROM auctions WHERE org_id = $1`;
+  const values: any[] = [orgId];
+  let paramIndex = 2;
+
+  if (cursor) {
+    sql += ` AND (created_at, id) < ($${paramIndex++}, $${paramIndex++})`;
+    values.push(cursor.c, cursor.i);
+  }
+
+  sql += ` ORDER BY created_at DESC, id DESC LIMIT $${paramIndex++}`;
+  values.push(limit + 1);
+
+  const rows = await queryAll(sql, values, client);
+  const items = rows.map(mapRowToAuction);
+
+  let nextCursor = null;
+  if (items.length > limit) {
+    items.pop();
+    const lastItem = items[items.length - 1];
+    nextCursor = Buffer.from(JSON.stringify({ c: lastItem.createdAt, i: lastItem.id })).toString('base64url');
+  }
+
+  return { items, nextCursor };
 }

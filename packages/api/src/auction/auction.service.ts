@@ -71,12 +71,12 @@ export async function getAuction(id: string): Promise<Auction> {
   return auction;
 }
 
-export async function listPublicAuctions(): Promise<Auction[]> {
-  return AuctionRepo.listPublicAuctions();
+export async function listPublicAuctions(params: AuctionRepo.ListAuctionsParams): Promise<AuctionRepo.PaginatedResult<Auction>> {
+  return AuctionRepo.listPublicAuctions(params);
 }
 
-export async function listByOrg(orgId: string): Promise<Auction[]> {
-  return AuctionRepo.listByOrgId(orgId);
+export async function listByOrg(orgId: string, limit: number, cursor?: { c: string; i: string }): Promise<AuctionRepo.PaginatedResult<Auction>> {
+  return AuctionRepo.listByOrgId(orgId, limit, cursor);
 }
 
 export async function submitForApproval(
