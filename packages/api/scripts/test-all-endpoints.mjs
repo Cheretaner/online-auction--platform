@@ -24,6 +24,29 @@
  * Strict Requirement: All generated emails use _____@cheretanet.org.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+
+// Auto-load .env so CLI runs pick up environment configurations like BOOTSTRAP_SUPER_ADMIN_EMAIL
+try {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const raw = fs.readFileSync(envPath, "utf-8");
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const k = trimmed.slice(0, eqIdx).trim();
+        const v = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[k]) process.env[k] = v;
+      }
+    }
+  }
+} catch {
+  // Best-effort
+}
+
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const STAMP = Date.now();
 const PASSWORD = "CheretaSecurePass2026!";
@@ -125,7 +148,10 @@ async function main() {
   // The platform admin must be the address in the API's
   // BOOTSTRAP_SUPER_ADMIN_EMAIL (or, in development only, the very first
   // account on an empty database). Set ADMIN_EMAIL to match the API.
-  const adminEmail = process.env.ADMIN_EMAIL ?? `admin.${STAMP}@cheretanet.org`;
+  const adminEmail =
+    process.env.ADMIN_EMAIL ??
+    process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL ??
+    "admin@cheretanet.org";
   const officerEmail = `officer.${STAMP}@cheretanet.org`;
   const complianceEmail = `compliance.${STAMP}@cheretanet.org`;
   const bidder1Email = `solomon.bidder.${STAMP}@cheretanet.org`;

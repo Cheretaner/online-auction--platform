@@ -76,10 +76,15 @@ export async function processOutboxBatch(): Promise<number> {
               : undefined;
 
         if (auctionId && message.aggregateType !== "auction") {
+          // T02: Strip bidder identity from public auction channels.
+          // The user: channel carries the full payload; the auction:
+          // channel is public and must not leak who placed the bid.
+          const publicPayload = { ...message.payload };
+          delete (publicPayload as Record<string, unknown>).bidderId;
           await realtimeAdapter.publish({
             channel: `auction:${auctionId}`,
             event: message.eventType,
-            payload: message.payload,
+            payload: publicPayload,
           });
         }
 

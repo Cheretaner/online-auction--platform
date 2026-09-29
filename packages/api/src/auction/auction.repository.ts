@@ -354,12 +354,33 @@ export async function markAwarded(id: string, client?: Queryable): Promise<Aucti
   return row ? mapRowToAuction(row) : null;
 }
 
-export async function listByOrgId(orgId: string, client?: Queryable): Promise<Auction[]> {
-  const sql = `
-    SELECT * FROM auctions 
-    WHERE org_id = $1
-    ORDER BY created_at DESC
-  `;
-  const rows = await queryAll(sql, [orgId], client);
-  return rows.map(mapRowToAuction);
+export async function listByOrgId(
+  orgId: string,
+  limit: number,
+  cursor?: { c: string; i: string },
+  client?: Queryable
+): Promise<PaginatedResult<Auction>> {
+  let sql = `SELECT * FROM auctions WHERE org_id = $1`;
+  const values: any[] = [orgId];
+  let paramIndex = 2;
+
+  if (cursor) {
+    sql += ` AND (created_at, id) < ($${paramIndex++}, $${paramIndex++})`;
+    values.push(cursor.c, cursor.i);
+  }
+
+  sql += ` ORDER BY created_at DESC, id DESC LIMIT $${paramIndex++}`;
+  values.push(limit + 1);
+
+  const rows = await queryAll(sql, values, client);
+  const items = rows.map(mapRowToAuction);
+
+  let nextCursor = null;
+  if (items.length > limit) {
+    items.pop();
+    const lastItem = items[items.length - 1];
+    nextCursor = Buffer.from(JSON.stringify({ c: lastItem.createdAt, i: lastItem.id })).toString('base64url');
+  }
+
+  return { items, nextCursor };
 }
