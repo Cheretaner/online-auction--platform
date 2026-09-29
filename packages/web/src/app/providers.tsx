@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { ThemeProvider } from "next-themes";
 import { useState, type ReactNode } from "react";
+import { ThemeProvider } from "@/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { PwaUpdater } from "@/components/pwa/pwa-updater";
@@ -10,8 +10,9 @@ import { createQueryClient } from "@/lib/query/client";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => createQueryClient());
+
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider defaultTheme="light" storageKey="app-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={200}>
           <AuthProvider>
