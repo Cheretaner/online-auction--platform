@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PageHeader } from "@/components/layout/page-header";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { AiAnomalyScanResult } from "@/lib/api/types";
-import { Assistant } from "@/features/ai/assistant";
 
 /** Radix forbids an empty item value, so "no auction" needs a sentinel. */
 const NO_AUCTION = "none";
@@ -126,7 +125,6 @@ export default function AiPage() {
           </div>
         )}
       </section>
-      <Assistant auctionId={selectedId} auctionTitle={selectedTitle} />
     </div>
   );
 }

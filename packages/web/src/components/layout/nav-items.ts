@@ -40,6 +40,7 @@ export function getAppNav(roles: Role[]): NavItem[] {
     { to: "/app/disputes", label: "Disputes", icon: Scale },
     { to: "/app/reports", label: "Reports", icon: FileText, roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
     { to: "/app/audit", label: "Audit", icon: ScrollText, roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
+    { to: "/app/ai-assistant", label: "AI assistant", icon: Sparkles },
     { to: "/app/ai", label: "Anomaly review", icon: Sparkles, roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
     { to: "/app/telegram", label: "Telegram", icon: Send },
     { to: "/app/autofetch", label: "AutoFetch", icon: Radar, roles: ["org_admin", "compliance_officer", "auction_officer"] },

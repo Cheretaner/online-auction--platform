@@ -5,6 +5,7 @@ import { runMigrations } from "./infrastructure/database/migrations/run.js";
 import { startInfrastructureJobs, stopAllJobs } from "./infrastructure/scheduler/scheduler.js";
 import { telegramService } from "./telegram/telegram.service.js";
 import { logger } from "./shared/utils/logger.js";
+import { mailAdapter } from "./infrastructure/mail/mail.adapter.js";
 
 // A rejected promise that nobody handles used to terminate the process
 // silently under Node's default policy. Log it and keep serving.
@@ -18,6 +19,18 @@ process.on("uncaughtException", (error) => {
 });
 
 async function main(): Promise<void> {
+  if (env.SMTP_HOST) {
+    try {
+      await mailAdapter.verify();
+      logger.info("SMTP transport verified");
+    } catch (error) {
+      logger.error({ err: error }, "SMTP transport verification failed");
+      if (env.NODE_ENV === "production") process.exit(1);
+    }
+  } else {
+    logger.warn("SMTP is not configured; local email uses the console adapter");
+  }
+
   if (env.DATABASE_URL) {
     try {
       await pingDatabase();

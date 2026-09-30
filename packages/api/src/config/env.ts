@@ -107,6 +107,42 @@ const envSchema = z
     WEB_BASE_URL: z.string().default("http://localhost:5173"),
   })
   .superRefine((value, ctx) => {
+    if (Boolean(value.SMTP_USER) !== Boolean(value.SMTP_PASS)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [value.SMTP_USER ? "SMTP_PASS" : "SMTP_USER"],
+        message: "must be set together with the other SMTP authentication field",
+      });
+    }
+    if (value.NODE_ENV === "production" && !value.SMTP_HOST) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["SMTP_HOST"],
+        message: "is required in production so password resets and email notifications are deliverable",
+      });
+    }
+    if (value.NODE_ENV === "production" && !z.string().email().safeParse(value.MAIL_FROM).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["MAIL_FROM"],
+        message: "must be a valid sender email address in production",
+      });
+    }
+    if (value.NODE_ENV === "production") {
+      const hasGemini = Boolean(value.GEMINI_API_KEY?.trim());
+      const hasOpenRouter = Boolean(value.OPENROUTER_API_KEY?.trim());
+      const hasConfiguredProvider =
+        (value.AI_PROVIDER === "gemini" && hasGemini) ||
+        (value.AI_PROVIDER === "openrouter" && hasOpenRouter) ||
+        (value.AI_PROVIDER === "auto" && (hasGemini || hasOpenRouter));
+      if (!hasConfiguredProvider) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["AI_PROVIDER"],
+          message: "production requires a configured Gemini or OpenRouter API key; the stub provider is for development only",
+        });
+      }
+    }
     if (value.NODE_ENV === "production" && value.JWT_SECRET.includes("dev-secret")) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

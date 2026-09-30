@@ -53,7 +53,7 @@ start in production** without the first three:
   runner holds a Postgres advisory lock, so a rolling deploy queues instead of
   colliding.
 - `WEB_BASE_URL` — used in password-reset links
-- `SMTP_*` — without it, password-reset links are never delivered
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — production requires a working SMTP host and verifies connectivity at startup. Authentication fields must be set together. Use port 587 with STARTTLS (`SMTP_SECURE=false`) or port 465 with TLS (`SMTP_SECURE=true`). Local development can omit SMTP and receive reset links in the API console.
 
 The web app is a separate static build; publish `packages/web/dist` as static
 assets / point the platform's CDN at it rather than serving it from the API.
@@ -80,7 +80,7 @@ Then edit `/etc/auction/api.env` and set at minimum:
   refuses to start in production without it)
 - `CORS_ORIGIN` and `WEB_BASE_URL` — your real front-end origin (`*` is
   refused in production; `WEB_BASE_URL` is used in password-reset links)
-- `SMTP_*` — without it, password-reset links are never delivered
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — production requires a working SMTP host and verifies connectivity at startup. Authentication fields must be set together. Use port 587 with STARTTLS (`SMTP_SECURE=false`) or port 465 with TLS (`SMTP_SECURE=true`). Local development can omit SMTP and receive reset links in the API console.
 
 It also installs a nightly backup (`deploy/backup.sh`: `pg_dump` plus the
 uploaded-documents directory, 14 days kept under `/var/backups/auction`).

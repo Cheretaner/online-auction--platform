@@ -11,9 +11,12 @@ export interface MailMessage {
 
 export interface MailAdapter {
   send(message: MailMessage): Promise<void>;
+  verify(): Promise<void>;
 }
 
 export class ConsoleMailAdapter implements MailAdapter {
+  async verify(): Promise<void> {}
+
   async send(message: MailMessage): Promise<void> {
     // Only local development prints the body (it can hold a password-reset
     // link). Everywhere else the console adapter records that mail was due.
@@ -27,6 +30,10 @@ export class SmtpMailAdapter implements MailAdapter {
     private readonly transporter: Transporter,
     private readonly from: string,
   ) {}
+
+  async verify(): Promise<void> {
+    await this.transporter.verify();
+  }
 
   async send(message: MailMessage): Promise<void> {
     await this.transporter.sendMail({
@@ -51,6 +58,9 @@ export function createMailAdapter(): MailAdapter {
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE,
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
   return new SmtpMailAdapter(transporter, env.MAIL_FROM);

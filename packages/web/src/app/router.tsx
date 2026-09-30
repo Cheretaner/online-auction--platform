@@ -35,6 +35,7 @@ const DisputesPage = lazy(() => import("@/pages/app/disputes-page"));
 const ReportsPage = lazy(() => import("@/pages/app/reports-page"));
 const AuditPage = lazy(() => import("@/pages/app/audit-page"));
 const AiPage = lazy(() => import("@/pages/app/ai-page"));
+const AiAssistantPage = lazy(() => import("@/pages/app/ai-assistant-page"));
 const TelegramPage = lazy(() => import("@/pages/app/telegram-page"));
 const AutofetchPage = lazy(() => import("@/pages/app/autofetch-page"));
 const OrganizationsPage = lazy(() => import("@/pages/app/organizations-page"));
@@ -98,6 +99,7 @@ export const router = createBrowserRouter([
               { path: "notifications", element: <NotificationsPage /> },
               { path: "disputes", element: <DisputesPage /> },
               { path: "telegram", element: <TelegramPage /> },
+              { path: "ai-assistant", element: <AiAssistantPage /> },
               {
                 // Compliance officers work inside the auction workspace too
                 // (deposits, anomalies, disputes, reports) but cannot edit.
