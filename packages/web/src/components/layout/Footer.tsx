@@ -1,69 +1,100 @@
-import { Link } from 'react-router-dom'
-import logo from '../../assets/images/cheretanet-logo.png'
+import { MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
+import logo from "../../assets/images/cheretanet-logo.png";
 
 const linkColumns = [
   {
-    title: 'Quick Links',
+    title: "Explore",
     links: [
-      { label: 'Browse All Auctions', to: '/auctions' },
-      { label: 'Live Auctions', to: '/auctions?status=live' },
-      { label: 'Past Auction Results', to: '/auctions?status=awarded' },
+      { label: "All auctions", to: "/auctions" },
+      { label: "Live auctions", to: "/auctions?status=live" },
+      { label: "Published results", to: "/auctions?status=awarded" },
+      { label: "How to participate", to: "/auctions#how-to-participate" },
     ],
   },
   {
-    title: 'For Bidders',
+    title: "Take part",
     links: [
-      { label: 'Register as a Bidder', to: '/register' },
-      { label: 'Verify Your Identity', to: '/app/kyc' },
-      { label: 'Step-by-Step Bidding Guide', to: '/auctions#how-to-participate' },
+      { label: "Create bidder account", to: "/register" },
+      { label: "Sign in", to: "/login" },
+      { label: "Bidder workspace", to: "/app" },
     ],
   },
   {
-    title: 'Institutional Issuers',
+    title: "For institutions",
     links: [
-      { label: 'Organization Workspace', to: '/app/auctions' },
-      { label: 'Sign In', to: '/login' },
+      { label: "Organization workspace", to: "/app/organizations" },
+      { label: "Manage auctions", to: "/app/auctions" },
+      { label: "Sign in", to: "/login" },
     ],
   },
-]
+];
 
-const bodyText = 'text-body-13 text-ink-soft'
+const socialLinks = [
+{ label: "Telegram", href: "https://t.me/cheretanet", mark: "T" },
+  { label: "YouTube", href: "https://www.youtube.com/@cheretanet", mark: "▶" },
+  { label: "Facebook", href: "https://www.facebook.com/cheretanet", mark: "f" },
+  { label: "Instagram", href: "https://www.instagram.com/cheretanet/", mark: "ig" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/company/cheretanet/", mark: "in" },
+  { label: "X", href: "https://x.com/cheretanet", mark: "X" },
+];
+
+const bodyText = "text-sm leading-6 text-white/65";
 
 export function Footer() {
   return (
-    <footer className="border-t border-line bg-panel">
-      <div className="mx-auto flex max-w-[1280px] flex-col gap-[19.5px] px-4 py-[32px] lg:px-[48px]">
-        <div className="grid gap-[20px] border-b border-line pb-[20px] sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col gap-[4px]">
-            <div className="pb-[4px]">
-              <img src={logo} alt="Cheretanet" className="block h-[28px] w-auto" />
-            </div>
-            <p className={`${bodyText} leading-[21.13px]`}>
-              Transparent institutional auctions: every bid, approval and decision is recorded in a tamper-evident
-              audit trail.
+    <footer className="border-t border-white/10 bg-accent-foreground text-accent">
+      <div className="mx-auto max-w-[1280px] px-4 py-12 lg:px-12 lg:py-14">
+        <div className="grid gap-10 border-b border-white/10 pb-10 md:grid-cols-2 lg:grid-cols-[1.3fr_2fr]">
+          <div className="max-w-sm">
+            <Link to="/" aria-label="Cheretanet home" className="inline-flex rounded bg-white px-2 py-1">
+              <img src={logo} alt="Cheretanet" className="block h-8 w-auto object-contain" />
+            </Link>
+            <p className="mt-4 text-sm leading-6 text-white/75">
+              A clear digital space for public auctions in Ethiopia—connecting institutions and bidders through a
+              process people can follow.
             </p>
+            <div className="mt-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#d5ba70]">Follow Cheretanet</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {socialLinks.map(({ label, href, mark }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Cheretanet on ${label}`}
+                    title={`${label} · Cheretanet`}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/15 px-3 text-white/75 transition-colors hover:border-[#d5ba70] hover:bg-white/10 hover:text-[#e6d69f] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d5ba70]"
+                  >
+                    <span className="flex size-5 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold" aria-hidden="true">{mark}</span>
+                    <span className="text-xs">{label}</span>
+                    <span className="sr-only"> · Cheretanet</span>
+                  </a>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {linkColumns.map(({ title, links }) => (
-            <div key={title} className="flex flex-col gap-[4px]">
-              <h3 className="font-label text-label-12 font-semibold text-ink uppercase">{title}</h3>
-              {links.map((link) => (
-                <Link key={link.label} to={link.to} className={`${bodyText} hover:text-ink`}>
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          ))}
+          <div className="grid gap-8 sm:grid-cols-3">
+            {linkColumns.map(({ title, links }) => (
+              <nav key={title} aria-label={title} className="flex flex-col items-start gap-2">
+                <h2 className="mb-1 text-xs font-semibold uppercase tracking-[0.15em] text-white">{title}</h2>
+                {links.map((link) => (
+                  <Link key={link.label} to={link.to} className={`${bodyText} transition-colors hover:text-white`}>
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
+            ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className={bodyText}>© {new Date().getFullYear()} Cheretanet. All rights reserved.</p>
-          <div className="flex items-center gap-[4px]">
-            <span className="size-[8px] rounded-full bg-forest" />
-            <span className="text-body-13 font-medium whitespace-nowrap text-forest">Portal Active</span>
-          </div>
+        <div className="flex flex-col gap-2 pt-5 text-xs text-white/50 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} Cheretanet. Public auctions, made clear.</p>
+          <p className="inline-flex items-center gap-1.5"><MapPin className="size-3" aria-hidden="true" /> Ethiopia</p>
         </div>
       </div>
     </footer>
-  )
+  );
 }

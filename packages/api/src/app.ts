@@ -33,10 +33,13 @@ import { logger } from "./shared/utils/logger.js";
 import { registerBuiltInAdapters } from "./autofetch/adapters/index.js";
 import { createAutofetchRouter } from "./autofetch/autofetch.routes.js";
 import { getPool } from "./infrastructure/database/pool.js";
+import path from "node:path";
 
 export function createApp(): express.Express {
   const app = express();
+ const webDist = path.resolve("/app/packages/web/dist");
 
+  app.use(express.static(webDist));
   // Register autofetch adapters at startup
   try {
     registerBuiltInAdapters();
@@ -124,6 +127,13 @@ export function createApp(): express.Express {
     }),
   );
 
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    if (req.path.startsWith("/api") || req.path.startsWith("/health")) return next();
+    res.sendFile(path.join(webDist, "index.html"), (err) => {
+      if (err) next();
+    });
+  });
   app.use(notFoundMiddleware);
   app.use(errorMiddleware);
 
