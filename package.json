@@ -10,6 +10,7 @@
     "dev": "pnpm build:shared && pnpm --parallel --filter \"./packages/**\" dev",
     "dev:api": "pnpm --filter @auction/api dev",
     "build": "pnpm -r build",
+    "start": "pnpm --filter @auction/api start",
     "test": "pnpm build:shared && pnpm -r test",
     "typecheck": "pnpm build:shared && pnpm -r typecheck",
     "lint": "pnpm -r lint",
