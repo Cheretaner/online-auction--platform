@@ -3,6 +3,13 @@ dist/
 build/
 .vite/
 coverage/
+*.tsbuildinfo
+packages/api/data/
+
+# Compiled output of the .ts test sources that live next to them.
+packages/api/tests/**/*.js
+packages/api/tests/**/*.js.map
+packages/api/tests/**/*.d.ts
 
 .env
 .env.*
