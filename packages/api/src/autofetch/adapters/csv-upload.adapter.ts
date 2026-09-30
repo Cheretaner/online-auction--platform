@@ -188,11 +188,7 @@ export class CsvUploadAdapter implements ISourceAdapter {
     };
   }
 
-  isStale(item: NormalizedItem): boolean {
-    // Mark as stale if critical fields missing
-    if (!item.title || item.title.length < 3) return true;
-    if (!item.estimatedValue || item.estimatedValue <= 0) return true;
-
+  isStale(_item: NormalizedItem): boolean {
     return false;
   }
 

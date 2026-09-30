@@ -24,7 +24,11 @@ import type {
   AuditEvent,
   ComplianceCheckRecord,
   DuplicateCheckResult,
-  AutofetchPendingItem,
+  AutofetchConflictSummary,
+  AutofetchFetchResult,
+  AutofetchPendingDetail,
+  AutofetchPendingResult,
+  AutofetchStats,
   AutofetchSource,
   CategoryRecord,
   CountResponse,
@@ -172,24 +176,24 @@ export const telegramApi = {
 };
 
 export const autofetchApi = {
-  listSources: () => apiRequest<ItemList<AutofetchSource>>(v1("/autofetch/sources")),
+  listSources: () => unwrap(apiRequest<{ data: ItemList<AutofetchSource> }>(v1("/autofetch/sources"))),
   createSource: (body: {
     name: string;
     adapterType: string;
     sourceUrl?: string;
     adapterConfig?: Record<string, unknown>;
-  }) => apiRequest<AutofetchSource>(v1("/autofetch/sources"), { method: "POST", body }),
+  }) => unwrap(apiRequest<{ data: AutofetchSource }>(v1("/autofetch/sources"), { method: "POST", body })),
   fetchSource: (sourceId: string) =>
-    apiRequest(v1(`/autofetch/sources/${sourceId}/fetch`), { method: "POST" }),
+    unwrap(apiRequest<{ data: AutofetchFetchResult }>(v1(`/autofetch/sources/${sourceId}/fetch`), { method: "POST" })),
   pending: (params?: { limit?: number; offset?: number; status?: string; sourceId?: string }) =>
-    apiRequest<ItemList<AutofetchPendingItem>>(v1(`/autofetch/pending${queryString(params ?? {})}`)),
-  getPending: (id: string) => apiRequest(v1(`/autofetch/pending/${id}`)),
-  conflicts: (id: string) => apiRequest(v1(`/autofetch/pending/${id}/conflicts`)),
+    unwrap(apiRequest<{ data: AutofetchPendingResult }>(v1(`/autofetch/pending${queryString(params ?? {})}`))),
+  getPending: (id: string) => unwrap(apiRequest<{ data: AutofetchPendingDetail }>(v1(`/autofetch/pending/${id}`))),
+  conflicts: (id: string) => unwrap(apiRequest<{ data: AutofetchConflictSummary }>(v1(`/autofetch/pending/${id}/conflicts`))),
   approve: (id: string, auctionId: string) =>
-    apiRequest(v1(`/autofetch/pending/${id}/approve`), { method: "POST", body: { auctionId } }),
+    unwrap(apiRequest<{ data: unknown }>(v1(`/autofetch/pending/${id}/approve`), { method: "POST", body: { auctionId } })),
   reject: (id: string, reason: string) =>
-    apiRequest(v1(`/autofetch/pending/${id}/reject`), { method: "POST", body: { reason } }),
-  stats: () => apiRequest(v1("/autofetch/stats")),
+    unwrap(apiRequest<{ data: unknown }>(v1(`/autofetch/pending/${id}/reject`), { method: "POST", body: { reason } })),
+  stats: () => unwrap(apiRequest<{ data: AutofetchStats }>(v1("/autofetch/stats"))),
 };
 
 export const healthApi = {
