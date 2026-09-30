@@ -1,18 +1,56 @@
 import { DOMAIN_EVENTS } from "../kernel/events.js";
 import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
+import { aiProviderAdapter } from "../infrastructure/ai/provider.adapter.js";
 import * as auctionService from "../auction/auction.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import * as repo from "./ai.repository.js";
 import { evaluateAuctionAnomalies } from "./anomaly.rules.js";
 import type { AnomalyFlag } from "./ai.repository.js";
+import type { AnomalyAdvisory } from "./ai.types.js";
 import type { Role } from "@auction/shared";
 import * as audit from "../audit/audit.service.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { primaryActorRole } from "../kernel/roles.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
+import { logger } from "../shared/utils/logger.js";
 
-export async function evaluateAuction(auctionId: string): Promise<AnomalyFlag | null> {
+/**
+ * Asks the configured model for a narrative read of the behavioural features.
+ *
+ * Deliberately advisory-only: the deterministic rules remain the gate that
+ * creates a flag, so a model outage can never change an enforcement outcome.
+ * It is never called from the per-bid path - only from an explicit scan.
+ */
+async function requestAdvisory(auctionId: string): Promise<AnomalyAdvisory | null> {
+  try {
+    const auction = await biddingRepo.findAuction(auctionId);
+    if (!auction) return null;
+    const bids = await biddingRepo.listBids(auctionId);
+    const features = await biddingRepo.listBidFeatures(auctionId);
+
+    const result = await aiProviderAdapter.detectAnomaly({
+      auction,
+      bidCount: bids.length,
+      // Cap the sample so the prompt stays small and cost stays predictable.
+      features: features.slice(-25),
+    });
+
+    return {
+      flagged: result.flagged,
+      ...(result.reason ? { reason: result.reason } : {}),
+      provider: result.provider ?? "unknown",
+    };
+  } catch (error) {
+    logger.warn({ err: error, auctionId }, "AI anomaly advisory unavailable");
+    return null;
+  }
+}
+
+export async function evaluateAuction(
+  auctionId: string,
+  options: { useAi?: boolean } = {},
+): Promise<AnomalyFlag | null> {
   const auction = await biddingRepo.findAuction(auctionId);
   if (!auction) return null;
   const bids = await biddingRepo.listBids(auctionId);
@@ -20,14 +58,27 @@ export async function evaluateAuction(auctionId: string): Promise<AnomalyFlag | 
   const evaluation = evaluateAuctionAnomalies({ auction, bids, features });
   if (!evaluation) return null;
 
+  let advisory: AnomalyAdvisory | null = null;
+  if (options.useAi) {
+    advisory = await requestAdvisory(auctionId);
+  }
+
+  const featureValues: Record<string, unknown> = advisory
+    ? { ...evaluation.features, aiAdvisory: advisory }
+    : evaluation.features;
+
+  const explanation = advisory?.reason
+    ? `${evaluation.explanation}\n\nAI review (${advisory.provider}): ${advisory.reason}`
+    : evaluation.explanation;
+
   const flag = await repo.insertFlag({
     auctionId,
     subjectAccounts: evaluation.subjects,
     score: evaluation.score,
     severity: evaluation.severity,
     triggeredRules: evaluation.rules,
-    featureValues: evaluation.features,
-    explanation: evaluation.explanation,
+    featureValues,
+    explanation,
   });
 
   await enqueueOutbox({
@@ -62,6 +113,20 @@ export async function evaluateAuction(auctionId: string): Promise<AnomalyFlag | 
   );
 
   return flag;
+}
+
+/**
+ * Explicit, user-triggered risk scan. Unlike the per-bid path this one always
+ * consults the model, so compliance gets a narrative even when no deterministic
+ * rule fired - which is exactly what the "Run AI scan" action is for.
+ */
+export async function assessAuction(auctionId: string): Promise<{
+  flag: AnomalyFlag | null;
+  advisory: AnomalyAdvisory | null;
+}> {
+  const advisory = await requestAdvisory(auctionId);
+  const flag = await evaluateAuction(auctionId, { useAi: false });
+  return { flag, advisory };
 }
 
 export async function listAnomalies(input: {

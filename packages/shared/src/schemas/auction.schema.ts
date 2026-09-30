@@ -13,8 +13,20 @@ export const CreateAuctionRequest = z.object({
   depositAmount: Money.default("0.00"),
   eligibilityRules: z.string().max(2000).optional(),
   region: z.string().max(80).optional(),
-  opensAt: z.string().datetime(),
-  closesAt: z.string().datetime(),
+  opensAt: z.preprocess((val) => {
+    if (typeof val === 'string' && val.trim() !== '') {
+      // Replace slashes with dashes and parse cleanly
+      return new Date(val);
+    }
+    return val;
+  }, z.date({ message: "Invalid datetime" })),
+
+  closesAt: z.preprocess((val) => {
+    if (typeof val === 'string' && val.trim() !== '') {
+      return new Date(val);
+    }
+    return val;
+  }, z.date({ message: "Invalid datetime" })),
 });
 
 export type CreateAuctionRequest = z.infer<typeof CreateAuctionRequest>;

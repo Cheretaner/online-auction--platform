@@ -18,7 +18,7 @@ export default defineConfig({
         "favicon-192.png",
         "favicon-512.png",
         "icons.svg",
-        "apple-touch-icon.png",
+        "cheretanet.png",
       ],
       manifest: {
         name: "Cheretanet Auctions",
@@ -50,7 +50,7 @@ export default defineConfig({
             purpose: "any maskable",
           },
           {
-            src: "/apple-touch-icon.png",
+            src: "/cheretanet.png",
             sizes: "180x180",
             type: "image/png",
           },

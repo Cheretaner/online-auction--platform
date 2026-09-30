@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { getAuth } from "../shared/types/request.js";
 import { HttpStatus } from "../shared/errors/index.js";
 import { telegramService } from "./telegram.service.js";
+import { assertAuctionAccess } from "../shared/authz/auction-access.js";
 
 export async function handleWebhook(req: Request, res: Response): Promise<void> {
   const secretHeader = req.headers["x-telegram-bot-api-secret-token"] as string | undefined;
@@ -36,6 +37,12 @@ export async function unlinkTelegram(req: Request, res: Response): Promise<void>
 
 export async function broadcastAuction(req: Request, res: Response): Promise<void> {
   const auctionId = String(req.params.auctionId);
+  const auth = getAuth(req);
+  await assertAuctionAccess(auctionId, {
+    userId: auth.userId,
+    roles: auth.roles,
+    organizationId: auth.organizationId,
+  });
   const broadcasted = await telegramService.broadcastAuction(auctionId);
   res.status(HttpStatus.OK).json({ data: { broadcasted } });
 }

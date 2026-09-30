@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import clockIcon from '../../assets/icons/clock.svg'
 import helpCircleIcon from '../../assets/icons/help-circle.svg'
 import searchIcon from '../../assets/icons/search.svg'
-import logo from '../../assets/images/cheretanet-logo.png'
+import logo from '../../assets/images/cheretanet-full-logo.png'
 import { useAuth } from '@/features/auth/auth-provider'
 import { useLogout } from '@/features/auth/queries'
 import { Icon } from '../ui/Icon'
@@ -106,7 +106,7 @@ function MainNavigation() {
   return (
     <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-4 py-3 lg:h-[80px] lg:flex-nowrap lg:px-[48px] lg:py-0">
       <div className="flex items-center gap-[32px]">
-        <Link to="/" className="block h-[32px] w-[136px]">
+        <Link to="/" className="block h-16  w-[136px]">
           <img src={logo} alt="Cheretanet" className="block h-full w-full" />
         </Link>
         <nav className="hidden items-center gap-[20px] lg:flex" aria-label="Main">

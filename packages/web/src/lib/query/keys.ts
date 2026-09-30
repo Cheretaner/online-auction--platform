@@ -58,9 +58,13 @@ export const queryKeys = {
   },
   ai: {
     anomalies: (auctionId?: string) => ["ai", "anomalies", { auctionId }] as const,
+    /** Cache of the last user-triggered AI risk scan per auction. */
+    scan: (auctionId: string) => ["ai", "scan", auctionId] as const,
   },
   telegram: {
     status: ["telegram", "status"] as const,
+    linkToken: ["telegram", "link-token"] as const,
+    broadcasts: ["telegram", "broadcasts"] as const,
   },
   autofetch: {
     sources: ["autofetch", "sources"] as const,

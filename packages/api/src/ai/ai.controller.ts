@@ -11,9 +11,17 @@ import { assertAuctionAccess } from "../shared/authz/auction-access.js";
 import * as anomalyService from "./anomaly.service.js";
 import * as assistantService from "./assistant.service.js";
 import * as categorizationService from "./categorization.service.js";
+import { AppError, HttpStatus } from "../shared/errors/index.js";
 
 export const categorize: RequestHandler = async (req, res) => {
   const body = req.body as CategorizeRequest;
+  if (body.itemId) {
+    const auctionId = await categorizationService.getItemAuctionId(body.itemId);
+    if (!auctionId) {
+      throw new AppError("Auction item not found", HttpStatus.NOT_FOUND);
+    }
+    await assertAuctionAccess(auctionId, actorOf(getAuth(req)));
+  }
   const result = await categorizationService.categorizeText(body.text, body.itemId);
   res.json(result);
 };
@@ -21,8 +29,8 @@ export const categorize: RequestHandler = async (req, res) => {
 export const detectAnomaly: RequestHandler = async (req, res) => {
   const { auctionId } = req.body as DetectAnomalyRequest;
   await assertAuctionAccess(auctionId, actorOf(getAuth(req)));
-  const flag = await anomalyService.evaluateAuction(auctionId);
-  res.json({ flagged: Boolean(flag), flag });
+  const { flag, advisory } = await anomalyService.assessAuction(auctionId);
+  res.json({ flagged: Boolean(flag) || Boolean(advisory?.flagged), flag, advisory });
 };
 
 function actorOf(auth: ReturnType<typeof getAuth>) {
@@ -68,6 +76,7 @@ export const reviewAnomaly: RequestHandler = async (req, res) => {
 
 export const assist: RequestHandler = async (req, res) => {
   const body = req.body as AssistRequest;
+  if (body.auctionId) await assertAuctionAccess(body.auctionId, actorOf(getAuth(req)));
   const result = await assistantService.askAssistant(body.prompt, body.auctionId);
   res.json(result);
 };

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserMenu } from "@/components/layout/user-menu";
 import { useAuth } from "@/features/auth/auth-provider";
+import logo from "../../assets/images/cheretanet-full-logo.png"
 
 export function PublicShell() {
   const { isAuthenticated } = useAuth();
@@ -11,8 +12,8 @@ export function PublicShell() {
     <div className="flex min-h-svh flex-col bg-background">
       <header className="sticky top-0 z-30 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4">
-          <Link to="/" className="font-heading text-lg font-semibold">
-            {APP_SHORT_NAME}
+          <Link to="/" className="block h-16  w-[136px]">
+            <img src={logo} alt={APP_SHORT_NAME} className="block h-full w-full" />
           </Link>
           <nav className="ml-4 hidden items-center gap-4 text-sm md:flex">
             <Link to="/auctions" className="text-muted-foreground hover:text-foreground">

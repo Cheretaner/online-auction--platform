@@ -1,0 +1,32 @@
+# EthioDeploy / Nixpacks build definition.
+#
+# EthioDeploy builds this pnpm workspace straight from source with Nixpacks —
+# no Dockerfile is required. Nixpacks reads this file from the app root and
+# merges it with the plan it generates for the detected pnpm workspace.
+#
+# Two things a monorepo has to spell out explicitly:
+#
+#  1. The start command. The API is a workspace package, not the root project,
+#     so Nixpacks' default root-level start would not find it.
+#  2. The build. `pnpm build` runs each package's build script in dependency
+#     order, which is what produces packages/shared/dist before the API starts
+#     (the API resolves @auction/shared through its "main"/"types" fields, so
+#     the compiled output must exist first).
+#
+# Migrations: set RUN_MIGRATIONS_ON_BOOT=true. The migration runner takes a
+# Postgres advisory lock, so during a rolling deploy concurrent instances queue
+# instead of colliding. Note that the API refuses to start in production unless
+# DATABASE_URL, BOOTSTRAP_SUPER_ADMIN_EMAIL and a non-wildcard CORS_ORIGIN are
+# set — configure those as environment variables on the platform.
+#
+# The web app is a separate static build; publish packages/web/dist as static
+# assets / point the platform's CDN at it rather than serving it from the API.
+
+[phases.setup]
+nixPkgs = ["nodejs_22", "pnpm"]
+
+[phases.build]
+cmds = ["corepack enable", "pnpm install --frozen-lockfile", "pnpm build"]
+
+[start]
+cmd = "node packages/api/dist/server.js"

@@ -32,11 +32,39 @@ pnpm --filter @auction/api smoke       # walks the whole flow end to end
 
 ## Production deployment
 
+Two supported paths. Pick one — they are alternatives, not steps.
+
+### Option A — EthioDeploy (Nixpacks, push-to-deploy)
+
+Connect the repository to EthioDeploy and push to the deploy branch. No
+Dockerfile is involved: the platform builds the pnpm workspace from source
+using Nixpacks. `nixpacks.toml` in the repository root pins the Node/pnpm
+toolchain, the build (`pnpm install --frozen-lockfile && pnpm build`) and the
+start command (`node packages/api/dist/server.js`).
+
+Set these as environment variables on the platform — the API **refuses to
+start in production** without the first three:
+
+- `DATABASE_URL` — the managed PostgreSQL connection string
+- `BOOTSTRAP_SUPER_ADMIN_EMAIL` — whoever will run the platform
+- `CORS_ORIGIN` — the real web origin (`*` is refused in production)
+- `JWT_SECRET` — a random value of 32+ characters (the default is rejected)
+- `RUN_MIGRATIONS_ON_BOOT=true` — applies pending migrations on boot. The
+  runner holds a Postgres advisory lock, so a rolling deploy queues instead of
+  colliding.
+- `WEB_BASE_URL` — used in password-reset links
+- `SMTP_*` — without it, password-reset links are never delivered
+
+The web app is a separate static build; publish `packages/web/dist` as static
+assets / point the platform's CDN at it rather than serving it from the API.
+
+### Option B — Self-managed host (systemd + nginx)
+
 Scripts in the repository-root `deploy/` directory, meant to be run in this
 order on a fresh Ubuntu/Debian host. nginx serves the built web app and
 proxies `/api` to the API on the same origin (`deploy/nginx.conf`).
 
-### 1. Provision (once)
+#### 1. Provision (once)
 
 ```bash
 sudo bash deploy/provision.sh
@@ -60,7 +88,7 @@ Copy those backups off the machine, and test a restore once before launch.
 
 Back that file up. Rotating `JWT_SECRET` signs out every existing session.
 
-### 2. Deploy (every release)
+#### 2. Deploy (every release)
 
 ```bash
 sudo bash deploy/deploy.sh              # deploy the current checkout
@@ -75,7 +103,7 @@ it rolls the symlink back and restarts the old one.
 **Migrations are not rolled back.** If a release fails for schema reasons,
 apply the matching `.down.sql` by hand.
 
-### 3. TLS
+#### 3. TLS
 
 ```bash
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/auction
@@ -90,7 +118,7 @@ Keep `TRUST_PROXY_HOPS` equal to the number of proxies in front of the API —
 `X-Forwarded-For` to escape its own rate-limit bucket; too low and every
 client shares the proxy's bucket.
 
-### Operating
+#### Operating
 
 ```bash
 sudo systemctl status auction-api

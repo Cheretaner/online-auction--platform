@@ -4,6 +4,7 @@ import { TelegramBotService } from "./telegram-bot.service.js";
 import { TelegramChannelService } from "./telegram-channel.service.js";
 import * as telegramRepo from "./telegram.repository.js";
 import type { TelegramNotificationPayload } from "./telegram.types.js";
+import { AppError, HttpStatus } from "../shared/errors/index.js";
 
 class TelegramService {
   private botService: TelegramBotService;
@@ -30,9 +31,16 @@ class TelegramService {
    * Generates an 8-character connection code for a user to link their Telegram account.
    */
   async createLinkToken(userId: string): Promise<{ token: string; deepLink: string; expiresAt: string }> {
+    const bot = this.botService.getBotInstance();
+    if (!bot) {
+      throw new AppError("Telegram bot is not configured on this server", HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    const botUsername = env.TELEGRAM_BOT_USERNAME || (await bot.telegram.getMe()).username;
+    if (!botUsername) {
+      throw new AppError("Telegram bot username is unavailable", HttpStatus.SERVICE_UNAVAILABLE);
+    }
     const token = await telegramRepo.createLinkToken(userId, 15);
-    const botUsername = (env.TELEGRAM_BOT_USERNAME || "cheretanet_bot").replace(/^@/, "");
-    const deepLink = `https://t.me/${botUsername}?start=link_${token}`;
+    const deepLink = `https://t.me/${botUsername.replace(/^@/, "")}?start=link_${token}`;
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     return { token, deepLink, expiresAt };
@@ -82,7 +90,7 @@ class TelegramService {
    * Processes a webhook update received from Telegram Bot API.
    */
   async handleWebhookUpdate(update: any, secretHeader?: string): Promise<void> {
-    if (env.TELEGRAM_WEBHOOK_SECRET && secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
+    if (!env.TELEGRAM_WEBHOOK_SECRET || secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
       throw new Error("Invalid Telegram webhook secret header");
     }
 

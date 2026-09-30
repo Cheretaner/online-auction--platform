@@ -123,6 +123,10 @@ export interface AuctionItem {
   estimatedValue: string | null;
   categoryId: string | null;
   categorySource: string | null;
+  /** Latest AI category suggestion, kept for audit even when unapplied. */
+  aiCategorySuggestion?: string | null;
+  aiSubCategory?: string | null;
+  aiConfidence?: number | null;
   region: string | null;
   city: string | null;
   createdAt: string;
@@ -254,10 +258,19 @@ export interface AuditEvent {
   createdAt: string;
 }
 
+/** Mirrors telegramService.getTelegramLinkStatus (GET /telegram/status). */
 export interface TelegramStatus {
   linked: boolean;
-  telegramUserId?: string | null;
-  username?: string | null;
+  telegramId: string | null;
+  telegramUsername: string | null;
+  telegramLinkedAt: string | null;
+}
+
+/** POST /telegram/link-token — the one-shot code plus the t.me deep link. */
+export interface TelegramLinkToken {
+  token: string;
+  deepLink: string;
+  expiresAt: string;
 }
 
 export interface AutofetchSource {
@@ -291,6 +304,45 @@ export interface AnomalyFlagRecord {
   reviewedAt: string | null;
   decisionNote: string | null;
   createdAt: string;
+}
+
+/** Mirrors CategorizationResult in packages/api/src/ai/ai.types.ts (POST /ai/categorize). */
+export interface AiCategorizationResult {
+  /** Slug that exists in the taxonomy, or the cleaned model answer. */
+  category: string;
+  categoryName: string | null;
+  confidence: number;
+  /** Which adapter answered ("gemini", "openai-compat", "stub", ...). */
+  provider: string;
+  /** True when the deterministic stub answered instead of a real model. */
+  fallback: boolean;
+  /** Whether the answer resolved to a real category row. */
+  matched: boolean;
+  rawSuggestion: string;
+  /** True when the suggestion was written onto the auction item server-side. */
+  applied: boolean;
+  reason: string;
+}
+
+/** POST /ai/assist */
+export interface AiAssistResult {
+  answer: string;
+  provider: string;
+  fallback: boolean;
+}
+
+/** Narrative risk assessment produced by the model; advisory only. */
+export interface AiAnomalyAdvisory {
+  flagged: boolean;
+  reason?: string;
+  provider: string;
+}
+
+/** POST /ai/anomaly — the deterministic flag plus the model's advisory. */
+export interface AiAnomalyScanResult {
+  flagged: boolean;
+  flag: AnomalyFlagRecord | null;
+  advisory: AiAnomalyAdvisory | null;
 }
 
 export interface ComplianceCheckRecord {

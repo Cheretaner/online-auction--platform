@@ -678,6 +678,9 @@ export class TelegramBotService {
       void this.bot.launch(() => {
         this.isPolling = true;
         logger.info("Telegram bot polling started");
+      }).catch((error) => {
+        this.isPolling = false;
+        logger.error({ err: error }, "Telegram bot polling failed to start");
       });
     } else {
       logger.warn(

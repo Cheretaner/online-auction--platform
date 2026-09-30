@@ -29,9 +29,10 @@ import {
   useUpdateAuction,
 } from "@/features/auctions/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { fromDatetimeLocalValue, toDatetimeLocalValue } from "@/lib/format";
+import { toDatetimeLocalValue } from "@/lib/format";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useEffect } from "react";
+import type { z } from "zod";
 
 export default function AuctionFormPage() {
   const { id } = useParams();
@@ -42,7 +43,7 @@ export default function AuctionFormPage() {
   const update = useUpdateAuction(id ?? "");
   const navigate = useNavigate();
 
-  const form = useForm({
+  const form = useForm<z.input<typeof CreateAuctionRequest>, unknown, z.output<typeof CreateAuctionRequest>>({
     resolver: zodResolver(CreateAuctionRequest),
     defaultValues: {
       organizationId: organizationId ?? "",
@@ -101,20 +102,18 @@ export default function AuctionFormPage() {
                 description: values.description || undefined,
                 eligibilityRules: values.eligibilityRules || undefined,
                 region: values.region || undefined,
-                opensAt: values.opensAt.includes("T")
-                  ? fromDatetimeLocalValue(values.opensAt)
-                  : values.opensAt,
-                closesAt: values.closesAt.includes("T")
-                  ? fromDatetimeLocalValue(values.closesAt)
-                  : values.closesAt,
               };
               try {
                 if (isEdit && id) {
-                  await update.mutateAsync(payload);
+                  await update.mutateAsync({
+                    ...payload,
+                    opensAt: values.opensAt.toISOString(),
+                    closesAt: values.closesAt.toISOString(),
+                  });
                   toast.success("Auction updated");
                   navigate(`/app/auctions/${id}`);
                 } else {
-                  const created = await create.mutateAsync(payload);
+                  const created = await create.mutateAsync(values);
                   toast.success("Auction created");
                   navigate(`/app/auctions/${created.id}`);
                 }
@@ -239,7 +238,7 @@ export default function AuctionFormPage() {
                 <FormItem>
                   <FormLabel>Opens</FormLabel>
                   <FormControl>
-                    <Input type="datetime-local" {...field} />
+                    <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -252,7 +251,7 @@ export default function AuctionFormPage() {
                 <FormItem>
                   <FormLabel>Closes</FormLabel>
                   <FormControl>
-                    <Input type="datetime-local" {...field} />
+                    <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

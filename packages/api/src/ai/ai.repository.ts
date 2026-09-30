@@ -141,8 +141,8 @@ export async function applyItemCategory(input: {
   subCategory?: string;
   confidence: number;
   rationale: string;
-}): Promise<void> {
-  await query(
+}): Promise<boolean> {
+  const result = await query(
     `UPDATE auction_items i
         SET category_id = c.id,
             ai_category_suggestion = $2,
@@ -153,4 +153,13 @@ export async function applyItemCategory(input: {
       WHERE i.id = $1 AND c.slug = $2`,
     [input.itemId, input.categorySlug, input.subCategory ?? null, input.confidence, input.rationale],
   );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function findItemAuctionId(itemId: string): Promise<string | null> {
+  const row = await queryOne<{ auction_id: string }>(
+    `SELECT auction_id FROM auction_items WHERE id = $1`,
+    [itemId],
+  );
+  return row?.auction_id ?? null;
 }

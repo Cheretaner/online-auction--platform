@@ -17,6 +17,9 @@ import type {
 } from "@auction/shared";
 import { apiRequest, v1 } from "@/lib/api/client";
 import type {
+  AiAnomalyScanResult,
+  AiAssistResult,
+  AiCategorizationResult,
   AnomalyFlagRecord,
   AuditEvent,
   ComplianceCheckRecord,
@@ -31,6 +34,7 @@ import type {
   ItemList,
   NotificationRecord,
   ReportRecord,
+  TelegramLinkToken,
   TelegramStatus,
   VerificationRecord,
 } from "@/lib/api/types";
@@ -134,21 +138,37 @@ export const complianceApi = {
 };
 
 export const aiApi = {
-  categorize: (body: CategorizeRequest) => apiRequest(v1("/ai/categorize"), { method: "POST", body }),
-  detectAnomaly: (body: DetectAnomalyRequest) => apiRequest(v1("/ai/anomaly"), { method: "POST", body }),
+  categorize: (body: CategorizeRequest) =>
+    apiRequest<AiCategorizationResult>(v1("/ai/categorize"), { method: "POST", body }),
+  /** Explicit, user-triggered risk scan: deterministic flag + AI narrative advisory. */
+  detectAnomaly: (body: DetectAnomalyRequest) =>
+    apiRequest<AiAnomalyScanResult>(v1("/ai/anomaly"), { method: "POST", body }),
   listAnomalies: (auctionId?: string) =>
     apiRequest<ItemList<AnomalyFlagRecord>>(v1(`/ai/anomalies${queryString({ auctionId })}`)),
   reviewAnomaly: (id: string, body: ReviewAnomalyRequest) =>
     apiRequest<AnomalyFlagRecord>(v1(`/ai/anomalies/${id}/review`), { method: "POST", body }),
-  assist: (body: AssistRequest) => apiRequest(v1("/ai/assist"), { method: "POST", body }),
+  assist: (body: AssistRequest) =>
+    apiRequest<AiAssistResult>(v1("/ai/assist"), { method: "POST", body, timeoutMs: 45_000 }),
 };
 
+function unwrap<T>(promise: Promise<{ data: T }>): Promise<T> {
+  return promise.then((response) => response.data);
+}
+
 export const telegramApi = {
-  createLinkToken: () => apiRequest(v1("/telegram/link-token"), { method: "POST" }),
-  status: () => apiRequest<TelegramStatus>(v1("/telegram/status")),
-  unlink: () => apiRequest<void>(v1("/telegram/unlink"), { method: "DELETE", parse: "void" }),
+  createLinkToken: () =>
+    unwrap(apiRequest<{ data: TelegramLinkToken }>(v1("/telegram/link-token"), { method: "POST" })),
+  status: () => unwrap(apiRequest<{ data: TelegramStatus }>(v1("/telegram/status"))),
+  unlink: () =>
+    unwrap(apiRequest<{ data: { unlinked: boolean } }>(v1("/telegram/unlink"), { method: "DELETE" })),
+  /** Publishes (or edits) the auction card on the public Telegram channel. */
   broadcast: (auctionId: string) =>
-    apiRequest(v1(`/telegram/broadcast/${auctionId}`), { method: "POST" }),
+    unwrap(
+      apiRequest<{ data: { broadcasted: boolean } }>(v1(`/telegram/broadcast/${auctionId}`), {
+        method: "POST",
+        timeoutMs: 30_000,
+      }),
+    ),
 };
 
 export const autofetchApi = {

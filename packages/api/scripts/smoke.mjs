@@ -1,6 +1,6 @@
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const STAMP = Date.now();
-const PASSWORD = "correct-horse-battery-staple";
+const PASSWORD = "Admin@123";
 
 let failures = 0;
 
@@ -64,7 +64,7 @@ async function main() {
   expect(await call("GET", "/health"), 200, "GET /health");
 
   heading("platform admin bootstrap");
-  const adminEmail = `admin+${STAMP}@example.com`;
+  const adminEmail = `admin@cheretanet.org`;
   const admin = expect(
     await call("POST", "/api/v1/auth/register", {
       body: { email: adminEmail, password: PASSWORD, fullName: "Platform Admin" },

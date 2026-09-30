@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useReviewAnomaly } from "@/features/operations/queries";
+import { useReviewAnomaly } from "@/features/ai/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { AnomalyFlagRecord } from "@/lib/api/types";
 import { formatDateTime, hasRole } from "@/lib/format";

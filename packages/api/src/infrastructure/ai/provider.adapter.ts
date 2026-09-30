@@ -1,44 +1,122 @@
 import { env } from "../../config/env.js";
 import { logger } from "../../shared/utils/logger.js";
 
+export interface AiCategorizeOptions {
+  allowedCategories?: string[];
+  /** Free-text hint (e.g. the seller's declared category) used only to bias
+   * the choice, never to override the taxonomy. */
+  hint?: string;
+}
+
+export interface AiCategorization {
+  category: string;
+  confidence: number;
+  /** Name of the adapter that produced the answer, so callers and the UI can
+   * tell a real model result from the deterministic fallback. */
+  provider: string;
+  /** True when the answer came from the always-on stub rather than a model. */
+  fallback: boolean;
+}
+
+export interface AiAssistResult {
+  answer: string;
+  provider: string;
+  fallback: boolean;
+}
+
 export interface AiProviderAdapter {
-  categorize(text: string): Promise<{ category: string; confidence: number }>;
-  detectAnomaly(input: Record<string, unknown>): Promise<{ flagged: boolean; reason?: string }>;
-  assist(prompt: string): Promise<string>;
+  categorize(text: string, options?: AiCategorizeOptions): Promise<AiCategorization>;
+  detectAnomaly(input: Record<string, unknown>): Promise<{ flagged: boolean; reason?: string; provider?: string }>;
+  assist(prompt: string): Promise<AiAssistResult>;
+}
+
+export function parseJsonLoose<T>(raw: string): T {
+  const text = raw.trim();
+  if (!text) throw new Error("AI provider returned an empty completion");
+
+  const attempts: string[] = [];
+
+  // Strip a leading ``` / ```json fence and its closing fence.
+  const fenceMatch = text.match(/^```[a-zA-Z0-9_-]*\s*\n?([\s\S]*?)\n?\s*```$/);
+  if (fenceMatch?.[1]) attempts.push(fenceMatch[1].trim());
+
+  attempts.push(text);
+
+  // Last resort: the widest balanced-looking object in the reply, which
+  // handles "Sure! Here you go: {...} Hope that helps."
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first !== -1 && last > first) attempts.push(text.slice(first, last + 1));
+
+  for (const candidate of attempts) {
+    try {
+      const value = JSON.parse(candidate) as unknown;
+      if (value && typeof value === "object" && !Array.isArray(value)) return value as T;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  throw new Error(`AI provider returned unparsable JSON: ${text.slice(0, 200)}`);
 }
 
 /**
- * Deterministic, zero-dependency fallback. Per the SRS (NFR "no AI
- * dependency is on the critical path of bidding"), auction creation and
- * bidding must keep working even when every configured AI provider is
- * unavailable or rate limited, so this adapter is always the last link in
- * the fallback chain built by `createAiProviderAdapter`.
+ * Canonical form of a category key: lowercase, trimmed, separators collapsed.
+ * Models answer "Vehicles", "vehicles", "VEHICLE" or "Vehicles Category" for
+ * the same slug `vehicles`, so both sides of the comparison go through here.
  */
+export function normalizeCategoryKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export class StubAiProviderAdapter implements AiProviderAdapter {
-  async categorize(text: string) {
+  async categorize(text: string, options?: AiCategorizeOptions) {
     const lowered = text.toLowerCase();
-    const category = lowered.includes("vehicle") || lowered.includes("car")
-      ? "vehicles"
-      : lowered.includes("property") || lowered.includes("land")
-        ? "property"
-        : lowered.includes("machine") || lowered.includes("equipment")
-          ? "machinery"
-          : lowered.includes("electronic") || lowered.includes("laptop") || lowered.includes("phone")
-            ? "electronics"
-            : "general";
-    return { category, confidence: text.trim().length > 0 ? 0.55 : 0 };
+    const allowed = options?.allowedCategories ?? [];
+
+    // Prefer a keyword hit against the real taxonomy (matched on slug or name)
+    // so the fallback agrees with the categories the database actually has.
+    const byTaxonomy = allowed.find((slug) => {
+      const key = normalizeCategoryKey(slug);
+      return (
+        key.length > 3 &&
+        (lowered.includes(key) || lowered.includes(key.replace(/-/g, " ")) || lowered.includes(key.replace(/s$/, "")))
+      );
+    });
+
+    const category =
+      byTaxonomy ??
+      (lowered.includes("vehicle") || lowered.includes("car")
+        ? "vehicles"
+        : lowered.includes("property") || lowered.includes("land")
+          ? "property"
+          : lowered.includes("machine") || lowered.includes("equipment")
+            ? "machinery"
+            : lowered.includes("electronic") || lowered.includes("laptop") || lowered.includes("phone")
+              ? "electronics"
+              : "general");
+
+    return { category, confidence: text.trim().length > 0 ? 0.55 : 0, provider: "stub", fallback: true };
   }
 
   async detectAnomaly(input: Record<string, unknown>) {
     const amount = Number(input.amount ?? 0);
     if (Number.isFinite(amount) && amount > 1_000_000) {
-      return { flagged: true, reason: "Amount exceeds anomaly threshold" };
+      return { flagged: true, reason: "Amount exceeds anomaly threshold", provider: "stub" };
     }
-    return { flagged: false };
+    return { flagged: false, provider: "stub" };
   }
 
   async assist(prompt: string) {
-    return `AI assistant is temporarily unavailable. Here is what you asked: ${prompt.slice(0, 160)}`;
+    return {
+      answer: `AI assistant is temporarily unavailable. Here is what you asked: ${prompt.slice(0, 160)}`,
+      provider: "stub",
+      fallback: true,
+    };
   }
 }
 
@@ -51,12 +129,6 @@ interface OpenAiCompatConfig {
   extraHeaders?: Record<string, string>;
 }
 
-/**
- * Adapter for any OpenAI-compatible `/chat/completions` endpoint. Both
- * Google Gemini (`.../v1beta/openai/`) and OpenRouter (`openrouter.ai/api/v1`)
- * expose this shape, so one implementation serves both providers - only
- * base URL, model, and headers differ.
- */
 export class OpenAiCompatProviderAdapter implements AiProviderAdapter {
   constructor(private readonly config: OpenAiCompatConfig) {}
 
@@ -97,32 +169,60 @@ export class OpenAiCompatProviderAdapter implements AiProviderAdapter {
     }
   }
 
-  async categorize(text: string) {
-    const raw = await this.complete(
-      'Classify the auction item description into a category. Return JSON only, no prose: {"category":"string","confidence":number between 0 and 1}',
-      text,
-    );
-    const parsed = JSON.parse(raw) as { category?: string; confidence?: number };
-    return {
-      category: parsed.category ?? "general",
-      confidence: Number(parsed.confidence ?? 0.5),
-    };
+  async categorize(text: string, options?: AiCategorizeOptions): Promise<AiCategorization> {
+    const allowed = options?.allowedCategories ?? [];
+    const taxonomy = allowed.length
+      ? `Choose exactly one of these lowercase category slugs: ${allowed.join(", ")}.`
+      : "Choose a short lowercase category slug in English.";
+
+    const system = [
+      "You classify auction listings for a government asset-disposal platform.",
+      taxonomy,
+      "Reply with a single JSON object and nothing else, using exactly this shape:",
+      '{"category":"<lowercase slug from the list>","confidence":<number between 0 and 1>}',
+      "Rules: the category value must be copied verbatim from the list in lowercase.",
+      "No markdown, no code fences, no commentary, no trailing text.",
+    ].join(" ");
+
+    const user = options?.hint ? `Declared category hint: ${options.hint}\n\nListing:\n${text}` : `Listing:\n${text}`;
+
+    const raw = await this.complete(system, user);
+    const parsed = parseJsonLoose<{ category?: unknown; confidence?: unknown }>(raw);
+
+    const category = typeof parsed.category === "string" ? parsed.category.trim() : "";
+    if (!category) {
+      // Signal "no usable answer" so the fallback chain advances to the next
+      // provider instead of accepting an empty category.
+      throw new Error(`${this.config.name} categorization omitted a category`);
+    }
+
+    const rawConfidence = Number(parsed.confidence);
+    const confidence = Number.isFinite(rawConfidence) ? Math.min(1, Math.max(0, rawConfidence)) : 0.5;
+
+    return { category, confidence, provider: this.config.name, fallback: false };
   }
 
   async detectAnomaly(input: Record<string, unknown>) {
     const raw = await this.complete(
-      'Given behavioural bidding features, return JSON only, no prose: {"flagged":boolean,"reason":"short string, optional"}',
+      [
+        "You review behavioural bidding features from a public auction for signs of collusive or manipulative patterns.",
+        'Reply with a single JSON object and nothing else, using exactly this shape: {"flagged":true|false,"reason":"one short sentence"}',
+        "No markdown, no code fences, no commentary.",
+        "Be conservative: only flag when the features show a concrete pattern.",
+      ].join(" "),
       JSON.stringify(input),
     );
-    const parsed = JSON.parse(raw) as { flagged?: boolean; reason?: string };
-    return { flagged: Boolean(parsed.flagged), reason: parsed.reason };
+    const parsed = parseJsonLoose<{ flagged?: unknown; reason?: unknown }>(raw);
+    const reason = typeof parsed.reason === "string" ? parsed.reason.trim() : undefined;
+    return { flagged: Boolean(parsed.flagged), ...(reason ? { reason } : {}), provider: this.config.name };
   }
 
-  async assist(prompt: string) {
-    return this.complete(
+  async assist(prompt: string): Promise<AiAssistResult> {
+    const answer = await this.complete(
       "You are the auction platform's assistant. Answer concisely and only from the context given. Never state that a participant is fraudulent; anomaly flags are advisory evidence for a human reviewer, not a verdict.",
       prompt,
     );
+    return { answer, provider: this.config.name, fallback: false };
   }
 }
 
@@ -155,8 +255,8 @@ export class FallbackAiProviderAdapter implements AiProviderAdapter {
     throw lastError;
   }
 
-  categorize(text: string) {
-    return this.run((adapter) => adapter.categorize(text));
+  categorize(text: string, options?: AiCategorizeOptions) {
+    return this.run((adapter) => adapter.categorize(text, options));
   }
 
   detectAnomaly(input: Record<string, unknown>) {

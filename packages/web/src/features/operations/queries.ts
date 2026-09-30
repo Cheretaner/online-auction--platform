@@ -3,7 +3,6 @@ import type {
   AddOrganizationMemberRequest,
   AssignDisputeRequest,
   ResolveDisputeRequest,
-  ReviewAnomalyRequest,
   CreateCategoryRequest,
   CreateDepositRequest,
   CreateOrganizationRequest,
@@ -23,10 +22,8 @@ import {
   documentsApi,
   notificationsApi,
   reportsApi,
-  telegramApi,
   verificationApi,
   autofetchApi,
-  aiApi,
 } from "@/lib/api/resources";
 import { organizationsApi } from "@/lib/api/organizations";
 import { queryKeys } from "@/lib/query/keys";
@@ -361,14 +358,6 @@ export function useRunCompliance() {
   });
 }
 
-export function useTelegramStatus(enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.telegram.status,
-    queryFn: () => telegramApi.status(),
-    enabled,
-  });
-}
-
 export function useAutofetchSources(enabled = true) {
   return useQuery({
     queryKey: queryKeys.autofetch.sources,
@@ -393,27 +382,3 @@ export function useAutofetchStats(enabled = true) {
   });
 }
 
-export function useAiAnomalies(auctionId?: string, enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.ai.anomalies(auctionId),
-    queryFn: () => aiApi.listAnomalies(auctionId),
-    enabled,
-  });
-}
-
-export function useReviewAnomaly() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: ReviewAnomalyRequest }) => aiApi.reviewAnomaly(id, body),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["ai"] });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
-    },
-  });
-}
-
-export function useAiAssist() {
-  return useMutation({
-    mutationFn: (prompt: string) => aiApi.assist({ prompt }),
-  });
-}

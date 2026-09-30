@@ -11,7 +11,7 @@
     "smoke": "node scripts/smoke.mjs",
     "test:endpoints": "node scripts/test-all-endpoints.mjs",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "lint": "echo \"no lint yet\""
   },
   "dependencies": {

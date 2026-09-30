@@ -4,6 +4,7 @@ import { logger } from "../shared/utils/logger.js";
 import * as auctionRepo from "../auction/auction.repository.js";
 import * as telegramRepo from "./telegram.repository.js";
 import type { Auction } from "../auction/auction.types.js";
+import { AppError, HttpStatus } from "../shared/errors/index.js";
 
 function escapeHtml(text: string): string {
   return text
@@ -99,25 +100,23 @@ export class TelegramChannelService {
   async broadcastAuction(auctionId: string): Promise<boolean> {
     const channelId = env.TELEGRAM_CHANNEL_ID;
     if (!channelId) {
-      logger.debug("TELEGRAM_CHANNEL_ID not set; skipping channel broadcast");
-      return false;
+      throw new AppError("The platform Telegram channel is not configured", HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     const bot = this.getBot();
     if (!bot) {
       logger.warn("Telegram bot instance not initialized; cannot broadcast to channel");
-      return false;
+      throw new AppError("Telegram bot is not configured on this server", HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     const auction = await auctionRepo.findById(auctionId);
     if (!auction) {
-      logger.warn({ auctionId }, "Cannot broadcast auction: auction not found");
-      return false;
+      throw new AppError("Auction not found", HttpStatus.NOT_FOUND, "AUCTION_NOT_FOUND");
     }
 
     // Only broadcast scheduled, live, or closed/awarded auctions
     if (!["scheduled", "live", "closed", "awarded"].includes(auction.status)) {
-      return false;
+      throw new AppError("Only scheduled, live, or concluded auctions can be published", HttpStatus.CONFLICT);
     }
 
     const botUsername = env.TELEGRAM_BOT_USERNAME || (await bot.telegram.getMe().then((me) => me.username).catch(() => undefined));
@@ -156,7 +155,8 @@ export class TelegramChannelService {
       return true;
     } catch (error) {
       logger.error({ err: error, auctionId, channelId }, "Failed to broadcast auction to Telegram channel");
-      return false;
+      const description = error instanceof Error ? error.message : "Telegram API request failed";
+      throw new AppError(`Telegram could not publish to the configured channel: ${description}`, HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
 }

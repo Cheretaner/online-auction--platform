@@ -3,13 +3,26 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-// Load the monorepo-root .env first, then any .env in the working
-// directory. dotenv never overwrites an already-set variable, so real
-// environment variables (Docker, systemd, a PaaS) always win over files.
-dotenv.config({
-  path: resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env"),
-});
-dotenv.config();
+// Resolve the .env files by walking outward from this module rather than
+// trusting `process.cwd()`, which is only `packages/api` when the dev script
+// runs and the repository root when `node packages/api/dist/server.js` is
+// started directly. This file sits at `src/config/env.ts` before the build and
+// `dist/config/env.js` after it, so two levels up is always the api package
+// root in both cases.
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const apiPackageDir = resolve(moduleDir, "../..");
+const monorepoRoot = resolve(apiPackageDir, "../..");
+
+// Order matters: dotenv never overwrites an already-set variable, so real
+// environment variables (systemd, a PaaS) always win over files, and
+// the package-local file wins over the monorepo-root one.
+for (const candidate of [
+  resolve(apiPackageDir, ".env"),
+  resolve(monorepoRoot, ".env"),
+  resolve(process.cwd(), ".env"),
+]) {
+  dotenv.config({ path: candidate, quiet: true });
+}
 
 const envSchema = z
   .object({
@@ -127,6 +140,13 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["TELEGRAM_WEBHOOK_URL"],
         message: "or TELEGRAM_POLLING=true is required when TELEGRAM_BOT_TOKEN is configured in production",
+      });
+    }
+    if (value.NODE_ENV === "production" && value.TELEGRAM_WEBHOOK_URL && !value.TELEGRAM_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["TELEGRAM_WEBHOOK_SECRET"],
+        message: "is required when a production Telegram webhook is configured",
       });
     }
   });
