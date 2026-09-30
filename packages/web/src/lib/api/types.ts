@@ -284,11 +284,25 @@ export interface AutofetchSource {
 export interface AutofetchPendingItem {
   id: string;
   sourceId: string;
+  source?: string;
   status: string;
-  title?: string;
-  payload?: unknown;
+  title: string;
+  estimatedValue?: number;
+  categoryName?: string;
+  confidenceScore?: number;
+  conflictCount?: number;
+  highSeverityConflicts?: number;
   createdAt?: string;
 }
+
+export interface AutofetchPendingResult extends ItemList<AutofetchPendingItem> {
+  total: number;
+  hasMore: boolean;
+}
+export interface AutofetchFetchResult { queued: number; conflicts: number; errors: number }
+export interface AutofetchPendingDetail { item: AutofetchPendingItem & { description?: string; normalizedMetadata?: Record<string, unknown> }; conflicts: unknown[] }
+export interface AutofetchConflictSummary { conflicts: unknown[]; count: number; critical: number; high: number; medium: number; low: number }
+export interface AutofetchStats { total: number; pending: number; approved: number; rejected: number }
 
 export interface AnomalyFlagRecord {
   id: string;
