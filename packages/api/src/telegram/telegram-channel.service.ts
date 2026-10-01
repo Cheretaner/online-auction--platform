@@ -32,67 +32,130 @@ function formatTimeRemaining(closesAt: Date | string): string {
   return `${hours}h ${minutes}m remaining`;
 }
 
-export function formatAuctionChannelMessage(auction: Auction, botUsername?: string) {
-  const isLive = auction.status === "live";
-  const isClosed = auction.status === "closed" || auction.status === "awarded";
-  const statusBadge = isLive
-    ? "🟢 <b>LIVE FOR BIDDING</b>"
-    : isClosed
-      ? "🏁 <b>AUCTION CONCLUDED</b>"
-      : "⏳ <b>UPCOMING AUCTION</b>";
+interface ChannelAuctionDetails {
+  organizationName: string | null;
+  winnerName: string | null;
+  approvedByName: string | null;
+  awardedByName: string | null;
+}
 
-  const typeLabel = auction.auctionType === "sealed_bid" ? "🔒 Sealed Bid Auction" : "📈 Open Ascending Auction";
+export function formatAuctionChannelMessage(
+  auction: Auction,
+  botUsername?: string,
+  details: ChannelAuctionDetails = { organizationName: null, winnerName: null, approvedByName: null, awardedByName: null },
+) {
+  const badges: Record<string, string> = {
+    scheduled: "<b>NEW AUCTION LISTING</b>",
+    live: "<b>LIVE · BIDDING OPEN</b>",
+    closed: "<b>BIDDING CLOSED · RESULT PENDING</b>",
+    under_review: "<b>OUTCOME UNDER REVIEW</b>",
+    awarded: "<b>AUCTION AWARDED</b>",
+    cancelled: "<b>AUCTION CANCELLED</b>",
+  };
+  const typeLabel = auction.auctionType === "sealed_bid" ? "Sealed bid" : "Open ascending";
   const startPrice = formatMoney(auction.startPrice);
   const highestBid = formatMoney(auction.currentHighestBid);
   const deposit = formatMoney(auction.depositAmount);
   const minIncrement = formatMoney(auction.minIncrement);
-  const timeLeft = formatTimeRemaining(auction.closesAt);
-  const closesFormatted = new Date(auction.closesAt).toUTCString();
-
   const webUrl = `${env.WEB_BASE_URL.replace(/\/$/, "")}/auctions/${auction.id}`;
   const botUser = (botUsername || env.TELEGRAM_BOT_USERNAME || "cheretanet_bot").replace(/^@/, "");
   const botBidUrl = `https://t.me/${botUser}?start=view_${auction.id}`;
   const botVerifyUrl = `https://t.me/${botUser}?start=verify_${auction.id}`;
 
+  const outcome = auction.status === "awarded"
+    ? [
+        details.winnerName ? `<b>Successful bidder:</b> ${escapeHtml(details.winnerName)}` : "<b>Successful bidder:</b> See the official award notice",
+        auction.winningAmount ? `<b>Award amount:</b> ETB ${formatMoney(auction.winningAmount)}` : "",
+        auction.awardedAt ? `<b>Awarded:</b> ${new Date(auction.awardedAt).toUTCString()}` : "",
+        details.awardedByName ? `<b>Award decision by:</b> ${escapeHtml(details.awardedByName)}` : "",
+      ]
+    : auction.status === "closed"
+      ? auction.auctionType === "sealed_bid" && !auction.sealedOpenedAt
+        ? ["Sealed offers are awaiting formal opening. No result is published yet."]
+        : [auction.winnerId ? "A provisional winner is recorded; the award decision is pending." : "No winner has been recorded."]
+      : auction.status === "under_review"
+        ? ["The auction outcome is under review. The final result will be posted after review."]
+        : auction.status === "cancelled"
+          ? [auction.cancellationReason ? `<b>Reason:</b> ${escapeHtml(auction.cancellationReason)}` : "This auction has been cancelled."]
+          : [];
+
   const text = [
-    `📢 <b>PUBLIC AUCTION NOTICE</b>`,
-    statusBadge,
-    ``,
-    `🏛️ <b>${escapeHtml(auction.title)}</b>`,
+    `<b>CHERETANET · PUBLIC AUCTION</b>`,
+    badges[auction.status] ?? `<b>${escapeHtml(auction.status.toUpperCase())}</b>`,
+    "",
+    `<b>${escapeHtml(auction.title)}</b>`,
     auction.description ? `<i>${escapeHtml(auction.description.slice(0, 200))}${auction.description.length > 200 ? "..." : ""}</i>` : "",
-    ``,
-    `📌 <b>Auction Type:</b> ${typeLabel}`,
-    `📍 <b>Region:</b> ${escapeHtml(auction.region || "National")}`,
-    `💰 <b>Starting Price:</b> ETB ${startPrice}`,
-    isLive && auction.auctionType !== "sealed_bid" ? `🔥 <b>Current Highest Bid:</b> ETB ${highestBid} (${auction.bidCount} bids)` : "",
-    `💳 <b>Required CPO Deposit:</b> ETB ${deposit}`,
-    auction.minIncrement ? `➕ <b>Min Increment:</b> ETB ${minIncrement}` : "",
-    `⏰ <b>Closes At:</b> ${closesFormatted}`,
-    `⏳ <b>Time Left:</b> <b>${timeLeft}</b>`,
-    ``,
-    `🛡️ <b>Audit Status:</b> Cryptographically verified & tamper-evident`,
-    `⚖️ <i>Governed by Federal Public Procurement & Asset Disposal Directives</i>`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+    "",
+    details.organizationName ? `<b>Published by:</b> ${escapeHtml(details.organizationName)}` : "",
+    details.approvedByName && auction.status === "scheduled" ? `<b>Approved by:</b> ${escapeHtml(details.approvedByName)}` : "",
+    `<b>Format:</b> ${typeLabel}`,
+    `<b>Region:</b> ${escapeHtml(auction.region || "National")}`,
+    `<b>Starting price:</b> ETB ${startPrice}`,
+    auction.status === "live" && auction.auctionType !== "sealed_bid" ? `<b>Current highest bid:</b> ETB ${highestBid} (${auction.bidCount} bids)` : "",
+    `<b>Required deposit:</b> ETB ${deposit}`,
+    auction.minIncrement ? `<b>Minimum increment:</b> ETB ${minIncrement}` : "",
+    auction.status === "scheduled" ? `<b>Opens:</b> ${new Date(auction.opensAt).toUTCString()}` : "",
+    ["scheduled", "live"].includes(auction.status)
+      ? `<b>Closes:</b> ${new Date(auction.closesAt).toUTCString()} · ${formatTimeRemaining(auction.closesAt)}`
+      : `<b>Closed:</b> ${auction.closedAt ? new Date(auction.closedAt).toUTCString() : new Date(auction.closesAt).toUTCString()}`,
+    ...outcome,
+    "",
+    `<i>See the auction notice for official terms and supporting records.</i>`,
+  ].filter(Boolean).join("\n");
 
   const replyMarkup = {
     inline_keyboard: [
       [
-        { text: "🌐 View on Portal", url: webUrl },
-        { text: "🤖 Bid via Bot", url: botBidUrl },
+        { text: "View auction", url: webUrl },
+        ...(["scheduled", "live"].includes(auction.status) ? [{ text: "Open Telegram bot", url: botBidUrl }] : []),
       ],
-      [
-        { text: "🛡️ Verify Audit Chain", url: botVerifyUrl },
-      ],
+      [{ text: "View audit record", url: botVerifyUrl }],
     ],
   };
-
   return { text, replyMarkup };
 }
-
 export class TelegramChannelService {
   constructor(private readonly getBot: () => Telegraf | null) {}
+
+  async getConnectionStatus() {
+    const channelId = env.TELEGRAM_CHANNEL_ID;
+    if (!channelId) {
+      return { configured: false, status: "not_configured" as const, title: null, username: null, canPost: false, error: null };
+    }
+
+    const bot = this.getBot();
+    if (!bot) {
+      return { configured: true, status: "bot_not_configured" as const, title: null, username: null, canPost: false, error: null };
+    }
+
+    try {
+      const [chat, me] = await Promise.all([
+        bot.telegram.getChat(channelId),
+        bot.telegram.getMe(),
+      ]);
+      const membership = await bot.telegram.getChatMember(channelId, me.id);
+      const canPost = membership.status === "creator" ||
+        (membership.status === "administrator" && membership.can_post_messages === true);
+
+      return {
+        configured: true,
+        status: canPost ? "connected" as const : "permission_required" as const,
+        title: "title" in chat ? chat.title : null,
+        username: "username" in chat ? chat.username ?? null : null,
+        canPost,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        configured: true,
+        status: "error" as const,
+        title: null,
+        username: null,
+        canPost: false,
+        error: error instanceof Error ? error.message : "Could not check channel access",
+      };
+    }
+  }
 
   /**
    * Broadcasts or updates an auction card on the official public Telegram Channel.
@@ -114,13 +177,14 @@ export class TelegramChannelService {
       throw new AppError("Auction not found", HttpStatus.NOT_FOUND, "AUCTION_NOT_FOUND");
     }
 
-    // Only broadcast scheduled, live, or closed/awarded auctions
-    if (!["scheduled", "live", "closed", "awarded"].includes(auction.status)) {
-      throw new AppError("Only scheduled, live, or concluded auctions can be published", HttpStatus.CONFLICT);
+    // Drafts and pending approvals stay private; approved lifecycle states get a channel card.
+    if (!["scheduled", "live", "closed", "under_review", "awarded", "cancelled"].includes(auction.status)) {
+      throw new AppError("Only approved auctions can be published", HttpStatus.CONFLICT);
     }
 
     const botUsername = env.TELEGRAM_BOT_USERNAME || (await bot.telegram.getMe().then((me) => me.username).catch(() => undefined));
-    const { text, replyMarkup } = formatAuctionChannelMessage(auction, botUsername);
+    const details = await telegramRepo.getChannelAuctionDetails(auctionId);
+    const { text, replyMarkup } = formatAuctionChannelMessage(auction, botUsername, details ?? undefined);
 
     const existingPost = await telegramRepo.findChannelPost(auctionId);
 

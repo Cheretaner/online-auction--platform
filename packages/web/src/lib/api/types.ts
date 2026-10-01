@@ -273,6 +273,24 @@ export interface TelegramLinkToken {
   expiresAt: string;
 }
 
+export interface TelegramIntegrationStatus {
+  bot: {
+    configured: boolean;
+    status: "not_configured" | "connected" | "error";
+    username: string | null;
+    inboundTransport: "disabled" | "starting" | "webhook" | "polling" | "error";
+    inboundError: string | null;
+  };
+  channel: {
+    configured: boolean;
+    status: "not_configured" | "bot_not_configured" | "connected" | "permission_required" | "error";
+    title: string | null;
+    username: string | null;
+    canPost: boolean;
+    error: string | null;
+  };
+}
+
 export interface AutofetchSource {
   id: string;
   name: string;

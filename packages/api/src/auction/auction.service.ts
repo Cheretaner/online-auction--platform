@@ -221,6 +221,15 @@ export async function transitionAuction(
         payload: { from: auction.status, to: status },
       });
 
+      if (status === "awarded" || status === "under_review") {
+        await enqueueOutbox({
+          aggregateType: "auction",
+          aggregateId: auction.id,
+          eventType: `auction.${status}`,
+          payload: { auctionId: auction.id, from: auction.status, to: status },
+        });
+      }
+
       return updated;
     },
     { userId: actor.userId, organizationId: orgId },

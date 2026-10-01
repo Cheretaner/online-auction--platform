@@ -27,6 +27,36 @@ class TelegramService {
     return this.botService.getBotInstance();
   }
 
+  async getIntegrationStatus() {
+    const bot = this.botService.getBotInstance();
+    const inbound = this.botService.getInboundStatus();
+    let botStatus: "not_configured" | "connected" | "error" = "not_configured";
+    let botUsername: string | null = null;
+    let botError: string | null = null;
+
+    if (bot) {
+      try {
+        const me = await bot.telegram.getMe();
+        botStatus = "connected";
+        botUsername = me.username ? `@${me.username}` : null;
+      } catch (error) {
+        botStatus = "error";
+        botError = error instanceof Error ? error.message : "Could not verify bot connection";
+      }
+    }
+
+    return {
+      bot: {
+        configured: Boolean(bot),
+        status: botStatus,
+        username: botUsername,
+        inboundTransport: inbound.transport,
+        inboundError: inbound.error ?? botError,
+      },
+      channel: await this.channelService.getConnectionStatus(),
+    };
+  }
+
   /**
    * Generates an 8-character connection code for a user to link their Telegram account.
    */

@@ -39,6 +39,7 @@ import type {
   NotificationRecord,
   ReportRecord,
   TelegramLinkToken,
+  TelegramIntegrationStatus,
   TelegramStatus,
   VerificationRecord,
 } from "@/lib/api/types";
@@ -163,6 +164,8 @@ export const telegramApi = {
   createLinkToken: () =>
     unwrap(apiRequest<{ data: TelegramLinkToken }>(v1("/telegram/link-token"), { method: "POST" })),
   status: () => unwrap(apiRequest<{ data: TelegramStatus }>(v1("/telegram/status"))),
+  integrationStatus: () =>
+    unwrap(apiRequest<{ data: TelegramIntegrationStatus }>(v1("/telegram/integration-status"), { timeoutMs: 30_000 })),
   unlink: () =>
     unwrap(apiRequest<{ data: { unlinked: boolean } }>(v1("/telegram/unlink"), { method: "DELETE" })),
   /** Publishes (or edits) the auction card on the public Telegram channel. */

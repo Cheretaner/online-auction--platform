@@ -3,12 +3,26 @@ import { telegramApi } from "@/lib/api/resources";
 import { queryKeys } from "@/lib/query/keys";
 
 
-export function useTelegramStatus(enabled = true, refetchInterval?: number | false) {
+export function useTelegramStatus(enabled = true, pendingLinkExpiresAt?: string) {
   return useQuery({
     queryKey: queryKeys.telegram.status,
     queryFn: () => telegramApi.status(),
     enabled,
-    refetchInterval,
+    refetchInterval: (query) =>
+      pendingLinkExpiresAt &&
+      !query.state.data?.telegramLinkedAt &&
+      Date.parse(pendingLinkExpiresAt) > Date.now()
+        ? 5000
+        : false,
+  });
+}
+
+export function useTelegramIntegrationStatus(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.telegram.integration,
+    queryFn: () => telegramApi.integrationStatus(),
+    enabled,
+    staleTime: 15_000,
   });
 }
 
