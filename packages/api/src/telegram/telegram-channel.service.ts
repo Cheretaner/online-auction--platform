@@ -46,13 +46,13 @@ export function formatAuctionChannelMessage(
 ) {
   const badges: Record<string, string> = {
     scheduled: "<b>NEW AUCTION LISTING</b>",
-    live: "<b>LIVE · BIDDING OPEN</b>",
+    live: "<b>LIVE FOR BIDDING · BIDDING OPEN</b>",
     closed: "<b>BIDDING CLOSED · RESULT PENDING</b>",
     under_review: "<b>OUTCOME UNDER REVIEW</b>",
     awarded: "<b>AUCTION AWARDED</b>",
     cancelled: "<b>AUCTION CANCELLED</b>",
   };
-  const typeLabel = auction.auctionType === "sealed_bid" ? "Sealed bid" : "Open ascending";
+  const typeLabel = auction.auctionType === "sealed_bid" ? "🔒 Sealed Bid Auction" : "📈 Open Ascending Auction";
   const startPrice = formatMoney(auction.startPrice);
   const highestBid = formatMoney(auction.currentHighestBid);
   const deposit = formatMoney(auction.depositAmount);
@@ -80,7 +80,7 @@ export function formatAuctionChannelMessage(
           : [];
 
   const text = [
-    `<b>CHERETANET · PUBLIC AUCTION</b>`,
+    `<b>CHERETANET · PUBLIC AUCTION NOTICE</b>`,
     badges[auction.status] ?? `<b>${escapeHtml(auction.status.toUpperCase())}</b>`,
     "",
     `<b>${escapeHtml(auction.title)}</b>`,
