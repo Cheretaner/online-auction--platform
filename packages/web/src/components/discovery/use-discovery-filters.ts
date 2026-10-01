@@ -4,8 +4,8 @@ import { useSearchParams } from "react-router-dom";
 export const PAGE_SIZE = 10;
 
 export const STATUS_TABS = [
-  { value: "", label: "All Tenders" },
-  { value: "live", label: "Live Auctions" },
+  { value: "", label: "All tenders" },
+  { value: "live", label: "Live" },
   { value: "scheduled", label: "Upcoming" },
   { value: "closed", label: "Closed" },
   { value: "awarded", label: "Awarded" },

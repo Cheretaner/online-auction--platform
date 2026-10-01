@@ -4,17 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { RegisterRequest } from "@auction/shared";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { OptionalHint } from "@/components/ui/label";
+import { AuthCard, authLinkClass } from "@/features/auth/auth-card";
 import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -97,16 +93,20 @@ export default function RegisterPage() {
   const accountType = useWatch({ control: form.control, name: "accountType" });
 
   return (
-    <div className="mx-auto max-w-lg">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create an account</CardTitle>
-          <CardDescription>
-            Registration creates a bidder by default unless the API bootstraps a
-            platform admin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthCard
+      wide
+      eyebrow="Bidder registration"
+      title="Create your bidder account"
+      description="One account lets you take part in any auction on Cheretanet. You will verify your identity once, from your workspace, before your first bid."
+      footer={
+        <>
+          Already registered?{" "}
+          <Link to="/login" className={authLinkClass}>
+            Sign in
+          </Link>
+        </>
+      }
+    >
           <Form {...form}>
             <form
               className="grid gap-4 sm:grid-cols-2"
@@ -160,6 +160,7 @@ export default function RegisterPage() {
                         {...field}
                       />
                     </FormControl>
+                    <FormDescription>At least 8 characters.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -190,9 +191,12 @@ export default function RegisterPage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>
+                      Phone
+                      <OptionalHint />
+                    </FormLabel>
                     <FormControl>
-                      <Input autoComplete="tel" {...field} />
+                      <Input type="tel" autoComplete="tel" placeholder="+251 9…" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -218,7 +222,7 @@ export default function RegisterPage() {
                     name="tinNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>TIN</FormLabel>
+                        <FormLabel>TIN (taxpayer ID)</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -233,7 +237,10 @@ export default function RegisterPage() {
                   name="nationalId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>National ID</FormLabel>
+                      <FormLabel>
+                        National ID
+                        <OptionalHint />
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
@@ -247,7 +254,10 @@ export default function RegisterPage() {
                 name="region"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel>Region</FormLabel>
+                    <FormLabel>
+                      Region
+                      <OptionalHint />
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -257,21 +267,14 @@ export default function RegisterPage() {
               />
               <Button
                 type="submit"
-                className="sm:col-span-2"
-                disabled={register.isPending}
+                size="lg"
+                className="mt-2 sm:col-span-2"
+                loading={register.isPending}
               >
                 {register.isPending ? "Creating account…" : "Create account"}
               </Button>
             </form>
           </Form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Already registered?{" "}
-            <Link to="/login" className="text-primary underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    </AuthCard>
   );
 }

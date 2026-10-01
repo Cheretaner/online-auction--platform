@@ -21,6 +21,8 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SectionHeader } from "@/components/layout/page-header";
 import { AuctionCard } from "@/features/auctions/auction-card";
 import { usePublicAuctions } from "@/features/auctions/queries";
 import { useCategories, useOrganizations } from "@/features/operations/queries";
@@ -74,31 +76,31 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-16 pb-12 sm:space-y-20 lg:space-y-24">
-      <section className="relative isolate overflow-hidden rounded-[2rem] bg-[#102f27] text-white shadow-2xl shadow-[#102f27]/15">
+    <div className="space-y-16 pb-8 sm:space-y-20 lg:space-y-24">
+      <section className="relative isolate -mt-2 overflow-hidden rounded-xl bg-inverse text-inverse-foreground shadow-lg sm:-mt-4">
         <img
           src={auctionYard}
           alt="Heavy equipment prepared for public asset sale"
           className="absolute inset-0 -z-20 size-full object-cover object-center"
         />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b2a22]/95 via-[#0b2a22]/85 to-[#0b2a22]/30 lg:to-[#0b2a22]/10" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0b2a22]/70 via-transparent to-[#0b2a22]/10" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-inverse/95 via-inverse/85 to-inverse/30 lg:to-inverse/10" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-inverse/70 via-transparent to-inverse/10" />
 
         <div className="grid min-h-[520px] items-end gap-10 px-6 py-9 sm:px-10 sm:py-12 lg:grid-cols-[1.1fr_0.65fr] lg:items-center lg:px-14 lg:py-16">
           <div className="max-w-2xl">
-            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#e5ce8a]">
-              <span className="size-2 rounded-full bg-[#e5ce8a]" aria-hidden="true" />
+            <p className="eyebrow inline-flex items-center gap-2 text-highlight">
+              <span className="size-1.5 rounded-full bg-highlight" aria-hidden="true" />
               Public asset auctions · Ethiopia
             </p>
-            <h1 className="mt-5 max-w-2xl font-heading text-4xl leading-[1.06] tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 max-w-2xl text-4xl leading-[1.06] font-semibold text-inverse-foreground sm:text-5xl lg:text-6xl">
               Every opportunity deserves a process people can follow.
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-white/80 sm:text-lg sm:leading-8">
+            <p className="mt-5 max-w-xl text-base leading-7 text-inverse-foreground/80 sm:text-lg sm:leading-8">
               {APP_NAME} brings auction notices, bidder participation, and published outcomes together—so people can
               see what is offered, understand what is required, and know what happens next.
             </p>
 
-            <form onSubmit={submitSearch} className="mt-8 flex max-w-xl flex-col gap-2 rounded-2xl bg-white p-2 shadow-xl sm:flex-row">
+            <form onSubmit={submitSearch} role="search" className="mt-8 flex max-w-xl flex-col gap-2 rounded-lg bg-card p-2 shadow-xl sm:flex-row">
               <label htmlFor="home-auction-search" className="sr-only">Search public auctions</label>
               <div className="flex min-w-0 flex-1 items-center gap-3 px-3">
                 <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -108,27 +110,27 @@ export default function HomePage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search vehicles, equipment, property..."
-                  className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
-              <Button type="submit" size="lg" className="shrink-0 bg-[#174b3b] text-white hover:bg-[#103c30]">
+              <Button type="submit" size="lg">
                 Search auctions <ArrowRight aria-hidden="true" />
               </Button>
             </form>
 
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-white/70">
-              <Link to="/auctions?status=live" className="inline-flex items-center gap-1.5 hover:text-white">
-                <span className="size-1.5 rounded-full bg-emerald-300" aria-hidden="true" /> View live auctions
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-inverse-foreground/75">
+              <Link to="/auctions?status=live" className="inline-flex items-center gap-1.5 rounded-sm hover:text-inverse-foreground">
+                <span className="size-1.5 rounded-full bg-highlight" aria-hidden="true" /> View live auctions
               </Link>
-              <Link to="/auctions?status=scheduled" className="inline-flex items-center gap-1.5 hover:text-white">
+              <Link to="/auctions?status=scheduled" className="inline-flex items-center gap-1.5 rounded-sm hover:text-inverse-foreground">
                 <Clock3 className="size-3.5" aria-hidden="true" /> See upcoming auctions
               </Link>
             </div>
           </div>
 
           <div className="hidden justify-self-end lg:block">
-            <div className="w-64 rounded-2xl border border-white/20 bg-[#102f27]/75 p-5 text-white shadow-xl backdrop-blur-md">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#e5ce8a]">One connected process</p>
+            <div className="w-64 rounded-lg border border-inverse-foreground/15 bg-inverse/80 p-5 shadow-xl backdrop-blur-md">
+              <p className="eyebrow text-highlight">One connected process</p>
               <div className="mt-5 space-y-4">
                 {[
                   ["01", "Notice published"],
@@ -136,14 +138,14 @@ export default function HomePage() {
                   ["03", "Outcome recorded"],
                 ].map(([number, label], index) => (
                   <div key={number} className="flex items-center gap-3">
-                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${index === 2 ? "bg-[#d5ba70] text-[#18372e]" : "border border-white/25 text-white"}`}>
+                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${index === 2 ? "bg-highlight text-inverse" : "border border-inverse-foreground/25"}`}>
                       {index === 2 ? <Check className="size-4" aria-hidden="true" /> : number}
                     </span>
-                    <span className="text-sm text-white/90">{label}</span>
+                    <span className="text-sm text-inverse-foreground/90">{label}</span>
                   </div>
                 ))}
               </div>
-              <p className="mt-5 border-t border-white/15 pt-4 text-xs leading-5 text-white/65">
+              <p className="mt-5 border-t border-inverse-foreground/15 pt-4 text-xs leading-5 text-inverse-foreground/65">
                 Clear information for bidders. A traceable workspace for institutions.
               </p>
             </div>
@@ -151,7 +153,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section aria-label="Auction activity" className="grid overflow-hidden rounded-2xl border bg-card sm:grid-cols-3">
+      <section aria-label="Auction activity" className="grid divide-y overflow-hidden rounded-lg border bg-card shadow-xs sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <MetricLink
           to="/auctions?status=live"
           label="Open for bidding"
@@ -176,7 +178,8 @@ export default function HomePage() {
       </section>
 
       <section aria-labelledby="live-auctions-title" className="space-y-5">
-        <SectionHeading
+        <SectionHeader size="display"
+          id="live-auctions-title"
           eyebrow="Open now"
           title="Opportunities ready for your attention"
           description="Each listing shows the information you need to decide whether and how to participate."
@@ -192,7 +195,7 @@ export default function HomePage() {
           </Card>
         ) : live.isLoading ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading live auctions">
-            {Array.from({ length: 3 }, (_, index) => <div key={index} className="h-72 animate-pulse rounded-xl border bg-muted/60" />)}
+            {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-72 rounded-lg" />)}
           </div>
         ) : liveAuctions.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -213,7 +216,8 @@ export default function HomePage() {
 
       {visibleCategories.length ? (
         <section aria-labelledby="categories-title" className="space-y-5">
-          <SectionHeading
+          <SectionHeader size="display"
+          id="categories-title"
             eyebrow="Browse by asset"
             title="Start with what you are looking for"
             description="Choose a category to narrow the public auction catalogue."
@@ -226,9 +230,9 @@ export default function HomePage() {
                 <Link
                   key={category.id}
                   to={`/auctions?categoryId=${encodeURIComponent(category.id)}`}
-                  className="group flex min-h-28 items-center gap-4 rounded-2xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:p-5"
+                  className="group flex min-h-28 items-center gap-4 rounded-lg border bg-card p-4 shadow-xs transition-[border-color,box-shadow] hover:border-primary/35 hover:shadow-md sm:p-5"
                 >
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                     <Icon className="size-5" aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -245,33 +249,34 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      <section className="grid gap-10 rounded-[2rem] bg-[#12392f] p-6 text-white sm:p-9 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:p-12" aria-labelledby="process-title">
+      <section className="grid gap-10 rounded-xl bg-inverse p-6 text-inverse-foreground sm:p-9 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:p-12" aria-labelledby="process-title">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#e5ce8a]">A clear route to participation</p>
-          <h2 id="process-title" className="mt-3 max-w-md font-heading text-3xl leading-tight text-white sm:text-4xl">
+          <p className="eyebrow text-highlight">A clear route to participation</p>
+          <h2 id="process-title" className="mt-3 max-w-md text-3xl leading-tight font-semibold text-inverse-foreground sm:text-4xl">
             Know what is expected before you place a bid.
           </h2>
-          <p className="mt-4 max-w-md text-sm leading-6 text-white/75">
+          <p className="mt-4 max-w-md text-sm leading-6 text-inverse-foreground/75">
             The requirements are shown with each auction. Take time to read them: verification, bid security, and timing
             can vary from one notice to another.
           </p>
-          <Button asChild className="mt-6 bg-[#d5ba70] text-[#18372e] hover:bg-[#e2cb89]">
+          <Button asChild className="mt-6 bg-highlight text-inverse hover:bg-highlight-strong">
             <Link to="/auctions#how-to-participate">Read the bidder guide <ArrowRight aria-hidden="true" /></Link>
           </Button>
         </div>
         <ol className="grid gap-0 sm:grid-cols-2">
           {participationSteps.map((step, index) => (
-            <li key={step.number} className={`border-white/15 py-5 ${index < 2 ? "border-b" : ""} ${index % 2 === 0 ? "sm:pr-6" : "sm:border-l sm:pl-6"}`}>
-              <p className="font-mono text-xs font-semibold tracking-widest text-[#e5ce8a]">STEP {step.number}</p>
-              <h3 className="mt-2 font-semibold text-white">{step.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-white/70">{step.text}</p>
+            <li key={step.number} className={`border-inverse-foreground/15 py-5 ${index < 2 ? "border-b" : ""} ${index % 2 === 0 ? "sm:pr-6" : "sm:border-l sm:pl-6"}`}>
+              <p className="eyebrow text-highlight">Step {step.number}</p>
+              <h3 className="mt-2 text-lg font-semibold text-inverse-foreground">{step.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-inverse-foreground/70">{step.text}</p>
             </li>
           ))}
         </ol>
       </section>
 
       <section aria-labelledby="auction-formats-title" className="space-y-5">
-        <SectionHeading
+        <SectionHeader size="display"
+          id="auction-formats-title"
           eyebrow="Two ways to participate"
           title="Understand the auction format"
           description="The listing tells you which format applies. The rules and visibility differ."
@@ -296,7 +301,8 @@ export default function HomePage() {
 
       {activeIssuers.length ? (
         <section aria-labelledby="issuers-title" className="space-y-5">
-          <SectionHeading
+          <SectionHeader size="display"
+          id="issuers-title"
             eyebrow="The organizations behind each notice"
             title="Issuing organizations"
             description="Every auction identifies the organization responsible for the notice and its requirements."
@@ -307,9 +313,9 @@ export default function HomePage() {
               <Link
                 key={organization.id}
                 to={`/auctions?orgId=${encodeURIComponent(organization.id)}`}
-                className="group flex items-center gap-3 rounded-2xl border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="group flex items-center gap-3 rounded-lg border bg-card p-4 shadow-xs transition-[border-color,box-shadow] hover:border-primary/35 hover:shadow-md"
               >
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
                   {organization.logoUrl ? (
                     <img src={organization.logoUrl} alt="" className="size-8 object-contain" />
                   ) : (
@@ -329,10 +335,10 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      <section className="grid gap-8 rounded-[2rem] border bg-card p-6 sm:p-9 lg:grid-cols-[1fr_1fr] lg:p-12">
+      <section className="grid gap-8 rounded-xl border bg-card p-6 shadow-xs sm:p-9 lg:grid-cols-[1fr_1fr] lg:p-12">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">For public institutions</p>
-          <h2 className="mt-3 max-w-lg font-heading text-3xl leading-tight sm:text-4xl">A workspace for the people running the process.</h2>
+          <p className="eyebrow text-primary">For public institutions</p>
+          <h2 className="mt-3 max-w-lg text-3xl leading-tight font-semibold sm:text-4xl">A workspace for the people running the process.</h2>
           <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
             Prepare auction notices, manage lots and bidder readiness, record approvals, and publish outcomes through
             your organization workspace.
@@ -351,16 +357,16 @@ export default function HomePage() {
 
       <section aria-labelledby="questions-title" className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr]">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Good to know</p>
-          <h2 id="questions-title" className="mt-3 font-heading text-3xl">Before you take part</h2>
+          <p className="eyebrow text-primary">Good to know</p>
+          <h2 id="questions-title" className="mt-3 text-3xl font-semibold sm:text-4xl">Before you take part</h2>
           <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">
             Start with the auction notice. It is the source for that sale&apos;s schedule, eligibility, deposit, and terms.
           </p>
-          <Link to="/auctions#how-to-participate" className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+          <Link to="/auctions#how-to-participate" className="mt-5 inline-flex items-center gap-2 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline">
             Open participation guide <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
-        <div className="divide-y rounded-2xl border bg-card px-5">
+        <div className="divide-y rounded-lg border bg-card px-5 shadow-xs">
           <Faq title="Do all auctions require bid security?">
             Requirements vary by auction. Check the notice for the amount, accepted security types, and submission instructions.
           </Faq>
@@ -373,13 +379,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="flex flex-col items-start justify-between gap-5 rounded-[2rem] bg-[#e9dfc3] p-6 text-[#24352d] sm:flex-row sm:items-center sm:p-9">
+      <section className="flex flex-col items-start justify-between gap-5 rounded-xl bg-accent p-6 text-accent-foreground sm:flex-row sm:items-center sm:p-9">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#496453]">Start with the public catalogue</p>
-          <h2 className="mt-2 font-heading text-2xl sm:text-3xl">Find an auction. Read the details. Decide with confidence.</h2>
-          <p className="mt-2 text-sm text-[#496453]">Browse notices, upcoming auctions, and published results.</p>
+          <p className="eyebrow text-accent-foreground/75">Start with the public catalogue</p>
+          <h2 className="mt-2 text-2xl font-semibold text-accent-foreground sm:text-3xl">Find an auction. Read the details. Decide with confidence.</h2>
+          <p className="mt-2 text-sm text-accent-foreground/75">Browse notices, upcoming auctions, and published results.</p>
         </div>
-        <Button asChild className="shrink-0 bg-[#174b3b] text-white hover:bg-[#103c30]">
+        <Button asChild size="lg" className="shrink-0">
           <Link to="/auctions">Explore the catalogue <ArrowRight aria-hidden="true" /></Link>
         </Button>
       </section>
@@ -389,32 +395,19 @@ export default function HomePage() {
 
 function MetricLink({ to, label, value, note, loading }: { to: string; label: string; value: string; note: string; loading: boolean }) {
   return (
-    <Link to={to} className="group flex items-center justify-between gap-4 px-5 py-5 transition-colors hover:bg-muted/50 sm:px-7">
+    <Link to={to} className="group flex items-center justify-between gap-4 px-5 py-5 transition-colors hover:bg-muted/50 focus-visible:ring-inset focus-visible:ring-offset-0 sm:px-7">
       <span>
-        <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
+        <span className="eyebrow block text-muted-foreground">{label}</span>
         <span className="mt-1 block text-sm text-foreground">{note}</span>
       </span>
-      <span className={`text-3xl font-semibold tracking-tight text-primary ${loading ? "animate-pulse" : ""}`} aria-live="polite">{value}</span>
+      <span className={`text-3xl font-semibold tracking-tight text-primary tabular-nums ${loading ? "animate-pulse" : ""}`} aria-live="polite">{value}</span>
     </Link>
-  );
-}
-
-function SectionHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div className="max-w-2xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
-        <h2 className="mt-2 font-heading text-3xl leading-tight sm:text-4xl">{title}</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-      {action}
-    </div>
   );
 }
 
 function TextLink({ to, label }: { to: string; label: string }) {
   return (
-    <Link to={to} className="inline-flex shrink-0 items-center gap-1 self-start text-sm font-medium text-primary hover:underline sm:self-auto">
+    <Link to={to} className="inline-flex shrink-0 items-center gap-1 self-start rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline sm:self-auto">
       {label} <ArrowUpRight className="size-4" aria-hidden="true" />
     </Link>
   );
@@ -424,11 +417,11 @@ function FormatCard({ icon: Icon, title, eyebrow, description, points }: { icon:
   return (
     <Card className="p-6 sm:p-7">
       <div className="flex items-start gap-4">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
           <Icon className="size-5" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p>
+          <p className="eyebrow text-primary">{eyebrow}</p>
           <h3 className="mt-1 text-xl font-semibold">{title}</h3>
         </div>
       </div>
@@ -446,7 +439,7 @@ function FormatCard({ icon: Icon, title, eyebrow, description, points }: { icon:
 
 function ValueCard({ icon: Icon, title, text }: { icon: typeof FileSearch; title: string; text: string }) {
   return (
-    <div className="rounded-2xl bg-muted/60 p-4 sm:p-5">
+    <div className="rounded-lg bg-muted/70 p-4 sm:p-5">
       <Icon className="size-5 text-primary" aria-hidden="true" />
       <h3 className="mt-3 font-semibold">{title}</h3>
       <p className="mt-1 text-sm leading-5 text-muted-foreground">{text}</p>
@@ -457,7 +450,7 @@ function ValueCard({ icon: Icon, title, text }: { icon: typeof FileSearch; title
 function Faq({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <details className="group py-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium marker:content-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-sm font-medium marker:content-none [&::-webkit-details-marker]:hidden">
         {title}
         <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>

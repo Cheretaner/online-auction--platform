@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { LoaderCircle, Send, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,8 +51,8 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Sparkles className="size-4" aria-hidden /> Assistant
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" aria-hidden /> Assistant
         </CardTitle>
         <CardDescription>
           Advice on listings, rules and bidding. It cannot place bids or change records.
@@ -63,22 +63,32 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
         {turns.length === 0 ? (
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map((suggestion) => (
-              <Button key={suggestion} type="button" size="sm" variant="outline" onClick={() => ask(suggestion)}>
+              <Button
+                key={suggestion}
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-auto min-h-9 py-2 text-left whitespace-normal"
+                onClick={() => ask(suggestion)}
+              >
                 {suggestion}
               </Button>
             ))}
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3" aria-live="polite">
             {turns.map((turn, index) => (
               <li
                 key={`${turn.role}-${index}`}
-                className={cn("rounded-lg border p-3", turn.role === "user" && "bg-muted")}
+                className={cn(
+                  "max-w-[85%] rounded-lg border p-3",
+                  turn.role === "user" ? "ml-auto border-primary/20 bg-primary/5" : "bg-card",
+                )}
               >
                 <p className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
                   {turn.role === "user" ? "You" : "Assistant"}
                   {turn.provider ? (
-                    <Badge variant="outline" className="font-mono text-xs">
+                    <Badge variant="outline" className="font-mono">
                       {turn.fallback || turn.provider === "stub" ? "rule-based fallback" : turn.provider}
                     </Badge>
                   ) : null}
@@ -87,8 +97,8 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
               </li>
             ))}
             {assist.isPending ? (
-              <li className="text-sm text-muted-foreground" aria-live="polite">
-                Thinking…
+              <li className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <LoaderCircle className="size-4 animate-spin" aria-hidden /> Thinking…
               </li>
             ) : null}
           </ul>
@@ -116,8 +126,8 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
           />
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">Enter sends · Shift+Enter starts a new line</p>
-            <Button type="submit" size="sm" disabled={assist.isPending || prompt.trim().length === 0}>
-              <Send className="size-4" aria-hidden />
+            <Button type="submit" disabled={assist.isPending || prompt.trim().length === 0}>
+              <Send aria-hidden />
               Ask
             </Button>
           </div>

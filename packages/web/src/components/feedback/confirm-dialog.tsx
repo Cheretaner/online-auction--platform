@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,12 +19,15 @@ export function ConfirmDialog({
   onConfirm,
   onOpenChange,
   pending,
+  destructive,
 }: {
   open: boolean;
   title: string;
   description: string;
   confirmLabel?: string;
   pending?: boolean;
+  /** Use for irreversible or removing actions so the confirm button reads as dangerous. */
+  destructive?: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -36,7 +40,15 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} onClick={onConfirm}>
+          <AlertDialogAction
+            disabled={pending}
+            className={destructive ? buttonVariants({ variant: "destructive" }) : undefined}
+            onClick={(event) => {
+              // Keep the dialog open while the action runs; callers close it on success.
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
             {pending ? "Working…" : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

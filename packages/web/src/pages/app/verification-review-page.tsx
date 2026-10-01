@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { VerificationDecision } from "@auction/shared";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -32,8 +33,9 @@ export default function VerificationReviewPage() {
         isError={pending.isError}
         error={pending.error}
         isEmpty={items.length === 0}
+        emptyIcon={ShieldCheck}
         emptyTitle="Nothing to review"
-        emptyDescription="New submissions appear here."
+        emptyDescription="You're all caught up. New identity submissions appear here."
         onRetry={() => void pending.refetch()}
       >
         <div className="space-y-3">
@@ -73,13 +75,13 @@ function ReviewCard({ record }: { record: VerificationRecord }) {
       <CardContent className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-medium">{user?.fullName ?? "Loading applicant…"}</p>
+            <p className="text-base font-semibold">{user?.fullName ?? "Loading applicant…"}</p>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
           </div>
           <p className="text-xs text-muted-foreground">Submitted {formatDateTime(record.createdAt)}</p>
         </div>
 
-        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        <dl className="grid gap-x-6 gap-y-4 rounded-md bg-muted/50 p-4 text-sm sm:grid-cols-3">
           <Field label="Document" value={record.documentType.replaceAll("_", " ")} />
           <Field label="Document number" value={record.documentNumber} />
           <Field label="Account type" value={user?.accountType ?? "—"} />
@@ -89,10 +91,13 @@ function ReviewCard({ record }: { record: VerificationRecord }) {
         </dl>
 
         {duplicates.data?.hasDuplicates ? (
-          <p className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
-            <AlertTriangle className="size-4 shrink-0 text-amber-600" aria-hidden />
-            {duplicates.data.duplicates.length} other account(s) use the same national ID or TIN. Check before approving.
-          </p>
+          <Alert variant="warning">
+            <AlertTriangle aria-hidden />
+            <AlertTitle>Possible duplicate identity</AlertTitle>
+            <AlertDescription>
+              {duplicates.data.duplicates.length} other account(s) use the same national ID or TIN. Check before approving.
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         <div className="flex flex-wrap gap-2">
@@ -102,7 +107,7 @@ function ReviewCard({ record }: { record: VerificationRecord }) {
           <Button variant="outline" disabled={review.isPending} onClick={() => setDialog("resubmission_required")}>
             Ask to resubmit
           </Button>
-          <Button variant="destructive" disabled={review.isPending} onClick={() => setDialog("rejected")}>
+          <Button variant="destructive-outline" disabled={review.isPending} onClick={() => setDialog("rejected")}>
             Reject
           </Button>
         </div>
@@ -124,8 +129,8 @@ function ReviewCard({ record }: { record: VerificationRecord }) {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="truncate font-medium capitalize">{value}</dd>
+      <dt className="eyebrow text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate font-medium capitalize">{value}</dd>
     </div>
   );
 }

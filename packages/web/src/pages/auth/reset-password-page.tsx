@@ -2,9 +2,9 @@ import { useId, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthCard } from "@/features/auth/auth-card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { useConfirmPasswordReset } from "@/features/auth/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 
@@ -21,23 +21,23 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="mx-auto max-w-md space-y-3 text-sm">
-        <p>This reset link is incomplete. Open the link from your email again, or ask for a new one.</p>
-        <Link to="/forgot-password" className="text-primary underline">
-          Request a new link
-        </Link>
-      </div>
+      <AuthCard
+        title="This link is incomplete"
+        description="Open the link from your email again, or ask for a new one."
+      >
+        <Button asChild className="w-full">
+          <Link to="/forgot-password">Request a new link</Link>
+        </Button>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card>
-        <CardHeader>
-          <CardTitle>Choose a new password</CardTitle>
-          <CardDescription>After this you are signed out on every device and sign in with the new password.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthCard
+      eyebrow="Account recovery"
+      title="Choose a new password"
+      description="After this you are signed out on every device and sign in with the new password."
+    >
           <form
             className="space-y-4"
             onSubmit={(event) => {
@@ -55,29 +55,31 @@ export default function ResetPasswordPage() {
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor={`${id}-new`}>New password (at least 8 characters)</Label>
-              <Input id={`${id}-new`} type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
-              {tooShort ? <p className="text-xs text-destructive">Use at least 8 characters.</p> : null}
+              <Label htmlFor={`${id}-new`}>New password</Label>
+              <Input id={`${id}-new`} aria-invalid={tooShort || undefined} type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+              {tooShort ? (
+                <p role="alert" className="text-xs font-medium text-destructive">Use at least 8 characters.</p>
+              ) : (
+                <FieldHint>At least 8 characters.</FieldHint>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor={`${id}-confirm`}>Repeat new password</Label>
-              <Input id={`${id}-confirm`} type="password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} />
-              {mismatch ? <p className="text-xs text-destructive">The passwords do not match.</p> : null}
+              <Input id={`${id}-confirm`} aria-invalid={mismatch || undefined} type="password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} />
+              {mismatch ? <p role="alert" className="text-xs font-medium text-destructive">The passwords do not match.</p> : null}
             </div>
             {reset.isError ? (
-              <p className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-destructive">
                 {getErrorMessage(reset.error)}{" "}
-                <Link to="/forgot-password" className="underline">
+                <Link to="/forgot-password" className="font-medium underline underline-offset-4">
                   Request a new link
                 </Link>
               </p>
             ) : null}
-            <Button type="submit" className="w-full" disabled={reset.isPending || mismatch || password.length < 8}>
+            <Button type="submit" size="lg" className="w-full" loading={reset.isPending} disabled={mismatch || password.length < 8}>
               {reset.isPending ? "Saving…" : "Set new password"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+    </AuthCard>
   );
 }

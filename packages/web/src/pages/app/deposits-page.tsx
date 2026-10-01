@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { Wallet } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
@@ -20,8 +22,14 @@ export default function DepositsPage() {
         isError={deposits.isError}
         error={deposits.error}
         isEmpty={items.length === 0}
+        emptyIcon={Wallet}
         emptyTitle="No deposits yet"
         emptyDescription="Open an auction that requires bid security and submit your CPO or guarantee there."
+        emptyAction={
+          <Button asChild variant="outline">
+            <Link to="/auctions?status=live">Browse live auctions</Link>
+          </Button>
+        }
         onRetry={() => void deposits.refetch()}
       >
         <div className="space-y-3">
@@ -29,8 +37,11 @@ export default function DepositsPage() {
             <Card key={deposit.id}>
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
                 <div className="min-w-0 space-y-1">
-                  <p className="font-medium">
-                    {formatMoney(deposit.amount)} · {deposit.instrumentType.replaceAll("_", " ").toUpperCase()}
+                  <p className="text-base font-semibold tabular-nums">
+                    {formatMoney(deposit.amount)}
+                    <span className="eyebrow ml-2 align-middle text-muted-foreground">
+                      {deposit.instrumentType.replaceAll("_", " ")}
+                    </span>
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {deposit.issuingBank} · Ref {deposit.referenceNumber}
@@ -39,7 +50,7 @@ export default function DepositsPage() {
                   {deposit.status === "rejected" && deposit.rejectionReason ? (
                     <p className="text-sm text-destructive">Rejected: {deposit.rejectionReason}</p>
                   ) : null}
-                  <Link className="text-sm text-primary underline" to={`/auctions/${deposit.auctionId}`}>
+                  <Link className="inline-block pt-1 text-sm font-medium text-primary underline-offset-4 hover:underline" to={`/auctions/${deposit.auctionId}`}>
                     View auction
                   </Link>
                 </div>

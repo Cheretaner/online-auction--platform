@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateAuctionItemRequest, ITEM_CONDITIONS } from "@auction/shared";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Lock, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { EmptyState, PageSkeleton } from "@/components/feedback/query-state";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -46,13 +47,22 @@ export function LotsManager({ auctionId, editable }: { auctionId: string; editab
     <div className="space-y-4">
       {editable ? (
         <Button onClick={() => setEditing("new")}>
-          <Plus className="size-4" aria-hidden /> Add lot
+          <Plus aria-hidden /> Add lot
         </Button>
       ) : (
-        <p className="text-sm text-muted-foreground">Lots are locked once the auction leaves draft.</p>
+        <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Lock className="size-4" aria-hidden /> Lots are locked once the auction leaves draft.
+        </p>
       )}
-      {items.isLoading ? <p className="text-sm text-muted-foreground">Loading lots…</p> : null}
-      {!items.isLoading && list.length === 0 ? <p className="text-sm text-muted-foreground">No lots yet.</p> : null}
+      {items.isLoading ? <PageSkeleton rows={2} /> : null}
+      {!items.isLoading && list.length === 0 ? (
+        <EmptyState
+          size="inline"
+          icon={Package}
+          title="No lots yet"
+          description={editable ? "Add at least one lot so bidders know what is for sale." : undefined}
+        />
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
         {list.map((item) => (
           <Card key={item.id}>
@@ -61,17 +71,17 @@ export function LotsManager({ auctionId, editable }: { auctionId: string; editab
                 <p className="font-medium">{item.title}</p>
                 {editable ? (
                   <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" aria-label={`Edit ${item.title}`} onClick={() => setEditing(item)}>
+                    <Button size="icon-sm" variant="ghost" aria-label={`Edit ${item.title}`} onClick={() => setEditing(item)}>
                       <Pencil className="size-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" aria-label={`Delete ${item.title}`} onClick={() => setDeleting(item)}>
+                    <Button size="icon-sm" variant="ghost" className="text-destructive hover:bg-destructive/10" aria-label={`Delete ${item.title}`} onClick={() => setDeleting(item)}>
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
                 ) : null}
               </div>
               {item.description ? <p className="text-sm text-muted-foreground">{item.description}</p> : null}
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground capitalize">
                 Qty {item.quantity} {item.unit ?? ""}
                 {item.condition ? ` · ${item.condition.replaceAll("_", " ")}` : ""}
                 {item.estimatedValue ? ` · est. ${formatMoney(item.estimatedValue)}` : ""}
@@ -88,7 +98,8 @@ export function LotsManager({ auctionId, editable }: { auctionId: string; editab
         onOpenChange={(open) => !open && setDeleting(null)}
         title="Delete lot"
         description={`Remove "${deleting?.title ?? ""}" from this auction?`}
-        confirmLabel="Delete"
+        confirmLabel="Delete lot"
+        destructive
         pending={remove.isPending}
         onConfirm={() =>
           deleting &&
@@ -127,7 +138,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{item ? "Edit lot" : "Add lot"}</DialogTitle>
           <DialogDescription>Describe the lot as bidders will see it.</DialogDescription>
@@ -291,7 +302,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" loading={pending}>
                 {pending ? "Saving…" : "Save lot"}
               </Button>
             </DialogFooter>

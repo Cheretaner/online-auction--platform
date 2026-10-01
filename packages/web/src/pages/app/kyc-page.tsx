@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { CircleCheck, Clock, ShieldAlert, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { SubmitVerificationRequest } from "@auction/shared";
@@ -7,7 +8,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,22 +51,38 @@ export default function KycPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-lg">Your status</CardTitle>
+            <CardTitle>Your status</CardTitle>
             <StatusBadge status={status} />
           </div>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {verification.isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
-          {status === "verified" ? <p>You are verified and can bid.</p> : null}
-          {status === "pending" && record ? (
-            <p>
-              Submitted {formatDateTime(record.createdAt)} ({record.documentType.replaceAll("_", " ")}). A compliance
-              officer will review it; you will get a notification when they decide.
-            </p>
+        <CardContent className="text-sm">
+          {verification.isLoading ? (
+            <Skeleton className="h-12 w-full" />
+          ) : status === "verified" ? (
+            <Alert variant="success">
+              <CircleCheck aria-hidden />
+              <AlertTitle>You are verified</AlertTitle>
+              <AlertDescription>You can bid on any auction once its bid security requirement is met.</AlertDescription>
+            </Alert>
+          ) : status === "pending" && record ? (
+            <Alert variant="warning">
+              <Clock aria-hidden />
+              <AlertTitle>Under review</AlertTitle>
+              <AlertDescription>
+                Submitted {formatDateTime(record.createdAt)} ({record.documentType.replaceAll("_", " ")}). A compliance
+                officer will review it; you will get a notification when they decide.
+              </AlertDescription>
+            </Alert>
+          ) : status === "unverified" ? (
+            <Alert>
+              <ShieldAlert aria-hidden />
+              <AlertTitle>Not verified yet</AlertTitle>
+              <AlertDescription>Submit one identity document below. You only need to do this once.</AlertDescription>
+            </Alert>
           ) : null}
-          {status === "unverified" && !verification.isLoading ? <p>You have not submitted anything yet.</p> : null}
           {status === "rejected" && record ? (
             <Alert variant="destructive">
+              <XCircle aria-hidden />
               <AlertTitle>Not accepted</AlertTitle>
               <AlertDescription>
                 {record.decisionReason ?? "No reason was given."} Correct the details and submit again.
@@ -88,7 +106,8 @@ function SubmitForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Submit your document</CardTitle>
+        <CardTitle>Submit your document</CardTitle>
+        <CardDescription>Enter the number exactly as printed. Only compliance officers can see it.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -141,7 +160,7 @@ function SubmitForm() {
               )}
             />
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={submit.isPending}>
+              <Button type="submit" loading={submit.isPending}>
                 {submit.isPending ? "Submitting…" : "Submit for verification"}
               </Button>
             </div>

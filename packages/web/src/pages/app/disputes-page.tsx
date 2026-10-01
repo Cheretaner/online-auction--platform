@@ -1,3 +1,4 @@
+import { Scale } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -24,7 +25,9 @@ export default function DisputesPage() {
         isError={disputes.isError}
         error={disputes.error}
         isEmpty={items.length === 0}
+        emptyIcon={Scale}
         emptyTitle="No disputes"
+        emptyDescription={isOfficer(roles) ? "Nothing has been raised on your organization's auctions." : "If an auction was run unfairly, raise a dispute from its page."}
         onRetry={() => void disputes.refetch()}
       >
         <DisputeList items={items} />

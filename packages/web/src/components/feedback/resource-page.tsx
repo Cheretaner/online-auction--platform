@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/feedback/status-badge";
 import { getErrorMessage } from "@/lib/api/errors";
 
 type ResourceQuery<T> = {
@@ -17,10 +17,12 @@ export function ResourcePage<T>({
   title,
   description,
   query,
+  emptyDescription = "Records will appear here as soon as there is activity on your account.",
   children,
 }: {
   title: string;
   description: string;
+  emptyDescription?: string;
   query: ResourceQuery<{ items: T[] } | T | null>;
   children?: ReactNode;
 }) {
@@ -44,7 +46,7 @@ export function ResourcePage<T>({
         error={query.error}
         isEmpty={rows.length === 0}
         emptyTitle={`No ${title.toLowerCase()} yet`}
-        emptyDescription="When the API has records for this account, they will appear here."
+        emptyDescription={emptyDescription}
         onRetry={() => void query.refetch()}
       >
         <div className="space-y-3">
@@ -89,10 +91,10 @@ function ResourceRecord({ value }: { value: unknown }) {
     <Card>
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0">
-          <p className="font-medium leading-snug">
+          <p className="leading-snug font-medium first-letter:uppercase">
             {titleEntry ? String(titleEntry[1] ?? "Untitled") : "Record"}
           </p>
-          <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs text-muted-foreground sm:grid-cols-2">
+          <dl className="mt-3 grid gap-x-6 gap-y-3 text-xs text-muted-foreground sm:grid-cols-2">
             {entries
               .filter(
                 ([key]) => key !== titleEntry?.[0] && key !== statusEntry?.[0],
@@ -100,7 +102,7 @@ function ResourceRecord({ value }: { value: unknown }) {
               .slice(0, 4)
               .map(([key, item]) => (
                 <div className="min-w-0" key={key}>
-                  <dt className="capitalize">{humanize(key)}</dt>
+                  <dt className="eyebrow">{humanize(key)}</dt>
                   <dd className="mt-0.5 truncate font-medium text-foreground">
                     {formatRecordValue(key, item)}
                   </dd>
@@ -108,11 +110,7 @@ function ResourceRecord({ value }: { value: unknown }) {
               ))}
           </dl>
         </div>
-        {statusEntry ? (
-          <Badge variant="secondary" className="self-start capitalize">
-            {String(statusEntry[1])}
-          </Badge>
-        ) : null}
+        {statusEntry ? <StatusBadge status={String(statusEntry[1])} className="self-start" /> : null}
       </CardContent>
     </Card>
   );

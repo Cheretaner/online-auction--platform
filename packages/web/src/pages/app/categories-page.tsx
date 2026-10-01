@@ -5,7 +5,7 @@ export default function CategoriesPage() {
   return (
     <ResourcePage
       title="Categories"
-      description="Auction category catalog maintained by platform administrators."
+      description="The category list bidders use to filter auctions."
       query={query}
     />
   );

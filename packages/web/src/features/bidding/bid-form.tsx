@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Copy } from "lucide-react";
+import { CircleAlert, Copy, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { usePlaceBid } from "@/features/auctions/queries";
 import type { Auction } from "@/lib/api/types";
 import { explainBidError, type BidErrorExplanation } from "@/lib/bid-errors";
@@ -87,7 +87,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
   return (
     <div className="space-y-4">
       <form
-        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 @md:flex-row @md:items-start"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
@@ -102,25 +102,35 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
             disabled={disabled}
+            aria-invalid={problem ? true : undefined}
+            aria-describedby={`bid-hint-${auction.id}`}
+            className="h-11 text-base tabular-nums"
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldHint id={`bid-hint-${auction.id}`}>
             {sealed
               ? `Minimum ${formatMoney(minimum)}. Other bidders and staff cannot see your amount until bids are opened.`
               : `Minimum ${formatMoney(minimum)} (current highest plus the ${formatMoney(auction.minIncrement)} increment).`}
-          </p>
+          </FieldHint>
         </div>
-        <Button type="submit" disabled={disabled || placeBid.isPending || !amount.trim()}>
+        <Button
+          type="submit"
+          size="lg"
+          className="@md:mt-6"
+          disabled={disabled || !amount.trim()}
+          loading={placeBid.isPending}
+        >
           {placeBid.isPending ? "Submitting…" : sealed ? "Submit sealed bid" : "Place bid"}
         </Button>
       </form>
 
       {problem ? (
         <Alert variant="destructive">
+          <CircleAlert aria-hidden />
           <AlertTitle>Bid not placed</AlertTitle>
           <AlertDescription>
             {problem.message}{" "}
             {problem.action ? (
-              <Link className="underline" to={problem.action.to}>
+              <Link className="font-medium text-foreground underline underline-offset-4" to={problem.action.to}>
                 {problem.action.label}
               </Link>
             ) : null}
@@ -141,14 +151,15 @@ function SealedReceiptCard({ auctionId, receipt }: { auctionId: string; receipt:
     `Commitment: ${receipt.commitmentHash}`,
   ].join("\n");
   return (
-    <Alert>
+    <Alert variant="success">
+      <ReceiptText aria-hidden />
       <AlertTitle>Keep this sealed-bid receipt</AlertTitle>
       <AlertDescription className="space-y-2">
         <p>
           The commitment below is stored in the audit trail. After bids are opened, the amount, nonce and auction id
           recompute to this commitment, which proves your bid was not changed.
         </p>
-        <pre className="overflow-x-auto rounded bg-muted p-2 text-xs">{text}</pre>
+        <pre className="overflow-x-auto rounded-md border bg-card p-3 font-mono text-xs leading-5 text-foreground">{text}</pre>
         <Button
           type="button"
           size="sm"

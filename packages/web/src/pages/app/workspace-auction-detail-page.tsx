@@ -3,7 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
-import { QueryState } from "@/components/feedback/query-state";
+import { EmptyState, QueryState } from "@/components/feedback/query-state";
+import { ExternalLink, Pencil, ScanSearch, Scale, ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
@@ -34,22 +36,34 @@ export default function WorkspaceAuctionDetailPage() {
   return (
     <div>
       <PageHeader
+        back={{ to: "/app/auctions", label: "Workspace auctions" }}
         title={record?.title ?? "Auction details"}
-        description="Organization workspace"
+        meta={
+          record ? (
+            <>
+              <StatusBadge status={record.status} />
+              <Badge variant="outline">{record.auctionType === "sealed_bid" ? "Sealed bid" : "Open ascending"}</Badge>
+            </>
+          ) : null
+        }
         actions={
           record ? (
-            <div className="flex flex-wrap gap-2">
+            <>
               {record.status === "draft" ? (
                 <Button asChild variant="outline">
-                  <Link to={`/app/auctions/${record.id}/edit`}>Edit auction</Link>
+                  <Link to={`/app/auctions/${record.id}/edit`}>
+                    <Pencil aria-hidden /> Edit auction
+                  </Link>
                 </Button>
               ) : null}
               {record.status !== "draft" && record.status !== "pending_review" ? (
-                <Button asChild variant="ghost">
-                  <Link to={`/auctions/${record.id}`}>Public page</Link>
+                <Button asChild variant="outline">
+                  <Link to={`/auctions/${record.id}`}>
+                    <ExternalLink aria-hidden /> Public page
+                  </Link>
                 </Button>
               ) : null}
-            </div>
+            </>
           ) : null
         }
       />
@@ -74,18 +88,24 @@ function Workspace({ auction }: { auction: Auction }) {
   const reviewer = hasRole(roles, "compliance_officer", "org_admin", "super_admin");
 
   return (
-    <div className="space-y-5">
-      <Overview auction={auction} />
+    <div className="space-y-6">
       <LifecycleActions auction={auction} />
+      <Overview auction={auction} />
       <Tabs defaultValue="lots">
-        <div className="overflow-x-auto">
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList>
             <TabsTrigger value="lots">Lots</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="deposits">Deposits</TabsTrigger>
             <TabsTrigger value="compliance">Compliance</TabsTrigger>
-            <TabsTrigger value="anomalies">Anomalies{openFlags ? ` (${openFlags})` : ""}</TabsTrigger>
-            <TabsTrigger value="disputes">Disputes{openDisputes ? ` (${openDisputes})` : ""}</TabsTrigger>
+            <TabsTrigger value="anomalies">
+              Anomalies
+              {openFlags ? <Badge variant="warning" className="px-1.5">{openFlags}</Badge> : null}
+            </TabsTrigger>
+            <TabsTrigger value="disputes">
+              Disputes
+              {openDisputes ? <Badge variant="warning" className="px-1.5">{openDisputes}</Badge> : null}
+            </TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
         </div>
@@ -99,7 +119,7 @@ function Workspace({ auction }: { auction: Auction }) {
           {Number(auction.depositAmount) > 0 ? (
             <DepositReview auction={auction} />
           ) : (
-            <p className="text-sm text-muted-foreground">This auction does not require bid security.</p>
+            <EmptyState size="inline" icon={ShieldCheck} title="This auction does not require bid security" />
           )}
         </TabsContent>
         <TabsContent value="compliance" className="pt-4">
@@ -107,14 +127,14 @@ function Workspace({ auction }: { auction: Auction }) {
         </TabsContent>
         <TabsContent value="anomalies" className="pt-4">
           {(anomalies.data?.items ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No anomaly flags on this auction.</p>
+            <EmptyState size="inline" icon={ScanSearch} title="No anomaly flags on this auction" />
           ) : (
             <AnomalyList items={anomalies.data?.items ?? []} showAuctionLink={false} />
           )}
         </TabsContent>
         <TabsContent value="disputes" className="pt-4">
           {(disputes.data?.items ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No disputes on this auction.</p>
+            <EmptyState size="inline" icon={Scale} title="No disputes on this auction" />
           ) : (
             <DisputeList items={disputes.data?.items ?? []} showAuctionLink={false} />
           )}
@@ -131,12 +151,9 @@ function Overview({ auction }: { auction: Auction }) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-lg">Overview</CardTitle>
-          <StatusBadge status={auction.status} />
-        </div>
+        <CardTitle>Overview</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <CardContent className="grid gap-x-6 gap-y-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Info label="Auction type" value={auction.auctionType.replaceAll("_", " ")} />
         <Info label="Starting price" value={formatMoney(auction.startPrice)} />
         <Info label="Minimum increment" value={formatMoney(auction.minIncrement)} />
@@ -180,12 +197,12 @@ function LifecycleActions({ auction }: { auction: Auction }) {
 
   const buttons = [
     auction.status === "draft" && manager ? (
-      <Button key="submit" disabled={action.submit.isPending} onClick={() => run(() => action.submit.mutateAsync(), "Submitted for review")}>
+      <Button key="submit" loading={action.submit.isPending} onClick={() => run(() => action.submit.mutateAsync(), "Submitted for review")}>
         Submit for review
       </Button>
     ) : null,
     auction.status === "pending_review" && approver && !isCreator ? (
-      <Button key="approve" disabled={action.approve.isPending} onClick={() => run(() => action.approve.mutateAsync(), "Auction approved")}>
+      <Button key="approve" loading={action.approve.isPending} onClick={() => run(() => action.approve.mutateAsync(), "Auction approved")}>
         Approve auction
       </Button>
     ) : null,
@@ -198,7 +215,7 @@ function LifecycleActions({ auction }: { auction: Auction }) {
       <Button
         key="open-sealed"
         variant="outline"
-        disabled={action.openSealed.isPending}
+        loading={action.openSealed.isPending}
         onClick={() => run(() => action.openSealed.mutateAsync(), "Sealed bids opened")}
       >
         Open sealed bids
@@ -210,7 +227,7 @@ function LifecycleActions({ auction }: { auction: Auction }) {
       </Button>
     ) : null,
     CANCELLABLE.has(auction.status) && manager ? (
-      <Button key="cancel" variant="destructive" onClick={() => setCancelling(true)}>
+      <Button key="cancel" variant="destructive-outline" onClick={() => setCancelling(true)}>
         Cancel auction
       </Button>
     ) : null,
@@ -219,8 +236,9 @@ function LifecycleActions({ auction }: { auction: Auction }) {
   if (buttons.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {buttons}
+    <div className="flex flex-col gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="eyebrow text-primary">Next step</p>
+      <div className="flex flex-wrap gap-2">{buttons}</div>
       <ReasonDialog
         open={cancelling}
         onOpenChange={setCancelling}
@@ -249,8 +267,8 @@ function LifecycleActions({ auction }: { auction: Auction }) {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-medium capitalize">{value}</p>
+      <p className="eyebrow text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium tabular-nums first-letter:uppercase">{value}</p>
     </div>
   );
 }

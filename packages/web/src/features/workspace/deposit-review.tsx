@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { Wallet } from "lucide-react";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
@@ -21,9 +23,17 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const [rejecting, setRejecting] = useState<DepositRecord | null>(null);
   const items = deposits.data?.items ?? [];
 
-  if (deposits.isLoading) return <p className="text-sm text-muted-foreground">Loading deposits…</p>;
-  if (deposits.isError) return <p className="text-sm text-destructive">{getErrorMessage(deposits.error)}</p>;
-  if (items.length === 0) return <p className="text-sm text-muted-foreground">No deposits registered yet.</p>;
+  if (deposits.isLoading) return <PageSkeleton rows={2} />;
+  if (deposits.isError) return <ErrorState error={deposits.error} onRetry={() => void deposits.refetch()} />;
+  if (items.length === 0)
+    return (
+      <EmptyState
+        size="inline"
+        icon={Wallet}
+        title="No deposits registered yet"
+        description="Bidders register their CPO or guarantee from the public auction page."
+      />
+    );
 
   const verify = (deposit: DepositRecord) =>
     review.mutate(
@@ -32,7 +42,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
     );
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <Table>
         <TableHeader>
           <TableRow>
@@ -54,11 +64,11 @@ export function DepositReview({ auction }: { auction: Auction }) {
                   </p>
                   <p className="text-xs text-muted-foreground">{deposit.issuingBank}</p>
                 </TableCell>
-                <TableCell className={short ? "text-destructive" : undefined}>
+                <TableCell className={short ? "text-destructive tabular-nums" : "tabular-nums"}>
                   {formatMoney(deposit.amount)}
                   {short ? <span className="block text-xs">below required {formatMoney(auction.depositAmount)}</span> : null}
                 </TableCell>
-                <TableCell className="text-sm">{formatDateTime(deposit.createdAt)}</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(deposit.createdAt)}</TableCell>
                 <TableCell>
                   <StatusBadge status={deposit.status} />
                   {deposit.rejectionReason ? <p className="mt-1 text-xs text-muted-foreground">{deposit.rejectionReason}</p> : null}
@@ -83,7 +93,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
                         <Button size="sm" disabled={review.isPending} onClick={() => verify(deposit)}>
                           Verify
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setRejecting(deposit)}>
+                        <Button size="sm" variant="destructive-outline" onClick={() => setRejecting(deposit)}>
                           Reject
                         </Button>
                       </>

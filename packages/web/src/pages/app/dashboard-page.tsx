@@ -1,7 +1,8 @@
-import type { LucideIcon } from "lucide-react";
-import { Activity, ArrowRight, Bell, CheckCircle2, Gavel } from "lucide-react";
+import { ArrowRight, Bell, Building2, CheckCircle2, Gavel, Plus, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,38 +31,42 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Welcome, ${session?.user.fullName ?? "there"}`}
+        title={`Welcome, ${session?.user.fullName.split(" ")[0] ?? "there"}`}
         description="Your account, eligibility, and activity across Cheretanet auctions."
         actions={
           canManageAuctions(roles) ? (
             <Button asChild>
-              <Link to="/app/auctions/new">Create auction</Link>
+              <Link to="/app/auctions/new">
+                <Plus aria-hidden /> Create auction
+              </Link>
             </Button>
           ) : null
         }
       />
 
       {!organizationId && (session?.organizations.length ?? 0) > 1 ? (
-        <div className="rounded-xl border border-accent bg-accent/40 px-4 py-3 text-sm text-accent-foreground">
-          Select an organization above to manage its auctions and complete
-          organization-scoped actions.
-        </div>
+        <Alert variant="warning">
+          <Building2 aria-hidden />
+          <AlertDescription className="text-foreground">
+            Choose an organization in the top bar to manage its auctions and complete organization actions.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <section
         aria-label="Account overview"
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <Stat
-          title="Live auctions"
+        <StatCard
+          label="Live auctions"
           value={auctions.data ? String(auctions.data.total) : "—"}
           hint="Open for bidding now"
           icon={Gavel}
           href="/auctions?status=live"
           loading={auctions.isLoading}
         />
-        <Stat
-          title="Identity check"
+        <StatCard
+          label="Identity check"
           value={statusLabel(
             verification.data?.status ??
               session?.user.verificationStatus ??
@@ -72,16 +77,16 @@ export default function DashboardPage() {
           href="/app/kyc"
           loading={verification.isLoading}
         />
-        <Stat
-          title="My deposits"
+        <StatCard
+          label="My deposits"
           value={deposits.data ? String(deposits.data.items.length) : "—"}
           hint="Review deposit records"
-          icon={Activity}
+          icon={Wallet}
           href="/app/deposits"
           loading={deposits.isLoading}
         />
-        <Stat
-          title="Unread messages"
+        <StatCard
+          label="Unread messages"
           value={unread.data ? String(unread.data.count) : "—"}
           hint="Open notifications"
           icon={Bell}
@@ -90,7 +95,7 @@ export default function DashboardPage() {
         />
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card className="h-full">
           <CardHeader>
             <CardTitle>Your access</CardTitle>
@@ -102,7 +107,7 @@ export default function DashboardPage() {
             {roles.length ? (
               <div className="flex flex-wrap gap-2">
                 {roles.map((role) => (
-                  <Badge key={role} variant="secondary">
+                  <Badge key={role} variant="secondary" className="capitalize">
                     {statusLabel(role)}
                   </Badge>
                 ))}
@@ -131,57 +136,11 @@ export default function DashboardPage() {
   );
 }
 
-function Stat({
-  title,
-  value,
-  hint,
-  icon: Icon,
-  href,
-  loading,
-}: {
-  title: string;
-  value: string;
-  hint: string;
-  icon: LucideIcon;
-  href: string;
-  loading: boolean;
-}) {
-  return (
-    <Link to={href} className="group rounded-2xl focus-visible:outline-none">
-      <Card
-        aria-busy={loading}
-        className="h-full transition-colors group-hover:border-primary/40 group-focus-visible:border-primary"
-      >
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm text-muted-foreground">{title}</p>
-              <p className="mt-2 text-2xl font-semibold capitalize tracking-tight">
-                {value}
-              </p>
-            </div>
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-              <Icon className="size-5" aria-hidden="true" />
-            </span>
-          </div>
-          <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-            <span>{hint}</span>
-            <ArrowRight
-              className="size-4 transition-transform group-hover:translate-x-0.5"
-              aria-hidden="true"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
-
 function QuickLink({ to, label }: { to: string; label: string }) {
   return (
     <Link
       to={to}
-      className="flex min-h-11 items-center justify-between rounded-lg px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:bg-muted"
+      className="flex min-h-11 items-center justify-between rounded-md px-3 text-sm font-medium transition-colors hover:bg-muted"
     >
       <span>{label}</span>
       <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />

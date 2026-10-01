@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Gavel, Lock, MapPin, Package } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
-import { QueryState } from "@/components/feedback/query-state";
+import { EmptyState, QueryState } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useAuction, useAuctionBids, useAuctionItems } from "@/features/auctions/queries";
@@ -46,114 +49,172 @@ export default function AuctionDetailPage() {
       onRetry={() => auction.refetch()}
     >
       {record ? (
-        <div className="space-y-6">
+        <div>
           <PageHeader
+            back={{ to: "/auctions", label: "All auctions" }}
             title={record.title}
+            meta={
+              <>
+                <StatusBadge status={record.status} />
+                <Badge variant="outline">
+                  {record.auctionType === "sealed_bid" ? <Lock aria-hidden /> : <Gavel aria-hidden />}
+                  {record.auctionType === "sealed_bid" ? "Sealed bid" : "Open ascending"}
+                </Badge>
+                {record.region ? (
+                  <Badge variant="outline">
+                    <MapPin aria-hidden /> {record.region}
+                  </Badge>
+                ) : null}
+              </>
+            }
             description={record.description ?? undefined}
-            actions={<StatusBadge status={record.status} />}
           />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label={record.auctionType === "sealed_bid" ? "Reserve basis" : "Start price"} value={formatMoney(record.startPrice)} />
-            <Metric
-              label="Highest bid"
-              value={
-                record.auctionType === "sealed_bid" && !record.sealedOpenedAt
-                  ? "Sealed"
-                  : Number(record.currentHighestBid ?? 0) > 0
-                    ? formatMoney(record.currentHighestBid)
-                    : "No bids yet"
-              }
-            />
-            <Metric label="Bids" value={String(record.bidCount)} />
-            <Metric label={record.status === "scheduled" ? "Opens" : "Closes"} value={formatDateTime(record.status === "scheduled" ? record.opensAt : record.closesAt)} />
-          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Lots</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {(items.data?.items ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No lots published yet.</p>
-              ) : (
-                items.data?.items.map((item) => (
-                  <div key={item.id} className="rounded-md border p-3">
-                    <p className="font-medium">{item.title}</p>
-                    {item.description ? <p className="text-sm text-muted-foreground">{item.description}</p> : null}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Quantity {item.quantity} {item.unit ?? ""}
-                      {item.condition ? ` · ${item.condition.replaceAll("_", " ")}` : ""}
-                      {item.region ? ` · ${item.region}` : ""}
-                    </p>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+          <KeyFacts auction={record} />
 
-          {isAuthenticated ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AuctionDocuments auctionId={record.id} />
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {isBidder ? (
-            <Participation auction={record} />
-          ) : !isAuthenticated ? (
-            <p className="text-sm">
-              <Link className="text-primary underline" to="/login" state={{ from: `/auctions/${record.id}` }}>
-                Sign in
-              </Link>{" "}
-              or{" "}
-              <Link className="text-primary underline" to="/register">
-                create an account
-              </Link>{" "}
-              to see the tender documents and take part.
-            </p>
-          ) : null}
-
-          {isAuthenticated ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Bid activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(bids.data?.items ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No bids visible yet.</p>
-                ) : (
-                  <ul className="space-y-2 text-sm">
-                    {bids.data?.items.map((bid) => (
-                      <li key={bid.id} className="flex justify-between gap-4 border-b py-2 last:border-0">
-                        <span>
-                          {bid.amount === null ? "Sealed bid" : formatMoney(bid.amount)}
-                          {bid.bidderId === session?.user.id ? <span className="ml-2 text-xs text-primary">(yours)</span> : null}
-                          {bid.status !== "active" ? (
-                            <span className="ml-2 text-xs text-muted-foreground">{bid.status}</span>
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+            <div className="order-2 space-y-6 lg:order-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Lots</CardTitle>
+                  <CardDescription>What is being sold in this auction.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(items.data?.items ?? []).length === 0 ? (
+                    <EmptyState size="inline" icon={Package} title="No lots published yet" />
+                  ) : (
+                    <ul className="divide-y rounded-md border">
+                      {items.data?.items.map((item) => (
+                        <li key={item.id} className="p-4">
+                          <p className="font-medium">{item.title}</p>
+                          {item.description ? (
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
                           ) : null}
-                        </span>
-                        <span className="text-muted-foreground">{formatDateTime(bid.placedAt)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
+                          <p className="mt-2 text-xs text-muted-foreground capitalize">
+                            Quantity {item.quantity} {item.unit ?? ""}
+                            {item.condition ? ` · ${item.condition.replaceAll("_", " ")}` : ""}
+                            {item.region ? ` · ${item.region}` : ""}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
 
-          {isBidder && DISPUTABLE.has(record.status) ? (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span>Something wrong with how this auction ran?</span>
-              <OpenDisputeButton auctionId={record.id} />
+              {isAuthenticated ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Documents</CardTitle>
+                    <CardDescription>Specifications, terms and notices from the issuing organization.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AuctionDocuments auctionId={record.id} />
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {isAuthenticated ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Bid activity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(bids.data?.items ?? []).length === 0 ? (
+                      <EmptyState size="inline" icon={Gavel} title="No bids visible yet" />
+                    ) : (
+                      <ul className="divide-y text-sm">
+                        {bids.data?.items.map((bid) => (
+                          <li key={bid.id} className="flex items-center justify-between gap-4 py-2.5">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium tabular-nums">
+                                {bid.amount === null ? "Sealed bid" : formatMoney(bid.amount)}
+                              </span>
+                              {bid.bidderId === session?.user.id ? <Badge>Yours</Badge> : null}
+                              {bid.status !== "active" ? (
+                                <Badge variant="muted" className="capitalize">
+                                  {bid.status}
+                                </Badge>
+                              ) : null}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(bid.placedAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {isBidder && DISPUTABLE.has(record.status) ? (
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">Something wrong with how this auction ran?</p>
+                  <OpenDisputeButton auctionId={record.id} />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+
+            <aside className="order-1 lg:sticky lg:top-32 lg:order-2" aria-label="Take part">
+              {isBidder ? (
+                <Participation auction={record} />
+              ) : !isAuthenticated ? (
+                <Card className="border-primary/30">
+                  <CardHeader>
+                    <CardTitle>Take part in this auction</CardTitle>
+                    <CardDescription>
+                      Sign in or create a bidder account to read the tender documents, register bid security and bid.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    <Button asChild>
+                      <Link to="/register">Create bidder account</Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link to="/login" state={{ from: `/auctions/${record.id}` }}>
+                        Sign in
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </aside>
+          </div>
         </div>
       ) : null}
     </QueryState>
+  );
+}
+
+function KeyFacts({ auction }: { auction: Auction }) {
+  const sealedHidden = auction.auctionType === "sealed_bid" && !auction.sealedOpenedAt;
+  const facts = [
+    { label: auction.auctionType === "sealed_bid" ? "Reserve basis" : "Start price", value: formatMoney(auction.startPrice) },
+    {
+      label: "Highest bid",
+      value: sealedHidden
+        ? "Sealed"
+        : Number(auction.currentHighestBid ?? 0) > 0
+          ? formatMoney(auction.currentHighestBid)
+          : "No bids yet",
+    },
+    { label: "Bids", value: String(auction.bidCount) },
+    {
+      label: auction.status === "scheduled" ? "Opens" : "Closes",
+      value: formatDateTime(auction.status === "scheduled" ? auction.opensAt : auction.closesAt),
+    },
+  ];
+  return (
+    <dl className="grid grid-cols-2 overflow-hidden rounded-lg border bg-card shadow-xs lg:grid-cols-4">
+      {facts.map((fact, index) => (
+        <div
+          key={fact.label}
+          className={`p-4 sm:p-5 ${index % 2 === 1 ? "border-l" : ""} ${index >= 2 ? "border-t lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`}
+        >
+          <dt className="eyebrow text-muted-foreground">{fact.label}</dt>
+          <dd className="mt-1.5 text-lg font-semibold tracking-tight tabular-nums sm:text-xl">{fact.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -163,28 +224,20 @@ function Participation({ auction }: { auction: Auction }) {
   const upcoming = auction.status === "scheduled";
   if (!open && !upcoming) return null;
   return (
-    <Card>
+    <Card className="border-primary/30">
       <CardHeader>
         <CardTitle>{open ? "Place a bid" : "Get ready to bid"}</CardTitle>
+        {readiness.ready ? null : (
+          <CardDescription>Complete these steps first. Each one is checked by the platform or the issuer.</CardDescription>
+        )}
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="@container space-y-6">
         {readiness.ready ? null : <BidderReadinessPanel auction={auction} readiness={readiness} />}
         {open ? (
           <BidForm auction={auction} disabled={!readiness.ready && !readiness.loading} />
         ) : (
           <p className="text-sm text-muted-foreground">Bidding opens {formatDateTime(auction.opensAt)}.</p>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-xs uppercase text-muted-foreground">{label}</p>
-        <p className="mt-1 text-lg font-semibold">{value}</p>
       </CardContent>
     </Card>
   );

@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useAssignDispute, useResolveDispute } from "@/features/operations/queries";
@@ -47,14 +47,14 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
       <CardContent className="space-y-3 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm">{dispute.reason}</p>
+            <p className="text-sm leading-6">{dispute.reason}</p>
             <p className="text-xs text-muted-foreground">
               Raised {formatDateTime(dispute.createdAt)}
               {mine ? " by you" : ""}
               {dispute.assignedReviewer ? (dispute.assignedReviewer === me ? " · assigned to you" : " · assigned") : ""}
             </p>
             {showAuctionLink ? (
-              <Link className="text-sm text-primary underline" to={`/auctions/${dispute.auctionId}`}>
+              <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" to={`/auctions/${dispute.auctionId}`}>
                 View auction
               </Link>
             ) : null}
@@ -63,7 +63,8 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
         </div>
 
         {dispute.decision ? (
-          <div className="rounded-md bg-muted p-3 text-sm">
+          <div className="rounded-md border-l-2 border-primary bg-muted p-3 text-sm">
+            <p className="eyebrow mb-1 text-muted-foreground">Decision</p>
             <p className="font-medium">{dispute.decision}</p>
             {dispute.decisionReason ? <p className="mt-1 text-muted-foreground">{dispute.decisionReason}</p> : null}
           </div>
@@ -74,7 +75,7 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
             {dispute.status === "open" && me ? (
               <Button
                 size="sm"
-                disabled={assign.isPending}
+                loading={assign.isPending}
                 onClick={() =>
                   assign.mutate(
                     { id: dispute.id, body: { reviewerId: me } },
@@ -146,12 +147,21 @@ function ResolveDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`${id}-reason`}>Reasoning (at least 12 characters)</Label>
-            <Textarea id={`${id}-reason`} rows={4} value={reason} onChange={(event) => setReason(event.target.value)} />
+            <Label htmlFor={`${id}-reason`}>Reasoning</Label>
+            <Textarea
+              id={`${id}-reason`}
+              rows={4}
+              aria-describedby={`${id}-reason-hint`}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+            />
+            <FieldHint id={`${id}-reason-hint`}>
+              {reason.trim().length}/12 characters minimum. The bidder sees this.
+            </FieldHint>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" disabled={!valid || resolve.isPending} onClick={() => submit("rejected")}>
+          <Button variant="destructive-outline" disabled={!valid || resolve.isPending} onClick={() => submit("rejected")}>
             Reject dispute
           </Button>
           <Button disabled={!valid || resolve.isPending} onClick={() => submit("resolved")}>

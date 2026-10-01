@@ -2,13 +2,16 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateOrganizationRequest, ORG_TYPES } from "@auction/shared";
-import { Trash2, UserPlus } from "lucide-react";
+import { Building2, ChevronDown, Trash2, UserPlus } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { PageSkeleton } from "@/components/feedback/query-state";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { QueryState } from "@/components/feedback/query-state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +60,7 @@ export default function OrganizationsPage() {
         isError={orgs.isError}
         error={orgs.error}
         isEmpty={visible.length === 0}
+        emptyIcon={Building2}
         emptyTitle="No organizations"
         onRetry={() => void orgs.refetch()}
       >
@@ -101,7 +105,8 @@ function CreateOrganizationCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Onboard an organization</CardTitle>
+        <CardTitle>Onboard an organization</CardTitle>
+        <CardDescription>Creates the institution. Add its staff afterwards under Manage members.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -149,7 +154,7 @@ function CreateOrganizationCard() {
             {text("contactEmail", "Contact email", "email")}
             {text("contactPhone", "Contact phone", "tel")}
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={create.isPending}>
+              <Button type="submit" loading={create.isPending}>
                 {create.isPending ? "Creating…" : "Create organization"}
               </Button>
             </div>
@@ -164,19 +169,30 @@ function OrganizationCard({ org }: { org: OrganizationRecord }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <Card>
-      <CardContent className="space-y-3 p-4 sm:p-5">
+      <CardContent className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-medium">{org.name}</p>
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-base font-semibold">{org.name}</p>
+              <Badge variant="secondary" className="capitalize">
+                {org.orgType.replaceAll("_", " ")}
+              </Badge>
+            </div>
             <p className="text-sm text-muted-foreground">
-              {org.orgType.replaceAll("_", " ")} · {org.region} · TIN {org.taxpayerId}
+              {org.region} · TIN <span className="font-mono">{org.taxpayerId}</span>
             </p>
             <p className="text-xs text-muted-foreground">
               {org.contactEmail} · {org.contactPhone}
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setExpanded((value) => !value)}>
+          <Button
+            size="sm"
+            variant="outline"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
             {expanded ? "Hide members" : "Manage members"}
+            <ChevronDown className={expanded ? "rotate-180 transition-transform" : "transition-transform"} aria-hidden />
           </Button>
         </div>
         {expanded ? <Members orgId={org.id} /> : null}
@@ -195,30 +211,39 @@ function Members({ orgId }: { orgId: string }) {
   const [removing, setRemoving] = useState<{ userId: string; label: string } | null>(null);
 
   return (
-    <div className="space-y-3 border-t pt-3">
-      {members.isLoading ? <p className="text-sm text-muted-foreground">Loading members…</p> : null}
-      <ul className="space-y-2">
+    <div className="space-y-4 border-t pt-4">
+      {members.isLoading ? <PageSkeleton rows={2} /> : null}
+      <ul className="divide-y rounded-md border">
         {(members.data?.items ?? []).map((member) => (
-          <li key={member.userId} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span>
-              <span className="font-medium">{member.fullName ?? member.email ?? member.userId}</span>{" "}
-              <span className="text-muted-foreground">
-                {member.email} · {member.role.replaceAll("_", " ")}
+          <li key={member.userId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+            <span className="flex min-w-0 items-center gap-3">
+              <Avatar className="size-8">
+                <AvatarFallback>{(member.fullName ?? member.email ?? "?").slice(0, 1).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{member.fullName ?? member.email ?? member.userId}</span>
+                <span className="block truncate text-xs text-muted-foreground">{member.email}</span>
               </span>
             </span>
+            <span className="flex shrink-0 items-center gap-1">
+              <Badge variant="muted" className="hidden capitalize sm:inline-flex">
+                {member.role.replaceAll("_", " ")}
+              </Badge>
             <Button
-              size="icon"
+              size="icon-sm"
               variant="ghost"
+              className="text-destructive hover:bg-destructive/10"
               aria-label={`Remove ${member.fullName ?? member.email ?? "member"}`}
               onClick={() => setRemoving({ userId: member.userId, label: member.fullName ?? member.email ?? member.userId })}
             >
-              <Trash2 className="size-4" />
+              <Trash2 />
             </Button>
+            </span>
           </li>
         ))}
       </ul>
       <form
-        className="grid gap-2 sm:grid-cols-[1fr_200px_auto] sm:items-end"
+        className="grid gap-3 rounded-md bg-muted/50 p-3 sm:grid-cols-[1fr_200px_auto] sm:items-end"
         onSubmit={(event) => {
           event.preventDefault();
           add.mutate(
@@ -238,9 +263,9 @@ function Members({ orgId }: { orgId: string }) {
           <Input id={`${id}-email`} type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label>Role</Label>
+          <Label htmlFor={`${id}-role`}>Role</Label>
           <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
-            <SelectTrigger aria-label="Member role">
+            <SelectTrigger id={`${id}-role`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -252,8 +277,8 @@ function Members({ orgId }: { orgId: string }) {
             </SelectContent>
           </Select>
         </div>
-        <Button type="submit" disabled={add.isPending}>
-          <UserPlus className="size-4" aria-hidden /> Add
+        <Button type="submit" loading={add.isPending}>
+          {add.isPending ? null : <UserPlus aria-hidden />} Add member
         </Button>
       </form>
       <ConfirmDialog
@@ -261,7 +286,8 @@ function Members({ orgId }: { orgId: string }) {
         onOpenChange={(open) => !open && setRemoving(null)}
         title="Remove member"
         description={`${removing?.label ?? ""} will lose their role in this organization.`}
-        confirmLabel="Remove"
+        confirmLabel="Remove member"
+        destructive
         pending={remove.isPending}
         onConfirm={() =>
           removing &&

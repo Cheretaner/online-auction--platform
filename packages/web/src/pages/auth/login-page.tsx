@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginRequest } from "@auction/shared";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthCard, authLinkClass } from "@/features/auth/auth-card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useLoginMutation } from "@/features/auth/queries";
@@ -21,13 +21,19 @@ export default function LoginPage() {
   });
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card>
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardDescription>Sign in to bid, track deposits and manage auctions.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthCard
+      eyebrow="Welcome back"
+      title="Sign in to Cheretanet"
+      description="Bid on auctions, track your deposits, or manage your organization's auctions."
+      footer={
+        <>
+          New to Cheretanet?{" "}
+          <Link to="/register" className={authLinkClass}>
+            Create a bidder account
+          </Link>
+        </>
+      }
+    >
           <Form {...form}>
             <form
               className="space-y-4"
@@ -63,7 +69,7 @@ export default function LoginPage() {
                   <FormItem>
                     <div className="flex items-center justify-between">
                       <FormLabel>Password</FormLabel>
-                      <Link to="/forgot-password" className="text-xs text-primary underline">
+                      <Link to="/forgot-password" className={`text-xs ${authLinkClass}`}>
                         Forgot password?
                       </Link>
                     </div>
@@ -74,19 +80,11 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={login.isPending}>
+              <Button type="submit" size="lg" className="w-full" loading={login.isPending}>
                 {login.isPending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
           </Form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            No account?{" "}
-            <Link to="/register" className="text-primary underline">
-              Register
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    </AuthCard>
   );
 }

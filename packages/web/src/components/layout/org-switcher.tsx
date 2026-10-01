@@ -22,7 +22,7 @@ export function OrgSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="max-w-48 justify-start">
+        <Button variant="outline" size="sm" className="max-w-56 justify-start">
           <Building2 className="size-4" />
           <span className="truncate">{current?.organizationName ?? "Select organization"}</span>
         </Button>

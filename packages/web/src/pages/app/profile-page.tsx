@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageSkeleton } from "@/components/feedback/query-state";
 import { useAuth } from "@/features/auth/auth-provider";
 export default function ProfilePage() {
   const { session } = useAuth();
@@ -8,11 +9,11 @@ export default function ProfilePage() {
     <div>
       <PageHeader
         title="Profile"
-        description="Account information associated with your authenticated session."
+        description="The details registered on your account."
       />
       {user ? (
         <Card>
-          <CardContent className="grid gap-4 p-5 sm:grid-cols-2">
+          <CardContent className="grid gap-x-6 gap-y-5 p-5 sm:grid-cols-2 sm:p-6">
             {[
               ["Name", user.fullName],
               ["Email", user.email],
@@ -22,14 +23,16 @@ export default function ProfilePage() {
               ["Verification", user.verificationStatus],
             ].map(([label, value]) => (
               <div key={label}>
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-1 font-medium">{value || "Not provided"}</p>
+                <p className="eyebrow text-muted-foreground">{label}</p>
+                <p className={`mt-1 font-medium first-letter:uppercase ${value ? "" : "text-muted-foreground"}`}>
+                  {value || "Not provided"}
+                </p>
               </div>
             ))}
           </CardContent>
         </Card>
       ) : (
-        <p role="status">Loading account…</p>
+        <PageSkeleton rows={2} />
       )}
     </div>
   );

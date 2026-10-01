@@ -91,7 +91,7 @@ function AccountLink({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Account link</CardTitle>
+        <CardTitle>Account link</CardTitle>
         <CardDescription>
           The bot gives you a one-time code that is valid for fifteen minutes; open the deep link and send it
           to the bot.
@@ -101,7 +101,7 @@ function AccountLink({
         {linked ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
-              <Badge variant="outline">
+              <Badge variant="success">
                 Linked as {status?.telegramUsername ? `@${status.telegramUsername}` : "Telegram account"}
               </Badge>
               <p className="text-sm text-muted-foreground">
@@ -110,24 +110,24 @@ function AccountLink({
                 {status?.telegramId ? ` · id ${status.telegramId}` : ""}
               </p>
             </div>
-            <Button type="button" variant="outline" disabled={unlinking} onClick={onUnlink}>
-              <Unlink className="size-4" aria-hidden />
+            <Button type="button" variant="destructive-outline" loading={unlinking} onClick={onUnlink}>
+              {unlinking ? null : <Unlink aria-hidden />}
               {unlinking ? "Unlinking…" : "Unlink"}
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
-            <Button type="button" disabled={linking} onClick={onLink}>
+            <Button type="button" loading={linking} onClick={onLink}>
               {linking ? "Preparing code…" : "Link Telegram account"}
             </Button>
             {link ? (
-              <div className="space-y-3 rounded-lg border bg-muted/40 p-3">
+              <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs text-muted-foreground">
                       One-time code — expires {formatDateTime(link.expiresAt)}
                     </p>
-                    <p className="font-mono text-lg tracking-widest">{link.token}</p>
+                    <p className="mt-1 font-mono text-xl font-semibold tracking-[0.2em]">{link.token}</p>
                   </div>
                   <Button
                     type="button"
@@ -135,7 +135,7 @@ function AccountLink({
                     variant="outline"
                     onClick={() =>
                       void navigator.clipboard
-                      .writeText(link.token)
+                        .writeText(link.token)
                         .then(() => toast.success("Code copied"))
                         .catch(() => toast.error("Copy failed — select the code manually"))
                     }
@@ -181,8 +181,8 @@ function ChannelPosting({ canPost }: { canPost: boolean }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Megaphone className="size-4" aria-hidden /> Public channel
+        <CardTitle className="flex items-center gap-2">
+          <Megaphone className="size-4 text-muted-foreground" aria-hidden /> Public channel
         </CardTitle>
         <CardDescription>
           Publish an auction card to the platform&apos;s configured public channel. Running it again edits the
@@ -213,7 +213,8 @@ function ChannelPosting({ canPost }: { canPost: boolean }) {
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
-                disabled={!selected || broadcast.isPending}
+                disabled={!selected}
+                loading={broadcast.isPending}
                 onClick={() =>
                   selected &&
                   broadcast.mutate(selected, {

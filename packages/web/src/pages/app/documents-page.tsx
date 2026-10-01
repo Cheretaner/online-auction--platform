@@ -5,7 +5,8 @@ export default function DocumentsPage() {
   return (
     <ResourcePage
       title="Documents"
-      description="Documents uploaded to your account and their API metadata."
+      description="Files you have uploaded, such as deposit instruments. Auction documents live on each auction's page."
+      emptyDescription="Files you upload while registering a deposit appear here."
       query={query}
     />
   );

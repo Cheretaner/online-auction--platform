@@ -7,7 +7,7 @@ import { CheckCircle2, Circle, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label, OptionalHint } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateDeposit, useUploadDocument } from "@/features/operations/queries";
@@ -27,17 +27,17 @@ function Step({ state, title, children }: { state: "done" | "waiting" | "todo" |
   const Icon = state === "done" ? CheckCircle2 : state === "waiting" ? Clock : state === "failed" ? XCircle : Circle;
   const tone =
     state === "done"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-success"
       : state === "failed"
         ? "text-destructive"
         : state === "waiting"
-          ? "text-amber-600 dark:text-amber-400"
+          ? "text-warning"
           : "text-muted-foreground";
   return (
     <li className="flex gap-3">
       <Icon className={`mt-0.5 size-5 shrink-0 ${tone}`} aria-hidden />
       <div className="min-w-0 flex-1 space-y-2">
-        <p className="font-medium">{title}</p>
+        <p className="leading-5 font-medium">{title}</p>
         {children}
       </div>
     </li>
@@ -67,7 +67,7 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
               : kycStatus === "rejected"
                 ? "Your verification was not accepted. Check the reason and submit again."
                 : "Verify your identity once to bid on any auction."}{" "}
-            <Link to="/app/kyc" className="text-primary underline">
+            <Link to="/app/kyc" className="font-medium text-primary underline-offset-4 hover:underline">
               {kycStatus === "pending" ? "View status" : "Verify identity"}
             </Link>
           </p>
@@ -120,7 +120,7 @@ function DepositForm({ auction }: { auction: Auction }) {
   return (
     <Form {...form}>
       <form
-        className="grid gap-3 rounded-md border p-3 sm:grid-cols-2"
+        className="grid gap-4 rounded-md border bg-background/60 p-4 @md:grid-cols-2"
         onSubmit={form.handleSubmit(async (values) => {
           setSubmitting(true);
           try {
@@ -206,19 +206,21 @@ function DepositForm({ auction }: { auction: Auction }) {
             </FormItem>
           )}
         />
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor={`deposit-proof-${auction.id}`}>Scan or photo of the instrument (recommended)</Label>
-          <input
+        <div className="space-y-1.5 @md:col-span-2">
+          <Label htmlFor={`deposit-proof-${auction.id}`}>
+            Scan or photo of the instrument
+            <OptionalHint />
+          </Label>
+          <Input
             id={`deposit-proof-${auction.id}`}
             type="file"
             accept="image/*,application/pdf"
             onChange={(event) => setProof(event.target.files?.[0] ?? null)}
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5"
           />
-          <p className="text-xs text-muted-foreground">Only you and the organization's officers can see this file.</p>
+          <FieldHint>Recommended. Only you and the organization's officers can see this file.</FieldHint>
         </div>
-        <div className="sm:col-span-2">
-          <Button type="submit" disabled={submitting}>
+        <div className="@md:col-span-2">
+          <Button type="submit" loading={submitting}>
             {submitting ? "Submitting…" : "Submit deposit"}
           </Button>
         </div>

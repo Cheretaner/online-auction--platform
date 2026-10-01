@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 /**
@@ -66,15 +66,17 @@ function ReasonDialogBody({
       >
         <div className="space-y-2">
           <Label htmlFor={id}>{label}</Label>
-          <Textarea id={id} value={reason} onChange={(event) => setReason(event.target.value)} rows={4} />
-          <p className="text-xs text-muted-foreground">At least {minLength} characters. This is recorded in the audit trail.</p>
+          <Textarea id={id} aria-describedby={`${id}-hint`} value={reason} onChange={(event) => setReason(event.target.value)} rows={4} autoFocus />
+          <FieldHint id={`${id}-hint`}>
+            {reason.trim().length}/{minLength} characters minimum. This is recorded in the audit trail.
+          </FieldHint>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
-          <Button type="submit" variant={destructive ? "destructive" : "default"} disabled={tooShort || pending}>
-            {pending ? "Working…" : confirmLabel}
+          <Button type="submit" variant={destructive ? "destructive" : "default"} disabled={tooShort} loading={pending}>
+            {confirmLabel}
           </Button>
         </DialogFooter>
       </form>

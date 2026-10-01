@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ScanSearch, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { ErrorState, PageSkeleton } from "@/components/feedback/query-state";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { AnomalyList } from "@/features/anomalies/anomaly-list";
 import { useAiAnomalies, useAiScan, useAiScanResult } from "@/features/ai/queries";
 import { useOrgAuctions } from "@/features/auctions/queries";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader, SectionHeader } from "@/components/layout/page-header";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { AiAnomalyScanResult } from "@/lib/api/types";
 
@@ -41,16 +41,15 @@ export default function AiPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="AI tools"
-        description="Model output is advisory and never moves money, changes a status or decides a flag on its own."
+        title="Anomaly review"
+        description="Rule-based risk flags for your organization's auctions, with optional AI explanations. Model output is advisory and never moves money, changes a status or decides a flag on its own."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Auction context</CardTitle>
+          <CardTitle>Run a risk scan</CardTitle>
           <CardDescription>
-            Both tools below work without a context; picking an auction lets the model read its title,
-            category, status and bids.
+            Choose an auction to score its bidding against the rules. The model only explains the result.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-3">
@@ -72,8 +71,8 @@ export default function AiPage() {
           </div>
           <Button
             type="button"
-            variant="outline"
-            disabled={!selectedId || scan.isPending}
+            disabled={!selectedId}
+            loading={scan.isPending}
             onClick={() =>
               selectedId &&
               scan.mutate(selectedId, {
@@ -83,7 +82,7 @@ export default function AiPage() {
               })
             }
           >
-            <ShieldCheck className="size-4" aria-hidden />
+            {scan.isPending ? null : <ShieldCheck aria-hidden />}
             {scan.isPending ? "Scanning…" : "Run risk scan"}
           </Button>
         </CardContent>
@@ -95,30 +94,37 @@ export default function AiPage() {
         <ScanResult result={scanResult} auctionTitle={selectedTitle ?? "this auction"} />
       ) : null}
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Anomaly review ({open.length} open)</h2>
-        <p className="text-sm text-muted-foreground">
-          Deterministic flags across your organization&apos;s auctions. A person decides every flag; an open
-          high-severity flag blocks the award.
-        </p>
+      <section className="space-y-4">
+        <SectionHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              Flags
+              {open.length ? <Badge variant="warning">{open.length} open</Badge> : null}
+            </span>
+          }
+          description="A person decides every flag. An open high-severity flag blocks the award."
+        />
         {anomalies.isLoading ? (
           <PageSkeleton />
         ) : anomalies.isError ? (
           <ErrorState error={anomalies.error} onRetry={() => void anomalies.refetch()} />
         ) : items.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-            No flags yet. They appear when bidding patterns trip the scoring rules.
-          </p>
+          <EmptyState
+            size="inline"
+            icon={ScanSearch}
+            title="No flags yet"
+            description="They appear when bidding patterns trip the scoring rules."
+          />
         ) : (
           <div className="space-y-3">
             {open.length === 0 ? (
-              <p className="text-sm text-muted-foreground">All flags have been reviewed.</p>
+              <EmptyState size="inline" icon={ShieldCheck} title="All flags have been reviewed" />
             ) : (
               <AnomalyList items={open} />
             )}
             {closed.length > 0 ? (
-              <div className="mt-6 space-y-3">
-                <h3 className="font-medium">Decided</h3>
+              <div className="mt-8 space-y-3">
+                <h3 className="eyebrow text-muted-foreground">Decided</h3>
                 <AnomalyList items={closed} />
               </div>
             ) : null}
@@ -135,7 +141,7 @@ function ScanResult({ result, auctionTitle }: { result: AiAnomalyScanResult; auc
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Risk scan — {auctionTitle}</CardTitle>
+        <CardTitle>Risk scan: {auctionTitle}</CardTitle>
         <CardDescription>
           The score and the flag come from the deterministic rules; the model only writes the narrative.
         </CardDescription>
@@ -153,12 +159,12 @@ function ScanResult({ result, auctionTitle }: { result: AiAnomalyScanResult; auc
           </Alert>
         )}
         {advisory ? (
-          <div className="space-y-2 rounded-lg border p-3">
+          <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={advisory.flagged ? "secondary" : "outline"}>
+              <Badge variant={advisory.flagged ? "warning" : "muted"}>
                 {advisory.flagged ? "Model suggests a closer look" : "Model sees nothing unusual"}
               </Badge>
-              <Badge variant="outline" className="font-mono text-xs">
+              <Badge variant="outline" className="font-mono">
                 {advisory.provider === "stub" ? "rule-based fallback" : advisory.provider}
               </Badge>
             </div>

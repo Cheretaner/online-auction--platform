@@ -1,8 +1,10 @@
 import { useId, useState } from "react";
 import { toast } from "sonner";
+import { ClipboardCheck } from "lucide-react";
+import { EmptyState, PageSkeleton } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Label, OptionalHint } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useComplianceChecks, useRunCompliance } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -25,7 +27,7 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
     <div className="space-y-4">
       {canRun ? (
         <form
-          className="space-y-2 rounded-md border p-3"
+          className="space-y-3 rounded-lg border bg-card p-4"
           onSubmit={(event) => {
             event.preventDefault();
             run.mutate(
@@ -40,18 +42,23 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
             );
           }}
         >
-          <Label htmlFor={id}>Notes for this check (optional)</Label>
+          <Label htmlFor={id}>
+            Notes for this check
+            <OptionalHint />
+          </Label>
           <Textarea id={id} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
-          <Button type="submit" disabled={run.isPending}>
+          <Button type="submit" loading={run.isPending}>
             {run.isPending ? "Running…" : "Run compliance check"}
           </Button>
         </form>
       ) : null}
-      {checks.isLoading ? <p className="text-sm text-muted-foreground">Loading checks…</p> : null}
-      {!checks.isLoading && items.length === 0 ? <p className="text-sm text-muted-foreground">No checks run yet.</p> : null}
+      {checks.isLoading ? <PageSkeleton rows={2} /> : null}
+      {!checks.isLoading && items.length === 0 ? (
+        <EmptyState size="inline" icon={ClipboardCheck} title="No compliance checks run yet" />
+      ) : null}
       <ul className="space-y-3">
         {items.map((check) => (
-          <li key={check.id} className="rounded-md border p-3 text-sm">
+          <li key={check.id} className="rounded-lg border bg-card p-4 text-sm">
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">{formatDateTime(check.createdAt)}</span>
               <StatusBadge status={check.status} />
@@ -63,7 +70,7 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
                 ))}
               </ul>
             ) : (
-              <p className="mt-2">No findings.</p>
+              <p className="mt-2 text-muted-foreground">No findings.</p>
             )}
             {check.notes ? <p className="mt-2 text-muted-foreground">{check.notes}</p> : null}
           </li>

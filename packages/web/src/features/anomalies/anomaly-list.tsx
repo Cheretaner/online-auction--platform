@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { StatusBadge } from "@/components/feedback/status-badge";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -32,10 +32,10 @@ const DECISION_COPY: Record<Decision, { title: string; confirm: string; descript
   },
 };
 
-const SEVERITY_TONE: Record<AnomalyFlagRecord["severity"], string> = {
-  high: "bg-destructive/10 text-destructive border-destructive/30",
-  medium: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  low: "bg-muted text-muted-foreground",
+const SEVERITY_TONE: Record<AnomalyFlagRecord["severity"], BadgeVariant> = {
+  high: "destructive",
+  medium: "warning",
+  low: "muted",
 };
 
 export function AnomalyList({ items, showAuctionLink = true }: { items: AnomalyFlagRecord[]; showAuctionLink?: boolean }) {
@@ -59,31 +59,31 @@ function AnomalyCard({ flag, showAuctionLink }: { flag: AnomalyFlagRecord; showA
       <CardContent className="space-y-3 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={`capitalize ${SEVERITY_TONE[flag.severity]}`}>
+            <Badge variant={SEVERITY_TONE[flag.severity]} className="capitalize">
               {flag.severity} · score {Number(flag.score).toFixed(0)}
             </Badge>
             {flag.triggeredRules.map((rule) => (
-              <Badge key={rule} variant="secondary" className="font-mono text-xs">
+              <Badge key={rule} variant="secondary" className="font-mono">
                 {rule}
               </Badge>
             ))}
           </div>
           <StatusBadge status={flag.status} />
         </div>
-        <p className="text-sm">{flag.explanation ?? "No explanation recorded."}</p>
+        <p className="text-sm leading-6">{flag.explanation ?? "No explanation recorded."}</p>
         <p className="text-xs text-muted-foreground">
           {flag.subjectAccounts.length} account(s) involved · flagged {formatDateTime(flag.createdAt)}
           {showAuctionLink ? (
             <>
               {" · "}
-              <Link className="text-primary underline" to={`/app/auctions/${flag.auctionId}`}>
-                auction
+              <Link className="font-medium text-primary underline-offset-4 hover:underline" to={`/app/auctions/${flag.auctionId}`}>
+                View auction
               </Link>
             </>
           ) : null}
         </p>
         {flag.decisionNote ? (
-          <p className="rounded-md bg-muted p-2 text-sm">
+          <p className="rounded-md bg-muted p-3 text-sm">
             <span className="font-medium">Decision:</span> {flag.decisionNote}
           </p>
         ) : null}
@@ -95,7 +95,7 @@ function AnomalyCard({ flag, showAuctionLink }: { flag: AnomalyFlagRecord; showA
             <Button size="sm" variant="outline" onClick={() => setDecision("reviewed")}>
               Mark reviewed
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setDecision("escalated")}>
+            <Button size="sm" variant="destructive-outline" onClick={() => setDecision("escalated")}>
               Escalate
             </Button>
           </div>

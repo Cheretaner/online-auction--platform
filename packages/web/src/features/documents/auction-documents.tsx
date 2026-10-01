@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { DOCUMENT_TYPES, type DocumentType } from "@auction/shared";
-import { Download, Lock } from "lucide-react";
+import { Download, FolderOpen, Lock } from "lucide-react";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuctionDocuments, useUploadDocument } from "@/features/operations/queries";
@@ -21,20 +23,20 @@ function formatSize(bytes: number) {
 export function DocumentRow({ doc }: { doc: DocumentRecord }) {
   const [busy, setBusy] = useState(false);
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 border-b py-2 last:border-0">
+    <li className="flex flex-wrap items-center justify-between gap-3 border-b py-3 first:pt-0 last:border-0 last:pb-0">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
           {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Private" /> : null}
           {doc.fileName}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground capitalize">
           {doc.documentType.replaceAll("_", " ")} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
         </p>
       </div>
       <Button
         size="sm"
         variant="outline"
-        disabled={busy}
+        loading={busy}
         onClick={() => {
           setBusy(true);
           downloadDocument(doc.id, doc.fileName)
@@ -42,7 +44,8 @@ export function DocumentRow({ doc }: { doc: DocumentRecord }) {
             .finally(() => setBusy(false));
         }}
       >
-        <Download className="size-4" aria-hidden /> {busy ? "Downloading…" : "Download"}
+        {busy ? null : <Download aria-hidden />}
+        {busy ? "Downloading…" : "Download"}
       </Button>
     </li>
   );
@@ -62,11 +65,11 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
   return (
     <div className="space-y-4">
       {docs.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading documents…</p>
+        <PageSkeleton rows={2} />
       ) : docs.isError ? (
-        <p className="text-sm text-destructive">{getErrorMessage(docs.error, "Documents could not be loaded")}</p>
+        <ErrorState error={docs.error} onRetry={() => void docs.refetch()} />
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No documents published yet.</p>
+        <EmptyState size="inline" icon={FolderOpen} title="No documents published yet" />
       ) : (
         <ul>
           {items.map((doc) => (
@@ -77,7 +80,7 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
 
       {canUpload ? (
         <form
-          className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_180px_auto] sm:items-end"
+          className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-[1fr_200px_auto] sm:items-end"
           onSubmit={(event) => {
             event.preventDefault();
             const file = fileRef.current?.files?.[0];
@@ -100,18 +103,13 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
           }}
         >
           <div className="space-y-1.5">
-            <Label htmlFor={`doc-file-${auctionId}`}>File (max 20 MB)</Label>
-            <input
-              id={`doc-file-${auctionId}`}
-              ref={fileRef}
-              type="file"
-              className="block w-full text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5"
-            />
+            <Label htmlFor={`doc-file-${auctionId}`}>File</Label>
+            <Input id={`doc-file-${auctionId}`} ref={fileRef} type="file" />
           </div>
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label htmlFor={`doc-type-${auctionId}`}>Type</Label>
             <Select value={docType} onValueChange={(value) => setDocType(value as DocumentType)}>
-              <SelectTrigger aria-label="Document type">
+              <SelectTrigger id={`doc-type-${auctionId}`} className="capitalize">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -123,13 +121,16 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={upload.isPending}>
+          <Button type="submit" loading={upload.isPending}>
             {upload.isPending ? "Uploading…" : "Upload"}
           </Button>
-          <label className="flex items-center gap-2 text-sm sm:col-span-3">
-            <Switch checked={publicDoc} onCheckedChange={setPublicDoc} />
-            Publish to bidders (turn off for internal documents)
-          </label>
+          <div className="flex items-start gap-3 sm:col-span-3">
+            <Switch id={`doc-public-${auctionId}`} checked={publicDoc} onCheckedChange={setPublicDoc} />
+            <div>
+              <Label htmlFor={`doc-public-${auctionId}`}>Publish to bidders</Label>
+              <FieldHint>Up to 20 MB. Turn off for internal documents only staff should see.</FieldHint>
+            </div>
+          </div>
         </form>
       ) : null}
     </div>

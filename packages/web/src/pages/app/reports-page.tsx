@@ -5,7 +5,8 @@ export default function ReportsPage() {
   return (
     <ResourcePage
       title="Reports"
-      description="Reports available to your role and organization context."
+      description="Auction reports generated for your organization. Generate new ones from an auction's Reports tab."
+      emptyDescription="Reports appear here once one is generated from an auction."
       query={query}
     />
   );

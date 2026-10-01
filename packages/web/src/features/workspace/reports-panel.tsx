@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { REPORT_TYPE } from "@auction/shared";
 import { toast } from "sonner";
+import { ExternalLink, FileText } from "lucide-react";
+import { EmptyState, PageSkeleton } from "@/components/feedback/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,7 +36,7 @@ export function ReportsPanel({ auctionId, canPublish }: { auctionId: string; can
           </SelectContent>
         </Select>
         <Button
-          disabled={generate.isPending}
+          loading={generate.isPending}
           onClick={() =>
             generate.mutate(
               { auctionId, type },
@@ -45,26 +47,34 @@ export function ReportsPanel({ auctionId, canPublish }: { auctionId: string; can
           {generate.isPending ? "Generating…" : "Generate report"}
         </Button>
       </div>
-      {reports.isLoading ? <p className="text-sm text-muted-foreground">Loading reports…</p> : null}
-      {!reports.isLoading && items.length === 0 ? <p className="text-sm text-muted-foreground">No reports yet.</p> : null}
+      {reports.isLoading ? <PageSkeleton rows={2} /> : null}
+      {!reports.isLoading && items.length === 0 ? (
+        <EmptyState size="inline" icon={FileText} title="No reports generated yet" />
+      ) : null}
       <ul className="space-y-2">
         {items.map((report) => (
-          <li key={report.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm">
+          <li key={report.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4 text-sm">
             <div className="space-y-1">
               <p className="font-medium capitalize">
                 {report.reportType.replaceAll("_", " ")} v{report.reportVersion}
               </p>
               <p className="text-xs text-muted-foreground">
-                Generated {formatDateTime(report.createdAt)} ·{" "}
-                {report.chainVerified ? "audit chain verified" : "audit chain NOT verified"}
+                Generated {formatDateTime(report.createdAt)}
               </p>
+              {report.chainVerified ? (
+                <Badge variant="success">Audit chain verified</Badge>
+              ) : (
+                <Badge variant="warning">Audit chain not verified</Badge>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {report.publishedAt ? (
                 <>
-                  <Badge variant="secondary">Published</Badge>
+                  <Badge variant="info">Published</Badge>
                   <Button asChild size="sm" variant="ghost">
-                    <Link to={`/reports/${report.id}`}>Public page</Link>
+                    <Link to={`/reports/${report.id}`}>
+                      <ExternalLink aria-hidden /> Public page
+                    </Link>
                   </Button>
                 </>
               ) : canPublish ? (

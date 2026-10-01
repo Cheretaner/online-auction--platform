@@ -1,27 +1,34 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { LoaderCircle } from "lucide-react";
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 min-h-10 px-4 py-2",
+  "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow] active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-busy:cursor-progress [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-muted",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-muted",
-        link: "text-primary underline-offset-4 hover:underline h-auto min-h-0 px-0",
+        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/70",
+        outline: "border border-input bg-card text-foreground shadow-xs hover:border-primary/40 hover:bg-muted",
+        ghost: "text-foreground hover:bg-muted",
+        destructive: "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90",
+        /** Secondary destructive action next to a primary one (reject, cancel, escalate). */
+        "destructive-outline":
+          "border border-destructive/40 bg-card text-destructive shadow-xs hover:border-destructive hover:bg-destructive/10",
+        success: "bg-success text-success-foreground shadow-xs hover:bg-success/90",
+        link: "h-auto px-0 text-primary underline-offset-4 hover:underline active:translate-y-0",
       },
       size: {
-        default: "h-10",
-        sm: "h-9 min-h-9 px-3",
-        lg: "h-11 min-h-11 px-6",
-        icon: "size-10 p-0",
+        default: "h-10 px-4",
+        sm: "h-9 px-3",
+        lg: "h-11 px-6 text-[15px]",
+        icon: "size-10",
+        "icon-sm": "size-9",
       },
     },
+    compoundVariants: [{ variant: "link", className: "h-auto px-0" }],
     defaultVariants: {
       variant: "default",
       size: "default",
@@ -34,11 +41,30 @@ export function Button({
   variant,
   size,
   asChild = false,
+  loading = false,
+  disabled,
+  children,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> &
-  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "button";
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+    /** Disables the button and shows a spinner before its label. */
+    loading?: boolean;
+  }) {
+  const classes = cn(buttonVariants({ variant, size, className }));
+  if (asChild) {
+    return (
+      <Slot className={classes} {...props}>
+        {children}
+      </Slot>
+    );
+  }
+  return (
+    <button className={classes} disabled={disabled || loading} aria-busy={loading || undefined} {...props}>
+      {loading ? <LoaderCircle className="animate-spin" aria-hidden /> : null}
+      {children}
+    </button>
+  );
 }
 
 export { buttonVariants };
