@@ -2,7 +2,18 @@ import { aiProviderAdapter, normalizeCategoryKey } from "../infrastructure/ai/pr
 import * as repo from "./ai.repository.js";
 import type { CategorizationResult } from "./ai.types.js";
 
-const FALLBACK = ["vehicles", "property", "machinery", "electronics", "general"] as const;
+const FALLBACK = [
+  "property",
+  "vehicles",
+  "commercial-trucks-logistics-fleet",
+  "heavy-construction-machinery",
+  "agricultural-equipment-tractors",
+  "industrial-machinery-plant-equipment",
+  "electronics",
+  "office-furniture-business-assets",
+  "scrap-metal-raw-materials",
+  "general",
+] as const;
 
 export function getItemAuctionId(itemId: string): Promise<string | null> {
   return repo.findItemAuctionId(itemId);

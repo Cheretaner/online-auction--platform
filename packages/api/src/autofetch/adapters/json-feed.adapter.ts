@@ -226,12 +226,7 @@ export class JsonFeedAdapter implements ISourceAdapter {
     };
   }
 
-  isStale(item: NormalizedItem): boolean {
-    // Mark as stale if critical fields missing
-    if (!item.description) return true;
-    if (!item.estimatedValue || item.estimatedValue <= 0) return true;
-    if (!item.region) return true;
-
+  isStale(_item: NormalizedItem): boolean {
     return false;
   }
 

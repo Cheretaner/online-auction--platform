@@ -29,6 +29,8 @@ function escapeHtml(text: string): string {
 export class TelegramBotService {
   private bot: Telegraf | null = null;
   private isPolling = false;
+  private inboundTransport: "disabled" | "starting" | "webhook" | "polling" | "error" = "disabled";
+  private inboundError: string | null = null;
 
   constructor() {
     if (env.TELEGRAM_BOT_TOKEN) {
@@ -43,6 +45,13 @@ export class TelegramBotService {
 
   getBotInstance(): Telegraf | null {
     return this.bot;
+  }
+
+  getInboundStatus() {
+    return {
+      transport: this.inboundTransport,
+      error: this.inboundError,
+    };
   }
 
   private setupMiddlewareAndCommands(): void {
@@ -663,26 +672,50 @@ export class TelegramBotService {
   // --- LIFECYCLE ---
 
   async start(): Promise<void> {
-    if (!this.bot) return;
+    if (!this.bot) {
+      this.inboundTransport = "disabled";
+      return;
+    }
 
     if (env.TELEGRAM_WEBHOOK_URL) {
       const webhookUrl = `${env.TELEGRAM_WEBHOOK_URL.replace(/\/$/, "")}/api/v1/telegram/webhook`;
-      await this.bot.telegram.setWebhook(webhookUrl, {
-        secret_token: env.TELEGRAM_WEBHOOK_SECRET,
-      });
-      logger.info({ webhookUrl }, "Telegram webhook registered");
+      this.inboundTransport = "starting";
+      try {
+        await this.bot.telegram.setWebhook(webhookUrl, {
+          secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+        });
+        this.inboundTransport = "webhook";
+        this.inboundError = null;
+        logger.info({ webhookUrl }, "Telegram webhook registered");
+      } catch (error) {
+        this.inboundTransport = "error";
+        this.inboundError = error instanceof Error ? error.message : "Webhook registration failed";
+        logger.error({ err: error, webhookUrl }, "Telegram webhook registration failed");
+      }
     } else if (env.TELEGRAM_POLLING || env.NODE_ENV === "development") {
-      // Long-polling for local dev or when polling flag enabled
-      // Remove any leftover webhook first
-      await this.bot.telegram.deleteWebhook().catch(() => undefined);
+      this.inboundTransport = "starting";
+      this.inboundError = null;
+      // Long-polling needs any previously registered webhook removed first.
+      try {
+        await this.bot.telegram.deleteWebhook();
+      } catch (error) {
+        this.inboundTransport = "error";
+        this.inboundError = error instanceof Error ? error.message : "Could not clear the Telegram webhook";
+        logger.error({ err: error }, "Could not clear Telegram webhook before polling");
+        return;
+      }
       void this.bot.launch(() => {
         this.isPolling = true;
+        this.inboundTransport = "polling";
         logger.info("Telegram bot polling started");
       }).catch((error) => {
         this.isPolling = false;
+        this.inboundTransport = "error";
+        this.inboundError = error instanceof Error ? error.message : "Telegram polling failed to start";
         logger.error({ err: error }, "Telegram bot polling failed to start");
       });
     } else {
+      this.inboundTransport = "disabled";
       logger.warn(
         "Telegram bot is configured but no inbound transport is enabled; set TELEGRAM_WEBHOOK_URL or TELEGRAM_POLLING=true",
       );
@@ -693,6 +726,7 @@ export class TelegramBotService {
     if (this.bot && this.isPolling) {
       this.bot.stop("SIGTERM");
       this.isPolling = false;
+      this.inboundTransport = "disabled";
       logger.info("Telegram bot polling stopped");
     }
   }

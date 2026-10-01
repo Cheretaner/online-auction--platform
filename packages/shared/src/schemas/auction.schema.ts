@@ -2,13 +2,20 @@ import { z } from "zod";
 import { AUCTION_STATUS, AUCTION_TYPES } from "../enums.js";
 import { Money } from "./money.js";
 
+// Form controls submit an empty string for an optional money field. Treat it
+// as omitted so client validation and API validation share the same behavior.
+const OptionalMoney = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  Money.optional(),
+);
+
 export const CreateAuctionRequest = z.object({
   organizationId: z.string().uuid(),
   title: z.string().min(3).max(200),
   description: z.string().max(5000).optional(),
   auctionType: z.enum(AUCTION_TYPES),
   startPrice: Money,
-  reservePrice: Money.optional(),
+  reservePrice: OptionalMoney,
   minIncrement: Money,
   depositAmount: Money.default("0.00"),
   eligibilityRules: z.string().max(2000).optional(),
@@ -35,7 +42,7 @@ export const UpdateAuctionRequest = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().max(5000).optional(),
   startPrice: Money.optional(),
-  reservePrice: Money.optional(),
+  reservePrice: OptionalMoney,
   minIncrement: Money.optional(),
   depositAmount: Money.optional(),
   eligibilityRules: z.string().max(2000).optional(),

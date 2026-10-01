@@ -67,7 +67,10 @@ export class AutoFetchService {
       adapter.configure?.({ ...source.adapterConfig, url: source.sourceUrl ?? source.adapterConfig.url });
 
       // Fetch from external source
-      const fetchedItems = await adapter.fetchItems('', {
+      const fetchQuery = typeof source.adapterConfig.query === 'string'
+        ? source.adapterConfig.query
+        : '';
+      const fetchedItems = await adapter.fetchItems(fetchQuery, {
         timeout: 30000,
         retryCount: 3,
       });

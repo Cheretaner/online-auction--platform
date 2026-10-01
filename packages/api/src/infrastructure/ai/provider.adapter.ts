@@ -77,6 +77,30 @@ export class StubAiProviderAdapter implements AiProviderAdapter {
   async categorize(text: string, options?: AiCategorizeOptions) {
     const lowered = text.toLowerCase();
     const allowed = options?.allowedCategories ?? [];
+    const pick = (...slugs: string[]) => allowed.find((slug) => slugs.includes(slug)) ?? slugs[0];
+
+    // Keep the deterministic fallback useful when a hosted AI provider is
+    // unavailable: match specific asset types before the broad categories.
+    const keywordCategory =
+      /real estate|property|building|warehouse|land|plot|premise/.test(lowered)
+        ? pick("property")
+        : /truck|lorry|bus|trailer|fleet|logistic|cargo|transport|tipper|tractor unit/.test(lowered)
+          ? pick("commercial-trucks-logistics-fleet", "vehicles")
+          : /excavator|bulldozer|grader|wheel loader|backhoe|crane|earthmov|construction machinery|caterpillar/.test(lowered)
+            ? pick("heavy-construction-machinery", "industrial-machinery-plant-equipment", "machinery")
+            : /farm|agricultur|harvest|plough|cultivat|irrigat|seed drill|tractor/.test(lowered)
+              ? pick("agricultural-equipment-tractors", "industrial-machinery-plant-equipment", "machinery")
+              : /generator|compressor|lathe|industrial|manufactur|plant equipment|production line/.test(lowered)
+                ? pick("industrial-machinery-plant-equipment", "machinery")
+                : /computer|laptop|server|network|telecom|electronic|printer|phone|it infrastructure/.test(lowered)
+                  ? pick("electronics")
+                  : /furniture|desk|chair|cabinet|office equipment|business asset/.test(lowered)
+                    ? pick("office-furniture-business-assets", "general")
+                    : /scrap|raw material|recycl|metal|steel|copper|aluminium|aluminum/.test(lowered)
+                      ? pick("scrap-metal-raw-materials", "general")
+                      : /vehicle|automobile|car|suv|van|sedan|pickup/.test(lowered)
+                        ? pick("vehicles")
+                        : null;
 
     // Prefer a keyword hit against the real taxonomy (matched on slug or name)
     // so the fallback agrees with the categories the database actually has.
@@ -89,13 +113,14 @@ export class StubAiProviderAdapter implements AiProviderAdapter {
     });
 
     const category =
+      keywordCategory ??
       byTaxonomy ??
       (lowered.includes("vehicle") || lowered.includes("car")
         ? "vehicles"
         : lowered.includes("property") || lowered.includes("land")
           ? "property"
           : lowered.includes("machine") || lowered.includes("equipment")
-            ? "machinery"
+            ? pick("industrial-machinery-plant-equipment", "machinery")
             : lowered.includes("electronic") || lowered.includes("laptop") || lowered.includes("phone")
               ? "electronics"
               : "general");

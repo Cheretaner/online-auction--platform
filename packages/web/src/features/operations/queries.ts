@@ -366,6 +366,26 @@ export function useAutofetchSources(enabled = true) {
   });
 }
 
+export function useCreateAutofetchSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; adapterType: string; sourceUrl?: string; adapterConfig?: Record<string, unknown> }) => autofetchApi.createSource(body),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
+  });
+}
+
+export function useFetchAutofetchSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sourceId: string) => autofetchApi.fetchSource(sourceId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
+    },
+  });
+}
+
 export function useAutofetchPending(enabled = true) {
   return useQuery({
     queryKey: queryKeys.autofetch.pending(),
@@ -379,6 +399,29 @@ export function useAutofetchStats(enabled = true) {
     queryKey: queryKeys.autofetch.stats,
     queryFn: () => autofetchApi.stats(),
     enabled,
+  });
+}
+
+export function useApproveAutofetchItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, auctionId }: { id: string; auctionId: string }) => autofetchApi.approve(id, auctionId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
+    },
+  });
+}
+
+export function useRejectAutofetchItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => autofetchApi.reject(id, reason),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
+    },
   });
 }
 
