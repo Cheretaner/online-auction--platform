@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useMyVerification, useSubmitVerification, useUploadDocument } from "@/features/operations/queries";
@@ -148,7 +149,7 @@ function SubmitForm() {
               name="documentNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document number</FormLabel>
+                  <FormLabel>Document number(12 digit FIN no if fayda) </FormLabel>
                   <FormControl>
                     <Input autoComplete="off" {...field} />
                   </FormControl>
@@ -157,7 +158,7 @@ function SubmitForm() {
               )}
             />
             <div className="space-y-1.5 sm:col-span-2">
-              <FormLabel htmlFor="kyc-evidence">Document image or scan</FormLabel>
+              <Label htmlFor="kyc-evidence">Document image or scan</Label>
               <Input
                 id="kyc-evidence"
                 type="file"

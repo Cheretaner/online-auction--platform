@@ -25,7 +25,7 @@ import { AuctionCard } from "@/features/auctions/auction-card";
 import { usePublicAuctions } from "@/features/auctions/queries";
 import { useCategories, useOrganizations } from "@/features/operations/queries";
 import { APP_NAME } from "@/config/env";
-import auctionYard from "@/assets/images/caterpillar-excavators-yard.jpg";
+import heroVedio from "@/assets/cheretanet-hero-vedio.mp4"
 
 const participationSteps = [
   {
@@ -74,23 +74,23 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-16 pb-12 sm:space-y-20 lg:space-y-24">
-      <section className="relative isolate overflow-hidden rounded-[2rem] bg-[#102f27] text-white shadow-2xl shadow-[#102f27]/15">
-        <img
-          src={auctionYard}
-          alt="Heavy equipment prepared for public asset sale"
-          className="absolute inset-0 -z-20 size-full object-cover object-center"
-        />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b2a22]/95 via-[#0b2a22]/85 to-[#0b2a22]/30 lg:to-[#0b2a22]/10" />
+    <div className="min-w-0 space-y-12 pb-8 sm:space-y-20 sm:pb-12 lg:space-y-24">
+      <section className="relative isolate w-full min-w-0 overflow-hidden rounded-2xl bg-[#102f27] text-white shadow-2xl shadow-[#102f27]/15 sm:rounded-[2rem]">
+        <video src={heroVedio} loop autoPlay muted
+          playsInline className="absolute inset-0 -z-20 size-full object-cover object-center"
+        >
+          Your browser does not support the video tag.
+        </video>
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b2a22]/90 via-[#0b2a22]/80 to-[#0b2a22]/55 lg:to-[#0b2a22]/10" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0b2a22]/70 via-transparent to-[#0b2a22]/10" />
 
-        <div className="grid min-h-[520px] items-end gap-10 px-6 py-9 sm:px-10 sm:py-12 lg:grid-cols-[1.1fr_0.65fr] lg:items-center lg:px-14 lg:py-16">
-          <div className="max-w-2xl">
+        <div className="grid w-full min-w-0 min-h-[min(680px,calc(100svh-6rem))] items-end gap-7 px-4 py-7 sm:min-h-[520px] sm:gap-10 sm:px-10 sm:py-12 lg:grid-cols-[1.1fr_0.65fr] lg:items-center lg:px-14 lg:py-16">
+          <div className="min-w-0 max-w-2xl">
             <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#e5ce8a]">
               <span className="size-2 rounded-full bg-[#e5ce8a]" aria-hidden="true" />
               Public asset auctions · Ethiopia
             </p>
-            <h1 className="mt-5 max-w-2xl font-heading text-4xl leading-[1.06] tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="mt-4 max-w-2xl font-heading text-[2.35rem] leading-[1.04] tracking-tight text-white sm:mt-5 sm:text-5xl lg:text-6xl">
               Every opportunity deserves a process people can follow.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-white/80 sm:text-lg sm:leading-8">
@@ -98,7 +98,7 @@ export default function HomePage() {
               see what is offered, understand what is required, and know what happens next.
             </p>
 
-            <form onSubmit={submitSearch} className="mt-8 flex max-w-xl flex-col gap-2 rounded-2xl bg-white p-2 shadow-xl sm:flex-row">
+            <form onSubmit={submitSearch} className="mt-6 flex w-full max-w-xl flex-col gap-1.5 rounded-2xl bg-white p-2 shadow-xl sm:mt-8 sm:flex-row sm:gap-2">
               <label htmlFor="home-auction-search" className="sr-only">Search public auctions</label>
               <div className="flex min-w-0 flex-1 items-center gap-3 px-3">
                 <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -111,7 +111,7 @@ export default function HomePage() {
                   className="h-11 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
-              <Button type="submit" size="lg" className="shrink-0 bg-[#174b3b] text-white hover:bg-[#103c30]">
+              <Button type="submit" size="lg" className="w-full shrink-0 bg-[#174b3b] text-white hover:bg-[#103c30] sm:w-auto">
                 Search auctions <ArrowRight aria-hidden="true" />
               </Button>
             </form>
@@ -126,24 +126,24 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="hidden justify-self-end lg:block">
-            <div className="w-64 rounded-2xl border border-white/20 bg-[#102f27]/75 p-5 text-white shadow-xl backdrop-blur-md">
+          <div className="w-full justify-self-end lg:w-auto">
+            <div className="rounded-2xl border border-white/20 bg-[#102f27]/75 p-4 text-white shadow-xl backdrop-blur-md backdrop-saturate-150 sm:p-5 lg:w-64">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#e5ce8a]">One connected process</p>
-              <div className="mt-5 space-y-4">
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-5 sm:space-y-4 lg:block">
                 {[
                   ["01", "Notice published"],
                   ["02", "Bidders participate"],
                   ["03", "Outcome recorded"],
                 ].map(([number, label], index) => (
-                  <div key={number} className="flex items-center gap-3">
-                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${index === 2 ? "bg-[#d5ba70] text-[#18372e]" : "border border-white/25 text-white"}`}>
+                  <div key={number} className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3 lg:mb-4">
+                    <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold sm:size-8 sm:text-xs ${index === 2 ? "bg-[#d5ba70] text-[#18372e]" : "border border-white/25 text-white"}`}>
                       {index === 2 ? <Check className="size-4" aria-hidden="true" /> : number}
                     </span>
-                    <span className="text-sm text-white/90">{label}</span>
+                    <span className="text-[11px] leading-4 text-white/90 sm:text-sm">{label}</span>
                   </div>
                 ))}
               </div>
-              <p className="mt-5 border-t border-white/15 pt-4 text-xs leading-5 text-white/65">
+              <p className="mt-3 hidden border-t border-white/15 pt-4 text-xs leading-5 text-white/65 sm:block sm:mt-5">
                 Clear information for bidders. A traceable workspace for institutions.
               </p>
             </div>

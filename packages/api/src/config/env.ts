@@ -46,7 +46,7 @@ const envSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
     SUBMISSION_RATE_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
-    SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+    SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(15),
     // Number of reverse proxies in front of the API. Needed so
     // express-rate-limit and audit IP hashing see the real client address.
     // Leave at 0 when the process is exposed directly.

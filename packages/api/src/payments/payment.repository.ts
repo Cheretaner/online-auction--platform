@@ -49,8 +49,8 @@ export async function create(input: {
   amount: string;
 }, client?: Queryable): Promise<ProviderTransaction> {
   const result = await query<DbProviderTransaction>(
-    `INSERT INTO provider_transactions (deposit_id, settlement_id, tx_ref, amount, status)
-     VALUES ($1, $2, $3, $4, 'initializing') RETURNING *`,
+    `INSERT INTO provider_transactions (provider, deposit_id, settlement_id, tx_ref, amount, status)
+     VALUES ('chapa', $1, $2, $3, $4, 'initializing') RETURNING *`,
     [input.depositId ?? null, input.settlementId ?? null, input.txRef, input.amount],
     client,
   );
