@@ -7,6 +7,8 @@ import * as audit from "../audit/audit.service.js";
 import { findAuctionOwner } from "../shared/authz/auction-access.js";
 import * as repo from "./document.repository.js";
 import type { DocumentRecord } from "./document.types.js";
+import { logger } from "../shared/utils/logger.js";
+import { processDocumentOcr } from "./ocr.service.js";
 
 const OFFICER_ROLES = ["auction_officer", "org_admin", "compliance_officer", "super_admin"];
 
@@ -39,7 +41,7 @@ export async function uploadDocument(input: {
   await storageAdapter.put(storagePath, input.data, input.mimeType);
 
   try {
-    return await withTransaction(
+    const savedDoc = await withTransaction(
       async () => {
         const document = await repo.createDocument({
           auctionId: input.auctionId,
@@ -74,6 +76,18 @@ export async function uploadDocument(input: {
       },
       { userId: input.uploadedBy },
     );
+
+    // Fire-and-forget OCR processing (non-blocking)
+    void processDocumentOcr(savedDoc.id, input.data, input.mimeType)
+      .then(result => {
+        return repo.updateDocumentOcrResult(savedDoc.id, result.text, result.status);
+      })
+      .catch(err => {
+        logger.error({ event: 'document:ocr_failed', documentId: savedDoc.id, err });
+        return repo.updateDocumentOcrResult(savedDoc.id, '', 'failed').catch(() => {});
+      });
+
+    return savedDoc;
   } catch (error) {
     // Do not leave an orphaned blob behind if the row could not be written.
     await storageAdapter.delete(storagePath).catch(() => undefined);
