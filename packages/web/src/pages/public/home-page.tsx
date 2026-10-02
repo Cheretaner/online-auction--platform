@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -52,6 +52,13 @@ const participationSteps = [
   },
 ];
 
+/** Shared hover treatment for the home page's cards: small lift, green edge, deeper shadow. */
+const cardHover =
+  "transition-[transform,border-color,box-shadow,background-color] duration-300 ease-out hover:border-primary/35 hover:shadow-lg motion-safe:hover:-translate-y-0.5";
+/** Icon tiles fill with the brand colour when their card is hovered. */
+const iconTileHover =
+  "transition-colors duration-300 group-hover:bg-primary group-hover:text-primary-foreground";
+
 function formatCount(value: number | undefined, isLoading: boolean): string {
   return isLoading ? "—" : new Intl.NumberFormat("en-US").format(value ?? 0);
 }
@@ -89,7 +96,10 @@ export default function HomePage() {
         <div className="grid min-h-[520px] items-end gap-10 px-6 py-9 sm:px-10 sm:py-12 lg:grid-cols-[1.1fr_0.65fr] lg:items-center lg:px-14 lg:py-16">
           <div className="max-w-2xl">
             <p className="eyebrow inline-flex items-center gap-2 text-highlight">
-              <span className="size-1.5 rounded-full bg-highlight" aria-hidden="true" />
+              <span className="relative flex size-2" aria-hidden="true">
+                <span className="absolute inset-0 animate-ping rounded-full bg-highlight/60" />
+                <span className="relative size-2 animate-pulse rounded-full bg-highlight" />
+              </span>
               Public asset auctions · Ethiopia
             </p>
             <h1 className="mt-5 max-w-2xl text-4xl leading-[1.06] font-semibold text-inverse-foreground sm:text-5xl lg:text-6xl">
@@ -129,26 +139,7 @@ export default function HomePage() {
           </div>
 
           <div className="hidden justify-self-end lg:block">
-            <div className="w-64 rounded-lg border border-inverse-foreground/15 bg-inverse/80 p-5 shadow-xl backdrop-blur-md">
-              <p className="eyebrow text-highlight">One connected process</p>
-              <div className="mt-5 space-y-4">
-                {[
-                  ["01", "Notice published"],
-                  ["02", "Bidders participate"],
-                  ["03", "Outcome recorded"],
-                ].map(([number, label], index) => (
-                  <div key={number} className="flex items-center gap-3">
-                    <span className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${index === 2 ? "bg-highlight text-inverse" : "border border-inverse-foreground/25"}`}>
-                      {index === 2 ? <Check className="size-4" aria-hidden="true" /> : number}
-                    </span>
-                    <span className="text-sm text-inverse-foreground/90">{label}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-5 border-t border-inverse-foreground/15 pt-4 text-xs leading-5 text-inverse-foreground/65">
-                Clear information for bidders. A traceable workspace for institutions.
-              </p>
-            </div>
+            <ProcessCard />
           </div>
         </div>
       </section>
@@ -263,15 +254,7 @@ export default function HomePage() {
             <Link to="/auctions#how-to-participate">Read the bidder guide <ArrowRight aria-hidden="true" /></Link>
           </Button>
         </div>
-        <ol className="grid gap-0 sm:grid-cols-2">
-          {participationSteps.map((step, index) => (
-            <li key={step.number} className={`border-inverse-foreground/15 py-5 ${index < 2 ? "border-b" : ""} ${index % 2 === 0 ? "sm:pr-6" : "sm:border-l sm:pl-6"}`}>
-              <p className="eyebrow text-highlight">Step {step.number}</p>
-              <h3 className="mt-2 text-lg font-semibold text-inverse-foreground">{step.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-inverse-foreground/70">{step.text}</p>
-            </li>
-          ))}
-        </ol>
+        <ParticipationSteps />
       </section>
 
       <section aria-labelledby="auction-formats-title" className="space-y-5">
@@ -313,9 +296,9 @@ export default function HomePage() {
               <Link
                 key={organization.id}
                 to={`/auctions?orgId=${encodeURIComponent(organization.id)}`}
-                className="group flex items-center gap-3 rounded-lg border bg-card p-4 shadow-xs transition-[border-color,box-shadow] hover:border-primary/35 hover:shadow-md"
+                className={`group flex items-center gap-3 rounded-lg border bg-card p-4 shadow-xs ${cardHover}`}
               >
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
+                <span className={`flex size-11 shrink-0 items-center justify-center rounded-md bg-muted text-primary ${iconTileHover}`}>
                   {organization.logoUrl ? (
                     <img src={organization.logoUrl} alt="" className="size-8 object-contain" />
                   ) : (
@@ -328,7 +311,7 @@ export default function HomePage() {
                     <MapPin className="size-3" aria-hidden="true" /> {organization.region || "Ethiopia"}
                   </span>
                 </span>
-                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" />
+                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-[color,transform] duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary" aria-hidden="true" />
               </Link>
             ))}
           </div>
@@ -366,7 +349,7 @@ export default function HomePage() {
             Open participation guide <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </div>
-        <div className="divide-y rounded-lg border bg-card px-5 shadow-xs">
+        <div className="divide-y overflow-hidden rounded-lg border bg-card px-5 shadow-xs">
           <Faq title="Do all auctions require bid security?">
             Requirements vary by auction. Check the notice for the amount, accepted security types, and submission instructions.
           </Faq>
@@ -393,6 +376,172 @@ export default function HomePage() {
   );
 }
 
+const PROCESS_STEPS = ["Notice published", "Bidders participate", "Outcome recorded"];
+const STEP_INTERVAL_MS = 1200;
+
+/**
+ * "One connected process" card. On hover the highlight walks 01 → 02 → 03
+ * and loops; hovering a step selects it and pauses the walk there.
+ * At rest it shows the finished state (03 checked).
+ */
+function ProcessCard() {
+  // null = resting state; otherwise the highlighted step.
+  const [active, setActive] = useState<number | null>(null);
+  const [paused, setPaused] = useState(false);
+  const reduceMotion = useRef(
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+
+  useEffect(() => {
+    if (active === null || paused || reduceMotion.current) return;
+    const timer = setTimeout(() => setActive((step) => (step === null ? null : (step + 1) % PROCESS_STEPS.length)), STEP_INTERVAL_MS);
+    return () => clearTimeout(timer);
+  }, [active, paused]);
+
+  return (
+    <div
+      className="w-64 rounded-lg border border-inverse-foreground/15 bg-inverse/80 p-5 shadow-xl backdrop-blur-md transition-[border-color,box-shadow] duration-300 hover:border-highlight/40 hover:shadow-2xl"
+      onMouseEnter={() => {
+        setPaused(false);
+        setActive(0);
+      }}
+      onMouseLeave={() => {
+        setPaused(false);
+        setActive(null);
+      }}
+    >
+      <p className="eyebrow text-highlight">One connected process</p>
+      <ol className="relative mt-5 space-y-4">
+        {/* Connector behind the circles; fills up to the highlighted step. */}
+        <span className="absolute top-4 bottom-4 left-4 w-px -translate-x-1/2 bg-inverse-foreground/15" aria-hidden="true" />
+        <span
+          className="absolute top-4 left-4 w-px -translate-x-1/2 bg-highlight transition-[height] duration-500 ease-out"
+          // Circles are 2rem tall with a 1rem gap, so step centres sit 3rem apart.
+          style={{ height: `${(active ?? 0) * 3}rem` }}
+          aria-hidden="true"
+        />
+        {PROCESS_STEPS.map((label, index) => {
+          const resting = active === null;
+          const isActive = resting ? index === PROCESS_STEPS.length - 1 : index === active;
+          const isDone = !resting && active !== null && index < active;
+          const isLast = index === PROCESS_STEPS.length - 1;
+          return (
+            <li
+              key={label}
+              className="relative flex cursor-default items-center gap-3"
+              onMouseEnter={() => {
+                setActive(index);
+                setPaused(true);
+              }}
+              onMouseLeave={() => setPaused(false)}
+            >
+              <span
+                className={`relative flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ease-out ${
+                  isActive
+                    ? "scale-110 bg-highlight text-inverse shadow-[0_0_0_4px_color-mix(in_oklch,var(--highlight)_25%,transparent)]"
+                    : isDone
+                      ? "border border-highlight bg-inverse text-highlight"
+                      : "border border-inverse-foreground/25 bg-inverse text-inverse-foreground"
+                }`}
+              >
+                {isActive && !resting ? (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-highlight/40" aria-hidden="true" />
+                ) : null}
+                <span className="relative">
+                  {isLast && isActive ? <Check className="size-4" aria-hidden="true" /> : `0${index + 1}`}
+                </span>
+              </span>
+              <span
+                className={`text-sm transition-colors duration-300 ${
+                  isActive ? "font-medium text-inverse-foreground" : "text-inverse-foreground/75"
+                }`}
+              >
+                {label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-5 border-t border-inverse-foreground/15 pt-4 text-xs leading-5 text-inverse-foreground/65">
+        Clear information for bidders. A traceable workspace for institutions.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Four participation steps on the dark band. Clicking a step selects it: the
+ * cell lights up and gold lines draw along the dividers that frame it.
+ */
+function ParticipationSteps() {
+  const [selected, setSelected] = useState(0);
+  return (
+    <ol className="grid sm:grid-cols-2">
+      {participationSteps.map((step, index) => {
+        const isSelected = index === selected;
+        const rightColumn = index % 2 === 1;
+        return (
+          <li
+            key={step.number}
+            className={`relative border-inverse-foreground/15 ${index > 0 ? "border-t" : ""} ${index === 1 ? "sm:border-t-0" : ""} ${rightColumn ? "sm:border-l" : ""}`}
+          >
+            {/* Horizontal divider highlight: draws left to right. */}
+            <span
+              className={`absolute inset-x-0 -top-px h-0.5 origin-left bg-highlight transition-transform duration-500 ease-out ${
+                isSelected ? "scale-x-100" : "scale-x-0"
+              }`}
+              aria-hidden="true"
+            />
+            {/* Vertical divider highlight on the right-hand column: draws top to bottom. */}
+            {rightColumn ? (
+              <span
+                className={`absolute inset-y-0 -left-px hidden w-0.5 origin-top bg-highlight transition-transform delay-150 duration-500 ease-out sm:block ${
+                  isSelected ? "scale-y-100" : "scale-y-0"
+                }`}
+                aria-hidden="true"
+              />
+            ) : null}
+            <button
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => setSelected(index)}
+              className={`block h-full w-full cursor-pointer px-1 py-5 text-left transition-colors duration-300 focus-visible:ring-highlight focus-visible:ring-offset-0 sm:px-6 ${
+                isSelected ? "bg-inverse-foreground/[0.06]" : "hover:bg-inverse-foreground/[0.03]"
+              }`}
+            >
+              <p
+                className={`eyebrow inline-flex items-center gap-2 transition-colors duration-300 ${
+                  isSelected ? "text-highlight-strong" : "text-highlight/70"
+                }`}
+              >
+                <span
+                  className={`size-1.5 rounded-full bg-highlight transition-transform duration-300 ${isSelected ? "scale-100" : "scale-0"}`}
+                  aria-hidden="true"
+                />
+                Step {step.number}
+              </p>
+              <h3
+                className={`mt-2 text-lg font-semibold transition-colors duration-300 ${
+                  isSelected ? "text-inverse-foreground" : "text-inverse-foreground/85"
+                }`}
+              >
+                {step.title}
+              </h3>
+              <p
+                className={`mt-2 text-sm leading-6 transition-colors duration-300 ${
+                  isSelected ? "text-inverse-foreground/85" : "text-inverse-foreground/60"
+                }`}
+              >
+                {step.text}
+              </p>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function MetricLink({ to, label, value, note, loading }: { to: string; label: string; value: string; note: string; loading: boolean }) {
   return (
     <Link to={to} className="group flex items-center justify-between gap-4 px-5 py-5 transition-colors hover:bg-muted/50 focus-visible:ring-inset focus-visible:ring-offset-0 sm:px-7">
@@ -415,10 +564,15 @@ function TextLink({ to, label }: { to: string; label: string }) {
 
 function FormatCard({ icon: Icon, title, eyebrow, description, points }: { icon: typeof Gavel; title: string; eyebrow: string; description: string; points: string[] }) {
   return (
-    <Card className="p-6 sm:p-7">
+    <Card className={`group relative overflow-hidden p-6 sm:p-7 ${cardHover}`}>
+      {/* Accent bar that draws across the top on hover. */}
+      <span
+        className="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-primary transition-transform duration-500 ease-out group-hover:scale-x-100"
+        aria-hidden="true"
+      />
       <div className="flex items-start gap-4">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="size-5" aria-hidden="true" />
+        <span className={`flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary ${iconTileHover}`}>
+          <Icon className="size-5 transition-transform duration-300 group-hover:scale-110" aria-hidden="true" />
         </span>
         <div>
           <p className="eyebrow text-primary">{eyebrow}</p>
@@ -428,7 +582,7 @@ function FormatCard({ icon: Icon, title, eyebrow, description, points }: { icon:
       <p className="mt-4 text-sm leading-6 text-muted-foreground">{description}</p>
       <ul className="mt-4 space-y-2">
         {points.map((point) => (
-          <li key={point} className="flex items-start gap-2 text-sm text-foreground/80">
+          <li key={point} className="flex items-start gap-2 text-sm text-foreground/80 transition-colors duration-300 group-hover:text-foreground">
             <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /> {point}
           </li>
         ))}
@@ -439,8 +593,10 @@ function FormatCard({ icon: Icon, title, eyebrow, description, points }: { icon:
 
 function ValueCard({ icon: Icon, title, text }: { icon: typeof FileSearch; title: string; text: string }) {
   return (
-    <div className="rounded-lg bg-muted/70 p-4 sm:p-5">
-      <Icon className="size-5 text-primary" aria-hidden="true" />
+    <div className={`group rounded-lg border border-transparent bg-muted/70 p-4 sm:p-5 hover:bg-card ${cardHover}`}>
+      <span className={`flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary ${iconTileHover}`}>
+        <Icon className="size-[18px]" aria-hidden="true" />
+      </span>
       <h3 className="mt-3 font-semibold">{title}</h3>
       <p className="mt-1 text-sm leading-5 text-muted-foreground">{text}</p>
     </div>
@@ -449,12 +605,22 @@ function ValueCard({ icon: Icon, title, text }: { icon: typeof FileSearch; title
 
 function Faq({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <details className="group py-4">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-sm font-medium marker:content-none [&::-webkit-details-marker]:hidden">
+    <details className="group relative -mx-5 px-5 transition-colors duration-300 open:bg-primary/[0.04] hover:bg-muted/50">
+      {/* Accent bar on the open question. */}
+      <span
+        className="absolute inset-y-3 left-0 w-0.5 origin-top scale-y-0 rounded-full bg-primary transition-transform duration-300 group-open:scale-y-100"
+        aria-hidden="true"
+      />
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 rounded-sm py-4 font-medium transition-colors duration-200 marker:content-none group-hover:text-primary group-open:text-primary focus-visible:ring-offset-0 [&::-webkit-details-marker]:hidden">
         {title}
-        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full border text-muted-foreground transition-[background-color,border-color,color] duration-300 group-hover:border-primary/40 group-hover:text-primary group-open:border-primary group-open:bg-primary group-open:text-primary-foreground">
+          <ChevronDown className="size-4 transition-transform duration-300 group-open:rotate-180" aria-hidden="true" />
+        </span>
       </summary>
-      <p className="mt-3 pr-8 text-sm leading-6 text-muted-foreground">{children}</p>
+      {/* Replays each time the answer is revealed. */}
+      <p className="animate-in fade-in-0 slide-in-from-top-1 pr-12 pb-5 text-sm leading-6 text-muted-foreground duration-300">
+        {children}
+      </p>
     </details>
   );
 }

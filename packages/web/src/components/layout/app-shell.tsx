@@ -1,9 +1,8 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { ArrowUpRight, Bell, Menu } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { OfflineBanner } from "@/components/feedback/query-state";
 import { BrandLogo } from "@/components/layout/brand-logo";
@@ -67,9 +66,21 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/**
+ * The sidebar's own scroll region. `overscroll-contain` keeps the wheel/touch
+ * scroll inside the sidebar instead of handing it to the page at either end.
+ */
+function SidebarScroll({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-color:var(--sidebar-accent)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin]">
+      {children}
+    </div>
+  );
+}
+
 function SidebarFooter() {
   return (
-    <div className="border-t border-sidebar-border p-3">
+    <div className="shrink-0 border-t border-sidebar-border p-3">
       <Link
         to="/auctions"
         className="flex min-h-10 items-center justify-between rounded-md px-3 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-highlight focus-visible:ring-offset-sidebar"
@@ -116,12 +127,12 @@ export function AppShell() {
   return (
     <div className="flex min-h-svh bg-background">
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
-        <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+        <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
           <BrandLogo tone="inverse" to="/app" className="focus-visible:ring-highlight focus-visible:ring-offset-sidebar" />
         </div>
-        <ScrollArea className="min-h-0 flex-1">
+        <SidebarScroll>
           <SidebarNav />
-        </ScrollArea>
+        </SidebarScroll>
         <SidebarFooter />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
@@ -143,14 +154,14 @@ export function AppShell() {
               side="left"
               className="w-72 gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
             >
-              <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+              <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
                 <SheetTitle className="sr-only">Workspace navigation</SheetTitle>
                 <SheetDescription className="sr-only">Pages available to your account</SheetDescription>
                 <BrandLogo tone="inverse" to="/app" />
               </div>
-              <ScrollArea className="min-h-0 flex-1">
+              <SidebarScroll>
                 <SidebarNav onNavigate={() => setOpen(false)} />
-              </ScrollArea>
+              </SidebarScroll>
               <SidebarFooter />
             </SheetContent>
           </Sheet>
