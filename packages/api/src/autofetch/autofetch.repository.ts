@@ -201,7 +201,7 @@ export class AutoFetchRepository {
           raw_metadata, normalized_metadata, ai_confidence, estimated_value, category_suggestion
         )
         VALUES ${placeholders}
-        ON CONFLICT (source_id, external_id) DO NOTHING
+        ON CONFLICT (source_id, external_id) WHERE status IN ('pending', 'approved') DO NOTHING
         RETURNING *
       `;
 

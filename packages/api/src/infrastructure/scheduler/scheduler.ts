@@ -159,6 +159,55 @@ export function startInfrastructureJobs(): void {
       await processNotificationQueue();
     },
   });
+
+  // Analytics refresh: Update materialized view with latest auction statistics
+  // Daily job to keep analytics fast and accurate
+  scheduleJob({
+    name: "analytics-refresh",
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const analyticsService = await import("../../analytics/analytics.service.js");
+      await analyticsService.refreshAnalytics();
+    },
+  });
+
+  // Bidder metrics update: Calculate participation stats for all bidders monthly
+  scheduleJob({
+    name: "bidder-metrics-update",
+    intervalMs: 24 * 60 * 60 * 1000, // Daily check (but only updates if new month)
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const analyticsService = await import("../../analytics/analytics.service.js");
+      await analyticsService.updateBidderMetrics();
+    },
+  });
+
+  // Saved search alerts: Check for new auctions matching saved searches
+  scheduleJob({
+    name: "saved-search-alerts",
+    intervalMs: 15 * 60 * 1000, // Every 15 minutes
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const watchlistService = await import("../../watchlist/watchlist.service.js");
+      await watchlistService.processSavedSearchAlerts();
+    },
+  });
+
+  // Watchlist closing alerts: Notify users of auctions closing soon
+  scheduleJob({
+    name: "watchlist-closing-alerts",
+    intervalMs: 60 * 60 * 1000, // Every hour
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const watchlistService = await import("../../watchlist/watchlist.service.js");
+      await watchlistService.processWatchlistClosingAlerts();
+    },
+  });
 }
 
 export function stopAllJobs(): void {

@@ -380,7 +380,7 @@ export function useFetchAutofetchSource() {
     mutationFn: (sourceId: string) => autofetchApi.fetchSource(sourceId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
     },
   });
@@ -388,8 +388,8 @@ export function useFetchAutofetchSource() {
 
 export function useAutofetchPending(enabled = true) {
   return useQuery({
-    queryKey: queryKeys.autofetch.pending(),
-    queryFn: () => autofetchApi.pending(),
+    queryKey: queryKeys.autofetch.pending({ status: "pending" }),
+    queryFn: () => autofetchApi.pending({ status: "pending" }),
     enabled,
   });
 }
@@ -407,7 +407,7 @@ export function useApproveAutofetchItem() {
   return useMutation({
     mutationFn: ({ id, auctionId }: { id: string; auctionId: string }) => autofetchApi.approve(id, auctionId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
       void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
     },
@@ -419,7 +419,7 @@ export function useRejectAutofetchItem() {
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => autofetchApi.reject(id, reason),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
     },
   });

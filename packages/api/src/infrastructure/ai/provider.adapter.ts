@@ -42,16 +42,21 @@ export function parseJsonLoose<T>(raw: string): T {
 
   attempts.push(text);
 
-  // Last resort: the widest balanced-looking object in the reply, which
-  // handles "Sure! Here you go: {...} Hope that helps."
-  const first = text.indexOf("{");
-  const last = text.lastIndexOf("}");
-  if (first !== -1 && last > first) attempts.push(text.slice(first, last + 1));
+  // Last resort for objects
+  const firstObj = text.indexOf("{");
+  const lastObj = text.lastIndexOf("}");
+  if (firstObj !== -1 && lastObj > firstObj) attempts.push(text.slice(firstObj, lastObj + 1));
+
+  // Last resort for arrays
+  const firstArr = text.indexOf("[");
+  const lastArr = text.lastIndexOf("]");
+  if (firstArr !== -1 && lastArr > firstArr) attempts.push(text.slice(firstArr, lastArr + 1));
 
   for (const candidate of attempts) {
     try {
       const value = JSON.parse(candidate) as unknown;
-      if (value && typeof value === "object" && !Array.isArray(value)) return value as T;
+      // Allow both objects and arrays
+      if (value && typeof value === "object") return value as T;
     } catch {
       // Try the next candidate.
     }

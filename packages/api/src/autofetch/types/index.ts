@@ -190,13 +190,16 @@ export interface SourceMetadata {
 // Error Types
 // ============================================================================
 
-export class AdapterError extends Error {
+import { AppError } from '../../shared/errors/AppError.js';
+import { HttpStatus } from '../../shared/errors/httpStatus.js';
+
+export class AdapterError extends AppError {
   constructor(
     message: string,
     public code: string,
     public details?: Record<string, unknown>
   ) {
-    super(message);
+    super(message, HttpStatus.UNPROCESSABLE, undefined, details);
     this.name = 'AdapterError';
   }
 }

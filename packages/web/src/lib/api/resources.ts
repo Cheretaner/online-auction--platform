@@ -179,7 +179,7 @@ export const telegramApi = {
 };
 
 export const autofetchApi = {
-  listSources: () => unwrap(apiRequest<{ data: ItemList<AutofetchSource> }>(v1("/autofetch/sources"))),
+  listSources: () => unwrap(apiRequest<{ data: AutofetchSource[] }>(v1("/autofetch/sources"))),
   createSource: (body: {
     name: string;
     adapterType: string;

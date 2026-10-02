@@ -31,7 +31,13 @@ export class RssFeedAdapter implements ISourceAdapter {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? 30000);
     try {
-      const response = await fetch(this.config.url, { signal: controller.signal, headers: { Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml' } });
+      const response = await fetch(this.config.url, { 
+        signal: controller.signal, 
+        headers: { 
+          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        } 
+      });
       if (!response.ok) throw new AdapterError(`HTTP ${response.status}: ${response.statusText}`, 'FETCH_FAILED');
       return this.parse(await response.text());
     } catch (error) {
