@@ -156,7 +156,7 @@ export type AnomalyStatus = (typeof ANOMALY_STATUS)[number];
 export const DISPUTE_STATUS = ['open', 'under_review', 'resolved', 'rejected'] as const;
 export type DisputeStatus = (typeof DISPUTE_STATUS)[number];
 
-export const NOTIFICATION_CHANNEL = ['in_app', 'email', 'telegram'] as const;
+export const NOTIFICATION_CHANNEL = ['in_app', 'email', 'telegram', 'voice'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNEL)[number];
 
 export const NOTIFICATION_STATUS = ['pending', 'sent', 'failed', 'read'] as const;

@@ -132,6 +132,11 @@ const envSchema = z
       z.string().min(32).optional(),
     ),
     WEB_BASE_URL: z.string().default("http://localhost:5173"),
+    
+    // Twilio voice/SMS configuration
+    TWILIO_ACCOUNT_SID: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TWILIO_AUTH_TOKEN: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TWILIO_PHONE_NUMBER: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV === "production" && !value.FILE_SCAN_ENABLED) {

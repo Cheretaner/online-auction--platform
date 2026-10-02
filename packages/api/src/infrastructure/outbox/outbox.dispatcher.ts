@@ -1,10 +1,12 @@
 import { mailAdapter } from "../mail/mail.adapter.js";
 import { realtimeAdapter } from "../realtime/realtime.adapter.js";
 import { telegramService } from "../../telegram/telegram.service.js";
+import { twilioVoiceService } from "../voice/twilio.service.js";
 import { logger } from "../../shared/utils/logger.js";
 import { withTransaction } from "../database/tx.js";
 import * as notificationRepo from "../../notification/notification.repository.js";
 import * as outboxRepo from "./outbox.repository.js";
+import { queryOne } from "../database/query.js";
 import { refundNonWinnerChapaDeposits } from "../../payments/payment.service.js";
 
 type ClaimedNotification = Awaited<ReturnType<typeof notificationRepo.claimNotificationById>>;
@@ -30,6 +32,40 @@ async function sendClaimedNotification(item: NonNullable<ClaimedNotification>): 
       if (!delivered) {
         logger.debug({ notificationId: item.id, userId: item.userId }, "Telegram notification skipped (user unlinked or bot offline)");
       }
+    } else if (item.channel === "voice") {
+      // Voice call notification via Twilio
+      const phoneData = await queryOne<{ phone_number: string | null; phone_verified: boolean }>(
+        `SELECT phone_number, phone_verified FROM profiles WHERE id = $1`,
+        [item.userId],
+      );
+
+      if (!phoneData?.phone_number || !phoneData.phone_verified) {
+        throw new Error("Phone number not verified");
+      }
+
+      if (!twilioVoiceService.isEnabled()) {
+        throw new Error("Voice service not configured");
+      }
+
+      // Format message for voice (simpler, clearer)
+      const voiceMessage = `${item.title}. ${item.message}`;
+
+      const result = await twilioVoiceService.makeCall({
+        to: phoneData.phone_number,
+        message: voiceMessage,
+        priority: item.type.includes('urgent') ? 'high' : 'normal',
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Voice call failed');
+      }
+
+      logger.info({
+        event: 'notification:voice_call_sent',
+        userId: item.userId,
+        notificationId: item.id,
+        callSid: result.callSid,
+      });
     }
 
     await notificationRepo.markSent(item.id);
