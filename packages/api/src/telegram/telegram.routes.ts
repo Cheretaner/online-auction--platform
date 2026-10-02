@@ -17,9 +17,9 @@ telegramRouter.get(
   controller.getIntegrationStatus,
 );
 
-// Broadcast an auction to the Telegram Channel (officers & admins)
+// Public channel posts require an organization admin or platform super admin.
 telegramRouter.post(
   "/broadcast/:auctionId",
-  requireAuth(["org_admin", "super_admin", "auction_officer"]),
+  requireAuth(["org_admin", "super_admin"]),
   controller.broadcastAuction,
 );

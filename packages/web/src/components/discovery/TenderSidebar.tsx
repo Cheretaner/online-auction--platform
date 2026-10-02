@@ -1,81 +1,85 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { BadgeCheck, Download, FileText, Gavel, LifeBuoy, MapPin, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
-import bidSecurityIcon from '../../assets/icons/bid-security.svg'
-import docSpecificationIcon from '../../assets/icons/doc-specification.svg'
-import downloadArrowIcon from '../../assets/icons/download-arrow.svg'
-import helpDeskIcon from '../../assets/icons/help-desk.svg'
-import inspectionSiteIcon from '../../assets/icons/inspection-site.svg'
-import sellerVerifiedIcon from '../../assets/icons/seller-verified.svg'
-import submitBidIcon from '../../assets/icons/submit-bid.svg'
-import tenderOverviewIcon from '../../assets/icons/tender-overview.svg'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/auth-provider'
 import { useAuctionDocuments } from '@/features/operations/queries'
 import { getErrorMessage } from '@/lib/api/errors'
 import type { Auction } from '@/lib/api/types'
 import { downloadDocument } from '@/lib/download'
-import { formatDateTime, formatMoney } from '@/lib/format'
-import { Icon } from '../ui/Icon'
+import { DocumentPreviewButton } from '@/features/documents/document-preview-button'
+import { enumLabel, formatDateTime, formatMoney, regionLabel } from '@/lib/format'
+import { useT } from '@/i18n/context'
 
-const sectionHeading = 'font-label text-label-11 font-semibold text-ink uppercase'
-const insetBox = 'flex flex-col border border-line bg-panel p-[12px]'
+const steps = ['step1', 'step2', 'step3'] as const
 
-const steps = [
-  'Create an account and verify your identity once. Verification covers every auction on the platform.',
-  'Register the bid security (CPO or bank guarantee) the auction asks for, with a scan of the instrument.',
-  'Once the organization verifies your deposit, bid while the auction is live. Sealed bids stay hidden until opening.',
-]
-
-function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
-  return (
-    <div id={id} className="flex flex-col gap-[4px]">
-      <h4 className={sectionHeading}>{title}</h4>
-      {children}
-    </div>
-  )
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <h3 className="eyebrow mb-2 text-muted-foreground">{children}</h3>
 }
 
 function Documents({ auctionId }: { auctionId: string }) {
   const { isAuthenticated } = useAuth()
   const docs = useAuctionDocuments(auctionId, isAuthenticated)
+  const t = useT('auctions')
+  const tc = useT('common')
   if (!isAuthenticated) {
     return (
-      <p className="text-body-13 text-ink-soft">
-        <Link to="/login" className="text-ink underline">
-          Sign in
+      <p className="text-sm text-muted-foreground">
+        <Link to="/login" state={{ from: '/auctions' }} className="font-medium text-primary underline-offset-4 hover:underline">
+          {t('sidebar.signInPrefix')}
         </Link>{' '}
-        to download the tender documents.
+        {t('sidebar.signInSuffix')}
       </p>
     )
   }
   const items = docs.data?.items ?? []
-  if (docs.isLoading) return <p className="text-body-13 text-ink-soft">Loading documents…</p>
-  if (items.length === 0) return <p className="text-body-13 text-ink-soft">No documents published yet.</p>
+  if (docs.isLoading) return <Skeleton className="h-12 w-full" />
+  if (items.length === 0) return <p className="text-sm text-muted-foreground">{t('sidebar.noDocuments')}</p>
   return (
-    <div className="flex flex-col gap-[8px]">
+    <ul className="flex flex-col gap-2">
       {items.map((doc) => (
-        <button
-          key={doc.id}
-          type="button"
-          onClick={() =>
-            downloadDocument(doc.id, doc.fileName).catch((error: unknown) =>
-              toast.error(getErrorMessage(error, 'Download failed')),
-            )
-          }
-          className="flex items-center justify-between gap-2 border border-line bg-canvas p-[8px] text-left"
-        >
-          <div className="flex min-w-0 items-center gap-[8px]">
-            <Icon src={docSpecificationIcon} width={16} height={16} />
-            <div className="flex min-w-0 flex-col">
-              <span className="truncate text-body-13 font-medium text-ink">{doc.fileName}</span>
-              <span className="font-label text-[11px] leading-5 text-ink-soft">
-                {doc.documentType.replaceAll('_', ' ')} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+        <li key={doc.id}>
+          <div className="flex items-center gap-2 rounded-md border bg-background p-2.5">
+            <span className="flex min-w-0 items-center gap-2.5">
+              <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium">{doc.fileName}</span>
+                <span className="text-xs text-muted-foreground capitalize">
+                  {enumLabel(doc.documentType)} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+                </span>
               </span>
-            </div>
+            </span>
+            <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} size="icon" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={tc('download')}
+              onClick={() => downloadDocument(doc.id, doc.fileName).catch((error: unknown) =>
+                toast.error(getErrorMessage(error, tc('downloadFailed'))),
+              )}
+            >
+              <Download className="size-4 text-muted-foreground" aria-hidden />
+            </Button>
           </div>
-          <Icon src={downloadArrowIcon} width={10.8} height={11.7} />
-        </button>
+        </li>
       ))}
+    </ul>
+  )
+}
+
+function Highlight({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-2 text-sm">
+      <dt className="inline-flex items-center gap-2 text-muted-foreground">
+        {icon}
+        {label}
+      </dt>
+      <dd className="text-right font-medium">{value}</dd>
     </div>
   )
 }
@@ -83,114 +87,78 @@ function Documents({ auctionId }: { auctionId: string }) {
 /** Summary of the highlighted auction (the first result) plus how to take
  * part. Everything shown comes from the API. */
 export function TenderSidebar({ auction, issuer }: { auction: Auction | undefined; issuer: string }) {
+  const t = useT('auctions')
+  const tc = useT('common')
   return (
-    <aside className="col-span-12 flex flex-col gap-[12px] self-start lg:col-span-4">
+    <aside className="flex flex-col gap-4 lg:sticky lg:top-32" aria-label={t('sidebar.label')}>
       {auction ? (
-        <>
-          <div className="flex items-center justify-between border border-line bg-panel p-[12px]">
-            <div className="flex items-center gap-[8px]">
-              <Icon src={tenderOverviewIcon} width={14} height={15.5} />
-              <h3 className="font-label text-xs font-semibold tracking-[0.6px] whitespace-nowrap text-ink uppercase">
-                Tender Overview
-              </h3>
-            </div>
-            <span className="bg-primary px-[8px] py-[2px] font-label text-xs font-medium whitespace-nowrap text-primary-foreground">
-              TOP RESULT
-            </span>
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b bg-muted/60 px-5 py-3">
+            <p className="eyebrow text-foreground">{t('sidebar.overview')}</p>
+            <Badge variant="solid">{t('sidebar.topResult')}</Badge>
           </div>
-
-          <div className="flex flex-col gap-[20px] border border-line bg-card p-[20px] drop-shadow-panel">
-            <div className="flex flex-col gap-[4px] border-b border-line pb-[12px]">
-              <h3 className="font-display text-xl font-medium text-ink">{auction.title}</h3>
-              <p className="text-body-13 text-ink-soft">
-                {issuer} · closes {formatDateTime(auction.closesAt)}
+          <div className="flex flex-col gap-5 p-5">
+            <div>
+              <h2 className="text-xl leading-snug font-semibold">{auction.title}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sidebar.closes', { issuer, date: formatDateTime(auction.closesAt) })}
               </p>
             </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <h4 className={sectionHeading}>Essential Highlights</h4>
-              <div className={`${insetBox} gap-[3.5px]`}>
-                <Highlight icon={sellerVerifiedIcon} size={[13.5, 12.75]} label="Issuer:" value={issuer} />
+            <div>
+              <SectionTitle>{t('sidebar.essentials')}</SectionTitle>
+              <dl className="divide-y rounded-md border px-3">
+                <Highlight icon={<BadgeCheck className="size-4" aria-hidden />} label={t('sidebar.issuer')} value={issuer} />
                 <Highlight
-                  icon={bidSecurityIcon}
-                  size={[12, 12]}
-                  label="Bid security:"
-                  value={Number(auction.depositAmount) > 0 ? formatMoney(auction.depositAmount) : 'None'}
-                  mono
+                  icon={<ShieldCheck className="size-4" aria-hidden />}
+                  label={t('sidebar.bidSecurity')}
+                  value={Number(auction.depositAmount) > 0 ? formatMoney(auction.depositAmount) : tc('none')}
                 />
                 <Highlight
-                  icon={inspectionSiteIcon}
-                  size={[10.5, 11.25]}
-                  label="Region:"
-                  value={auction.region ?? 'Not specified'}
+                  icon={<MapPin className="size-4" aria-hidden />}
+                  label={t('sidebar.region')}
+                  value={auction.region ? regionLabel(auction.region) : tc('notSpecified')}
                 />
-              </div>
+              </dl>
             </div>
 
-            <Section title="Official Tender Documents">
+            <div>
+              <SectionTitle>{t('sidebar.documents')}</SectionTitle>
               <Documents auctionId={auction.id} />
-            </Section>
-
-            <div className="flex flex-col gap-[8px] border-t border-line pt-[4px]">
-              <Link
-                to={`/auctions/${auction.id}`}
-                className="flex items-center justify-center gap-[8px] border border-primary bg-primary py-[10px] font-label text-label-12 font-medium whitespace-nowrap text-primary-foreground uppercase"
-              >
-                <Icon src={submitBidIcon} width={12.6} height={13.5} />
-                Open Auction
-              </Link>
             </div>
+
+            <Button asChild className="w-full">
+              <Link to={`/auctions/${auction.id}`}>
+                <Gavel aria-hidden /> {t('sidebar.openAuction')}
+              </Link>
+            </Button>
           </div>
-        </>
+        </Card>
       ) : null}
 
-      <div className="border border-line bg-card p-[20px] drop-shadow-panel">
-        <Section id="how-to-participate" title="How to Participate">
-          <ol className={`${insetBox} gap-[6px]`}>
-            {steps.map((step, index) => (
-              <li key={step} className="flex items-start gap-[7.99px]">
-                <span className="font-label text-xs font-bold text-ink">{index + 1}.</span>
-                <p className="min-w-0 flex-1 text-body-13 text-ink-soft">{step}</p>
-              </li>
-            ))}
-          </ol>
-        </Section>
-      </div>
+      <Card id="how-to-participate" className="p-5">
+        <h2 className="text-lg font-semibold">{t('sidebar.howTitle')}</h2>
+        <ol className="mt-4 flex flex-col gap-4">
+          {steps.map((step, index) => (
+            <li key={step} className="flex items-start gap-3">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/10 font-mono text-xs font-semibold text-primary">
+                {index + 1}
+              </span>
+              <p className="text-sm leading-6 text-muted-foreground">{t(`sidebar.${step}`)}</p>
+            </li>
+          ))}
+        </ol>
+      </Card>
 
-      <div className={`${insetBox} gap-[8px]`}>
-        <div className="flex items-center gap-[6px]">
-          <Icon src={helpDeskIcon} width={14.4} height={12.6} />
-          <span className="text-sm font-semibold whitespace-nowrap text-ink">Need Assistance?</span>
-        </div>
-        <p className="text-body-13 text-ink-soft">
-          Questions about a specific tender go to the issuing organization named on it. If you believe an auction was run
-          unfairly, raise a dispute from the auction page; every step is recorded in the audit trail.
+      <div className="rounded-lg border border-dashed p-5">
+        <p className="inline-flex items-center gap-2 text-sm font-semibold">
+          <LifeBuoy className="size-4 text-primary" aria-hidden />
+          {t('sidebar.helpTitle')}
+        </p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {t('sidebar.helpBody')}
         </p>
       </div>
     </aside>
-  )
-}
-
-function Highlight({
-  icon,
-  size,
-  label,
-  value,
-  mono = false,
-}: {
-  icon: string
-  size: [number, number]
-  label: string
-  value: string
-  mono?: boolean
-}) {
-  return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex items-center gap-[6px]">
-        <Icon src={icon} width={size[0]} height={size[1]} />
-        <span className="text-body-13 whitespace-nowrap text-ink-soft">{label}</span>
-      </div>
-      <span className={`text-right text-body-13 font-medium text-ink ${mono ? 'font-label' : ''}`}>{value}</span>
-    </div>
   )
 }

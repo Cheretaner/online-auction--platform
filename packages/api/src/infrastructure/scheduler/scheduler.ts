@@ -3,6 +3,7 @@ import { logger } from "../../shared/utils/logger.js";
 import { pruneExpiredIdempotencyKeys } from "../../shared/utils/idempotency.js";
 import { pruneExpiredIdempotencyKeys as pruneIdempotencyRows } from "../idempotency/idempotency.repository.js";
 import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
+import { reconcileChapaRefunds } from "../../payments/payment.service.js";
 import { closeDueAuctions, openDueAuctions } from "../../auction/auction.service.js";
 import { getPool } from "../database/pool.js";
 import { pruneExpiredRefreshTokens } from "../../identity/session.repository.js";
@@ -30,7 +31,7 @@ const jobState = new Map<string, JobState>();
 /** Jobs whose absence breaks the product, not just housekeeping. /health/ready
  * reports not-ready when one of them stops succeeding, so an uptime monitor
  * catches a stuck scheduler instead of it failing silently in the logs. */
-const CRITICAL_JOBS = ["auction-lifecycle", "outbox-dispatch"];
+const CRITICAL_JOBS = ["auction-lifecycle", "outbox-dispatch", "provider-refund-reconciliation"];
 
 export interface JobHealth {
   healthy: boolean;
@@ -157,6 +158,55 @@ export function startInfrastructureJobs(): void {
     run: async () => {
       if (!env.DATABASE_URL) return;
       await processNotificationQueue();
+    },
+  });
+
+  // Analytics refresh: Update materialized view with latest auction statistics
+  // Daily job to keep analytics fast and accurate
+  scheduleJob({
+    name: "analytics-refresh",
+    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const analyticsService = await import("../../analytics/analytics.service.js");
+      await analyticsService.refreshAnalytics();
+    },
+  });
+
+  // Bidder metrics update: Calculate participation stats for all bidders monthly
+  scheduleJob({
+    name: "bidder-metrics-update",
+    intervalMs: 24 * 60 * 60 * 1000, // Daily check (but only updates if new month)
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const analyticsService = await import("../../analytics/analytics.service.js");
+      await analyticsService.updateBidderMetrics();
+    },
+  });
+
+  // Saved search alerts: Check for new auctions matching saved searches
+  scheduleJob({
+    name: "saved-search-alerts",
+    intervalMs: 15 * 60 * 1000, // Every 15 minutes
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const watchlistService = await import("../../watchlist/watchlist.service.js");
+      await watchlistService.processSavedSearchAlerts();
+    },
+  });
+
+  // Watchlist closing alerts: Notify users of auctions closing soon
+  scheduleJob({
+    name: "watchlist-closing-alerts",
+    intervalMs: 60 * 60 * 1000, // Every hour
+    runOnStart: false,
+    run: async () => {
+      if (!env.DATABASE_URL) return;
+      const watchlistService = await import("../../watchlist/watchlist.service.js");
+      await watchlistService.processWatchlistClosingAlerts();
     },
   });
 }

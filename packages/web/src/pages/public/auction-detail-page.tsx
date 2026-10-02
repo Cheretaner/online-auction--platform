@@ -1,9 +1,12 @@
 import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Gavel, Lock, MapPin, Package } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
-import { QueryState } from "@/components/feedback/query-state";
+import { EmptyState, QueryState } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useAuction, useAuctionBids, useAuctionItems } from "@/features/auctions/queries";
@@ -12,8 +15,10 @@ import { BidderReadinessPanel } from "@/features/bidding/bidder-readiness";
 import { useBidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { OpenDisputeButton } from "@/features/disputes/open-dispute-dialog";
 import { AuctionDocuments } from "@/features/documents/auction-documents";
+import { AuctionTransparencyPanel } from "@/features/auctions/auction-transparency-panel";
 import type { Auction } from "@/lib/api/types";
-import { formatDateTime, formatMoney, hasRole } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney, hasRole, regionLabel, statusLabel } from "@/lib/format";
+import { useT } from "@/i18n/context";
 import { subscribeToEvents } from "@/lib/realtime/sse";
 import { queryKeys } from "@/lib/query/keys";
 
@@ -37,6 +42,7 @@ export default function AuctionDetailPage() {
 
   const isBidder = isAuthenticated && hasRole(session?.roles ?? [], "bidder");
   const record = auction.data;
+  const t = useT("auctions");
 
   return (
     <QueryState
@@ -48,25 +54,27 @@ export default function AuctionDetailPage() {
       {record ? (
         <div className="space-y-6">
           <PageHeader
+            back={{ to: "/auctions", label: t("detail.back") }}
             title={record.title}
+            meta={
+              <>
+                <StatusBadge status={record.status} />
+                <Badge variant="outline">
+                  {record.auctionType === "sealed_bid" ? <Lock aria-hidden /> : <Gavel aria-hidden />}
+                  {enumLabel(record.auctionType)}
+                </Badge>
+                {record.region ? (
+                  <Badge variant="outline">
+                    <MapPin aria-hidden /> {regionLabel(record.region)}
+                  </Badge>
+                ) : null}
+              </>
+            }
             description={record.description ?? undefined}
-            actions={<StatusBadge status={record.status} />}
           />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label={record.auctionType === "sealed_bid" ? "Reserve basis" : "Start price"} value={formatMoney(record.startPrice)} />
-            <Metric
-              label="Highest bid"
-              value={
-                record.auctionType === "sealed_bid" && !record.sealedOpenedAt
-                  ? "Sealed"
-                  : Number(record.currentHighestBid ?? 0) > 0
-                    ? formatMoney(record.currentHighestBid)
-                    : "No bids yet"
-              }
-            />
-            <Metric label="Bids" value={String(record.bidCount)} />
-            <Metric label={record.status === "scheduled" ? "Opens" : "Closes"} value={formatDateTime(record.status === "scheduled" ? record.opensAt : record.closesAt)} />
-          </div>
+
+          <KeyFacts auction={record} />
+          <AuctionTransparencyPanel auctionId={record.id} status={record.status} />
 
           <Card>
             <CardHeader>
@@ -91,100 +99,173 @@ export default function AuctionDetailPage() {
             </CardContent>
           </Card>
 
-          {isAuthenticated ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Documents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AuctionDocuments auctionId={record.id} />
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {isBidder ? (
-            <Participation auction={record} />
-          ) : !isAuthenticated ? (
-            <p className="text-sm">
-              <Link className="text-primary underline" to="/login" state={{ from: `/auctions/${record.id}` }}>
-                Sign in
-              </Link>{" "}
-              or{" "}
-              <Link className="text-primary underline" to="/register">
-                create an account
-              </Link>{" "}
-              to see the tender documents and take part.
-            </p>
-          ) : null}
-
-          {isAuthenticated ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Bid activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(bids.data?.items ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No bids visible yet.</p>
-                ) : (
-                  <ul className="space-y-2 text-sm">
-                    {bids.data?.items.map((bid) => (
-                      <li key={bid.id} className="flex justify-between gap-4 border-b py-2 last:border-0">
-                        <span>
-                          {bid.amount === null ? "Sealed bid" : formatMoney(bid.amount)}
-                          {bid.bidderId === session?.user.id ? <span className="ml-2 text-xs text-primary">(yours)</span> : null}
-                          {bid.status !== "active" ? (
-                            <span className="ml-2 text-xs text-muted-foreground">{bid.status}</span>
+          <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+            <div className="order-2 space-y-6 lg:order-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("detail.lots")}</CardTitle>
+                  <CardDescription>{t("detail.lotsDescription")}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(items.data?.items ?? []).length === 0 ? (
+                    <EmptyState size="inline" icon={Package} title={t("detail.noLots")} />
+                  ) : (
+                    <ul className="divide-y rounded-md border">
+                      {items.data?.items.map((item) => (
+                        <li key={item.id} className="p-4">
+                          <p className="font-medium">{item.title}</p>
+                          {item.description ? (
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
                           ) : null}
-                        </span>
-                        <span className="text-muted-foreground">{formatDateTime(bid.placedAt)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
+                          <p className="mt-2 text-xs text-muted-foreground capitalize">
+                            {t("detail.quantity", { quantity: item.quantity, unit: item.unit ?? "" })}
+                            {item.condition ? ` · ${enumLabel(item.condition)}` : ""}
+                            {item.region ? ` · ${regionLabel(item.region)}` : ""}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
 
-          {isBidder && DISPUTABLE.has(record.status) ? (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span>Something wrong with how this auction ran?</span>
-              <OpenDisputeButton auctionId={record.id} />
+              {isAuthenticated ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("detail.documents")}</CardTitle>
+                    <CardDescription>{t("detail.documentsDescription")}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AuctionDocuments auctionId={record.id} />
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {isAuthenticated ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("detail.bidActivity")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {(bids.data?.items ?? []).length === 0 ? (
+                      <EmptyState size="inline" icon={Gavel} title={t("detail.noBids")} />
+                    ) : (
+                      <ul className="divide-y text-sm">
+                        {bids.data?.items.map((bid) => (
+                          <li key={bid.id} className="flex items-center justify-between gap-4 py-2.5">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium tabular-nums">
+                                {bid.amount === null ? t("detail.sealedBid") : formatMoney(bid.amount)}
+                              </span>
+                              {bid.bidderId === session?.user.id ? <Badge>{t("detail.yours")}</Badge> : null}
+                              {bid.status !== "active" ? (
+                                <Badge variant="muted">{statusLabel(bid.status)}</Badge>
+                              ) : null}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(bid.placedAt)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              {isBidder && DISPUTABLE.has(record.status) ? (
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">{t("detail.disputePrompt")}</p>
+                  <OpenDisputeButton auctionId={record.id} />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+
+            <aside className="order-1 lg:sticky lg:top-32 lg:order-2" aria-label={t("detail.takePart")}>
+              {isBidder ? (
+                <Participation auction={record} />
+              ) : !isAuthenticated ? (
+                <Card className="border-primary/30">
+                  <CardHeader>
+                    <CardTitle>{t("detail.takePartTitle")}</CardTitle>
+                    <CardDescription>{t("detail.takePartBody")}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2">
+                    <Button asChild>
+                      <Link to="/register">{t("detail.createAccount")}</Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link to="/login" state={{ from: `/auctions/${record.id}` }}>
+                        {t("detail.signIn")}
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </aside>
+          </div>
         </div>
       ) : null}
     </QueryState>
   );
 }
 
+function KeyFacts({ auction }: { auction: Auction }) {
+  const t = useT("auctions");
+  const sealedHidden = auction.auctionType === "sealed_bid" && !auction.sealedOpenedAt;
+  const facts = [
+    {
+      label: auction.auctionType === "sealed_bid" ? t("detail.reserveBasis") : t("detail.startPrice"),
+      value: formatMoney(auction.startPrice),
+    },
+    {
+      label: t("detail.highestBid"),
+      value: sealedHidden
+        ? t("detail.sealed")
+        : Number(auction.currentHighestBid ?? 0) > 0
+          ? formatMoney(auction.currentHighestBid)
+          : t("detail.noBidsYet"),
+    },
+    { label: t("detail.bids"), value: String(auction.bidCount) },
+    {
+      label: auction.status === "scheduled" ? t("detail.opens") : t("detail.closes"),
+      value: formatDateTime(auction.status === "scheduled" ? auction.opensAt : auction.closesAt),
+    },
+  ];
+  return (
+    <dl className="grid grid-cols-2 overflow-hidden rounded-lg border bg-card shadow-xs lg:grid-cols-4">
+      {facts.map((fact, index) => (
+        <div
+          key={fact.label}
+          className={`p-4 sm:p-5 ${index % 2 === 1 ? "border-l" : ""} ${index >= 2 ? "border-t lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`}
+        >
+          <dt className="eyebrow text-muted-foreground">{fact.label}</dt>
+          <dd className="mt-1.5 text-lg font-semibold tracking-tight tabular-nums sm:text-xl">{fact.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function Participation({ auction }: { auction: Auction }) {
   const readiness = useBidderReadiness(auction);
+  const t = useT("auctions");
   const open = auction.status === "live";
   const upcoming = auction.status === "scheduled";
   if (!open && !upcoming) return null;
   return (
-    <Card>
+    <Card className="border-primary/30">
       <CardHeader>
-        <CardTitle>{open ? "Place a bid" : "Get ready to bid"}</CardTitle>
+        <CardTitle>{open ? t("detail.placeBid") : t("detail.getReady")}</CardTitle>
+        {readiness.ready ? null : (
+          <CardDescription>{t("detail.stepsFirst")}</CardDescription>
+        )}
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="@container space-y-6">
         {readiness.ready ? null : <BidderReadinessPanel auction={auction} readiness={readiness} />}
         {open ? (
           <BidForm auction={auction} disabled={!readiness.ready && !readiness.loading} />
         ) : (
-          <p className="text-sm text-muted-foreground">Bidding opens {formatDateTime(auction.opensAt)}.</p>
+          <p className="text-sm text-muted-foreground">{t("detail.opensOn", { date: formatDateTime(auction.opensAt) })}</p>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-xs uppercase text-muted-foreground">{label}</p>
-        <p className="mt-1 text-lg font-semibold">{value}</p>
       </CardContent>
     </Card>
   );

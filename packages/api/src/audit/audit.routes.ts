@@ -5,6 +5,13 @@ import * as controller from "./audit.controller.js";
 
 export const auditRouter = Router();
 
+// Results may be independently checked without an account. This endpoint
+// returns only chain integrity and cryptographic hashes, never audit events.
+auditRouter.get(
+  "/public/auctions/:auctionId/verify",
+  asyncHandler(controller.verifyPublicAuction),
+);
+
 auditRouter.get(
   "/events",
   requireAuth(["compliance_officer", "org_admin", "auction_officer", "super_admin"]),

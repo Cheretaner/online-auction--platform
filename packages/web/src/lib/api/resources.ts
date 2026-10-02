@@ -10,6 +10,7 @@ import type {
   ResolveDisputeRequest,
   ReviewAnomalyRequest,
   ReviewDepositRequest,
+  ReleaseDepositRequest,
   ReviewVerificationRequest,
   RunComplianceRequest,
   SendNotificationRequest,
@@ -32,12 +33,16 @@ import type {
   AutofetchSource,
   CategoryRecord,
   CountResponse,
+  ChapaDepositInitiation,
+  ChapaSettlementInitiation,
   DepositRecord,
+  FinancialReconciliationSnapshot,
   DisputeRecord,
   DocumentRecord,
   ItemList,
   NotificationRecord,
   ReportRecord,
+  SettlementRecord,
   TelegramLinkToken,
   TelegramIntegrationStatus,
   TelegramStatus,
@@ -64,15 +69,25 @@ export const catalogApi = {
 };
 
 export const depositsApi = {
+  providers: () => apiRequest<{ chapa: boolean }>(v1("/deposits/providers")),
   create: (body: CreateDepositRequest) =>
     apiRequest<DepositRecord>(v1("/deposits"), { method: "POST", body }),
+  initiateChapa: (body: { auctionId: string }) =>
+    apiRequest<ChapaDepositInitiation>(v1("/deposits/initiate"), { method: "POST", body }),
   listMine: () => apiRequest<ItemList<DepositRecord>>(v1("/deposits/me")),
   listByAuction: (auctionId: string) =>
     apiRequest<ItemList<DepositRecord>>(v1(`/deposits${queryString({ auctionId })}`)),
   getById: (id: string) => apiRequest<DepositRecord>(v1(`/deposits/${id}`)),
   review: (id: string, body: ReviewDepositRequest) =>
     apiRequest<DepositRecord>(v1(`/deposits/${id}/review`), { method: "POST", body }),
-  release: (id: string) => apiRequest<DepositRecord>(v1(`/deposits/${id}/release`), { method: "POST" }),
+  release: (id: string, body: ReleaseDepositRequest) =>
+    apiRequest<DepositRecord>(v1(`/deposits/${id}/release`), { method: "POST", body }),
+};
+
+export const settlementsApi = {
+  listMine: () => apiRequest<ItemList<SettlementRecord>>(v1("/settlements/me")),
+  initiateChapa: (auctionId: string) =>
+    apiRequest<ChapaSettlementInitiation>(v1(`/settlements/${auctionId}/initiate`), { method: "POST" }),
 };
 
 export const documentsApi = {
@@ -127,6 +142,8 @@ export const reportsApi = {
     apiRequest<ItemList<ReportRecord>>(v1(`/reports${queryString({ auctionId })}`)),
   getById: (id: string) => apiRequest<ReportRecord>(v1(`/reports/${id}`)),
   publish: (id: string) => apiRequest<ReportRecord>(v1(`/reports/${id}/publish`), { method: "POST" }),
+  financialReconciliation: (auctionId: string) =>
+    apiRequest<FinancialReconciliationSnapshot>(v1(`/reports/financial-reconciliation${queryString({ auctionId })}`)),
 };
 
 export const auditApi = {
@@ -179,7 +196,7 @@ export const telegramApi = {
 };
 
 export const autofetchApi = {
-  listSources: () => unwrap(apiRequest<{ data: ItemList<AutofetchSource> }>(v1("/autofetch/sources"))),
+  listSources: () => unwrap(apiRequest<{ data: AutofetchSource[] }>(v1("/autofetch/sources"))),
   createSource: (body: {
     name: string;
     adapterType: string;

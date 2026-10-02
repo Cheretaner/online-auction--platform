@@ -8,8 +8,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/context";
 
 /**
  * Asks for a written reason before a consequential action (reject, cancel,
@@ -40,7 +41,7 @@ function ReasonDialogBody({
   onOpenChange,
   title,
   description,
-  label = "Reason",
+  label,
   confirmLabel,
   minLength = 4,
   pending,
@@ -48,6 +49,7 @@ function ReasonDialogBody({
   onConfirm,
 }: Parameters<typeof ReasonDialog>[0]) {
   const id = useId();
+  const t = useT("common");
   const [reason, setReason] = useState("");
   const tooShort = reason.trim().length < minLength;
 
@@ -65,16 +67,18 @@ function ReasonDialogBody({
         }}
       >
         <div className="space-y-2">
-          <Label htmlFor={id}>{label}</Label>
-          <Textarea id={id} value={reason} onChange={(event) => setReason(event.target.value)} rows={4} />
-          <p className="text-xs text-muted-foreground">At least {minLength} characters. This is recorded in the audit trail.</p>
+          <Label htmlFor={id}>{label ?? t("reason")}</Label>
+          <Textarea id={id} aria-describedby={`${id}-hint`} value={reason} onChange={(event) => setReason(event.target.value)} rows={4} autoFocus />
+          <FieldHint id={`${id}-hint`}>
+            {t("charactersMinimum", { count: reason.trim().length, min: minLength })} {t("recordedInAudit")}
+          </FieldHint>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
-            Cancel
+            {t("cancel")}
           </Button>
-          <Button type="submit" variant={destructive ? "destructive" : "default"} disabled={tooShort || pending}>
-            {pending ? "Working…" : confirmLabel}
+          <Button type="submit" variant={destructive ? "destructive" : "default"} disabled={tooShort} loading={pending}>
+            {confirmLabel}
           </Button>
         </DialogFooter>
       </form>

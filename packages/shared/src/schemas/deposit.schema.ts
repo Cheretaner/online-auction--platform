@@ -1,17 +1,22 @@
 import { z } from "zod";
-import { INSTRUMENT_TYPES, DEPOSIT_STATUS } from "../enums.js";
+import { DEPOSIT_STATUS, ETHIOPIAN_BANKS, INSTRUMENT_TYPES } from "../enums.js";
 import { Money } from "./money.js";
 
 export const CreateDepositRequest = z.object({
   auctionId: z.string().uuid(),
   amount: Money,
-  referenceNumber: z.string().min(1).max(100),
-  issuingBank: z.string().min(1).max(200),
+  referenceNumber: z.string().trim().min(3).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9./_-]*$/),
+  issuingBank: z.enum(ETHIOPIAN_BANKS),
   instrumentType: z.enum(INSTRUMENT_TYPES),
   documentId: z.string().uuid().optional(),
 });
 
 export type CreateDepositRequest = z.infer<typeof CreateDepositRequest>;
+
+export const InitiateChapaDepositRequest = z.object({
+  auctionId: z.string().uuid(),
+});
+export type InitiateChapaDepositRequest = z.infer<typeof InitiateChapaDepositRequest>;
 
 export const ReviewDepositRequest = z.object({
   decision: z.enum(["verified", "rejected"]),
@@ -23,3 +28,9 @@ export const ReviewDepositRequest = z.object({
 });
 
 export type ReviewDepositRequest = z.infer<typeof ReviewDepositRequest>;
+
+export const ReleaseDepositRequest = z.object({
+  releaseReferenceNumber: z.string().trim().min(3).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9./_-]*$/),
+  releaseDocumentId: z.string().uuid(),
+});
+export type ReleaseDepositRequest = z.infer<typeof ReleaseDepositRequest>;

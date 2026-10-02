@@ -1,14 +1,21 @@
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Wallet } from "lucide-react";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useAuctionDeposits, useReleaseDeposit, useReviewDeposit } from "@/features/operations/queries";
+import { useAuctionDeposits, useReleaseDeposit, useReviewDeposit, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction, DepositRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 const RELEASABLE = new Set(["closed", "awarded", "cancelled"]);
 
@@ -18,29 +25,45 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const deposits = useAuctionDeposits(auction.id);
   const review = useReviewDeposit();
   const release = useReleaseDeposit();
+  const upload = useUploadDocument();
   const [rejecting, setRejecting] = useState<DepositRecord | null>(null);
+  const [releasing, setReleasing] = useState<DepositRecord | null>(null);
+  const [releaseReferenceNumber, setReleaseReferenceNumber] = useState("");
+  const [releaseEvidence, setReleaseEvidence] = useState<File | null>(null);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [submittingRelease, setSubmittingRelease] = useState(false);
   const items = deposits.data?.items ?? [];
+  const t = useT("workspace");
+  const tc = useT("common");
 
-  if (deposits.isLoading) return <p className="text-sm text-muted-foreground">Loading deposits…</p>;
-  if (deposits.isError) return <p className="text-sm text-destructive">{getErrorMessage(deposits.error)}</p>;
-  if (items.length === 0) return <p className="text-sm text-muted-foreground">No deposits registered yet.</p>;
+  if (deposits.isLoading) return <PageSkeleton rows={2} />;
+  if (deposits.isError) return <ErrorState error={deposits.error} onRetry={() => void deposits.refetch()} />;
+  if (items.length === 0)
+    return (
+      <EmptyState
+        size="inline"
+        icon={Wallet}
+        title={t("deposits.emptyTitle")}
+        description={t("deposits.emptyBody")}
+      />
+    );
 
   const verify = (deposit: DepositRecord) =>
     review.mutate(
       { id: deposit.id, body: { decision: "verified" } },
-      { onSuccess: () => toast.success("Deposit verified"), onError: (error) => toast.error(getErrorMessage(error)) },
+      { onSuccess: () => toast.success(t("deposits.verified")), onError: (error) => toast.error(getErrorMessage(error)) },
     );
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Instrument</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Submitted</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead>{t("deposits.instrument")}</TableHead>
+            <TableHead>{t("deposits.amount")}</TableHead>
+            <TableHead>{t("deposits.submitted")}</TableHead>
+            <TableHead>{t("deposits.status")}</TableHead>
+            <TableHead className="text-right">{t("deposits.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -50,15 +73,15 @@ export function DepositReview({ auction }: { auction: Auction }) {
               <TableRow key={deposit.id}>
                 <TableCell>
                   <p className="font-medium">
-                    {deposit.instrumentType.replaceAll("_", " ").toUpperCase()} · {deposit.referenceNumber}
+                    {enumLabel(deposit.instrumentType)} · {deposit.referenceNumber}
                   </p>
                   <p className="text-xs text-muted-foreground">{deposit.issuingBank}</p>
                 </TableCell>
-                <TableCell className={short ? "text-destructive" : undefined}>
+                <TableCell className={short ? "text-destructive tabular-nums" : "tabular-nums"}>
                   {formatMoney(deposit.amount)}
-                  {short ? <span className="block text-xs">below required {formatMoney(auction.depositAmount)}</span> : null}
+                  {short ? <span className="block text-xs">{t("deposits.belowRequired", { amount: formatMoney(auction.depositAmount) })}</span> : null}
                 </TableCell>
-                <TableCell className="text-sm">{formatDateTime(deposit.createdAt)}</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(deposit.createdAt)}</TableCell>
                 <TableCell>
                   <StatusBadge status={deposit.status} />
                   {deposit.rejectionReason ? <p className="mt-1 text-xs text-muted-foreground">{deposit.rejectionReason}</p> : null}
@@ -66,41 +89,53 @@ export function DepositReview({ auction }: { auction: Auction }) {
                 <TableCell>
                   <div className="flex flex-wrap justify-end gap-2">
                     {deposit.documentId ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          downloadDocument(deposit.documentId!, `deposit-${deposit.referenceNumber}`).catch((error: unknown) =>
-                            toast.error(getErrorMessage(error, "Download failed")),
-                          )
-                        }
-                      >
-                        View proof
-                      </Button>
+                      <>
+                        <DocumentPreviewButton documentId={deposit.documentId} fileName={`deposit-${deposit.id}`} allowUnknown />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => downloadDocument(deposit.documentId!, `deposit-${deposit.referenceNumber}`).catch((error: unknown) =>
+                            toast.error(getErrorMessage(error, tc("downloadFailed"))),
+                          )}
+                        >
+                          {t("deposits.viewProof")}
+                        </Button>
+                      </>
+                    ) : null}
+                    {deposit.releaseDocumentId ? (
+                      <>
+                        <DocumentPreviewButton documentId={deposit.releaseDocumentId} fileName={`release-${deposit.id}`} allowUnknown />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => downloadDocument(deposit.releaseDocumentId!, `release-${deposit.id}`).catch((error: unknown) =>
+                            toast.error(getErrorMessage(error, tc("downloadFailed"))),
+                          )}
+                        >
+                          {t("deposits.viewReleaseEvidence")}
+                        </Button>
+                      </>
                     ) : null}
                     {deposit.status === "pending" ? (
                       <>
                         <Button size="sm" disabled={review.isPending} onClick={() => verify(deposit)}>
-                          Verify
+                          {t("deposits.verify")}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setRejecting(deposit)}>
-                          Reject
+                        <Button size="sm" variant="destructive-outline" onClick={() => setRejecting(deposit)}>
+                          {t("deposits.reject")}
                         </Button>
                       </>
                     ) : null}
-                    {deposit.status === "verified" && RELEASABLE.has(auction.status) && deposit.bidderId !== auction.winnerId ? (
+                    {deposit.status === "verified" && RELEASABLE.has(auction.status) && (
+                      deposit.bidderId !== auction.winnerId || auction.status === "awarded"
+                    ) ? (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={release.isPending}
-                        onClick={() =>
-                          release.mutate(deposit.id, {
-                            onSuccess: () => toast.success("Deposit released"),
-                            onError: (error) => toast.error(getErrorMessage(error)),
-                          })
-                        }
+                        onClick={() => setReleasing(deposit)}
                       >
-                        Release
+                        {t("deposits.release")}
                       </Button>
                     ) : null}
                   </div>
@@ -113,9 +148,9 @@ export function DepositReview({ auction }: { auction: Auction }) {
       <ReasonDialog
         open={rejecting !== null}
         onOpenChange={(open) => !open && setRejecting(null)}
-        title="Reject deposit"
-        description="The bidder sees this reason and cannot bid until a valid deposit is verified."
-        confirmLabel="Reject deposit"
+        title={t("deposits.rejectTitle")}
+        description={t("deposits.rejectDescription")}
+        confirmLabel={t("deposits.rejectTitle")}
         destructive
         pending={review.isPending}
         onConfirm={(reason) =>
@@ -124,7 +159,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
             { id: rejecting.id, body: { decision: "rejected", rejectionReason: reason } },
             {
               onSuccess: () => {
-                toast.success("Deposit rejected");
+                toast.success(t("deposits.rejected"));
                 setRejecting(null);
               },
               onError: (error) => toast.error(getErrorMessage(error)),
@@ -132,6 +167,78 @@ export function DepositReview({ auction }: { auction: Auction }) {
           )
         }
       />
+      <Dialog
+        open={releasing !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReleasing(null);
+            setReleaseReferenceNumber("");
+            setReleaseEvidence(null);
+            setReleaseError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("deposits.releaseTitle")}</DialogTitle>
+            <DialogDescription>{t("deposits.releaseDescription")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="release-reference">{t("deposits.releaseReference")}</Label>
+              <Input
+                id="release-reference"
+                autoComplete="off"
+                value={releaseReferenceNumber}
+                onChange={(event) => setReleaseReferenceNumber(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="release-evidence">{t("deposits.releaseEvidence")}</Label>
+              <Input
+                id="release-evidence"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                onChange={(event) => setReleaseEvidence(event.target.files?.[0] ?? null)}
+              />
+            </div>
+            {releaseError ? <p className="text-sm text-destructive" role="alert">{releaseError}</p> : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReleasing(null)}>{t("deposits.keepHeld")}</Button>
+            <Button
+              disabled={submittingRelease || !releaseReferenceNumber.trim() || !releaseEvidence}
+              onClick={async () => {
+                if (!releasing || !releaseEvidence) return;
+                setSubmittingRelease(true);
+                setReleaseError(null);
+                try {
+                  const form = new FormData();
+                  form.set("file", releaseEvidence);
+                  form.set("docType", "deposit_release_evidence");
+                  form.set("auctionId", auction.id);
+                  form.set("isPrivate", "true");
+                  const document = await upload.mutateAsync(form);
+                  await release.mutateAsync({
+                    id: releasing.id,
+                    body: { releaseReferenceNumber, releaseDocumentId: document.id },
+                  });
+                  toast.success(t("deposits.releaseRecorded"));
+                  setReleasing(null);
+                  setReleaseReferenceNumber("");
+                  setReleaseEvidence(null);
+                } catch (error) {
+                  setReleaseError(getErrorMessage(error));
+                } finally {
+                  setSubmittingRelease(false);
+                }
+              }}
+            >
+              {submittingRelease ? t("deposits.recording") : t("deposits.confirmRelease")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

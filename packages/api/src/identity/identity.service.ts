@@ -29,7 +29,7 @@ function hashResetToken(token: string): string {
 }
 
 function toPublicProfile(profile: Profile): PublicProfile {
-  const { passwordHash: _passwordHash, ...rest } = profile;
+  const { passwordHash: _passwordHash, nationalId: _nationalId, tinNumber: _tinNumber, ...rest } = profile;
   return rest;
 }
 

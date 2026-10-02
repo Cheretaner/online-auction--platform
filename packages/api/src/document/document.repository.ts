@@ -14,6 +14,8 @@ interface DbDocument {
   checksum_sha256: string;
   is_private: boolean;
   summary: string | null;
+  extracted_text: string | null;
+  ocr_status: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -31,6 +33,8 @@ function mapDocument(row: DbDocument): DocumentRecord {
     checksumSha256: row.checksum_sha256,
     isPrivate: row.is_private,
     summary: row.summary,
+    extractedText: row.extracted_text,
+    ocrStatus: row.ocr_status,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -78,4 +82,11 @@ export async function findByAuctionId(auctionId: string): Promise<DocumentRecord
 export async function findByUploader(uploadedBy: string): Promise<DocumentRecord[]> {
   const rows = await queryAll<DbDocument>("SELECT * FROM documents WHERE uploaded_by = $1 ORDER BY created_at DESC", [uploadedBy]);
   return rows.map(mapDocument);
+}
+
+export async function updateDocumentOcrResult(documentId: string, extractedText: string, ocrStatus: string): Promise<void> {
+  await query(
+    "UPDATE documents SET extracted_text = $1, ocr_status = $2, updated_at = NOW() WHERE id = $3",
+    [extractedText, ocrStatus, documentId]
+  );
 }

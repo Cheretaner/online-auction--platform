@@ -14,6 +14,8 @@ export interface Deposit {
   verifiedAt: string | null;
   releasedAt: string | null;
   rejectionReason: string | null;
+  releaseReferenceNumber: string | null;
+  releaseDocumentId: string | null;
   createdAt: string;
   updatedAt: string;
 }

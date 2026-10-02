@@ -1,70 +1,26 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import auctionGavelIcon from '../../assets/icons/auction-gavel.svg'
-import awardedCheckIcon from '../../assets/icons/awarded-check.svg'
-import bondIcon from '../../assets/icons/bond.svg'
-import issuerVerifiedIcon from '../../assets/icons/issuer-verified.svg'
-import locationIcon from '../../assets/icons/location.svg'
-import sealedLockIcon from '../../assets/icons/sealed-lock.svg'
-import timerIcon from '../../assets/icons/timer.svg'
+import { BadgeCheck, CircleCheck, Gavel, Lock, MapPin, SearchX, ShieldCheck, Timer } from 'lucide-react'
+import { EmptyState, ErrorState } from '@/components/feedback/query-state'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Auction } from '@/lib/api/types'
 import { formatDateTime, formatMoney } from '@/lib/format'
-import { Icon } from '../ui/Icon'
-
-const buttonBase =
-  'flex shrink-0 items-center justify-center font-label text-label-12 font-medium text-center uppercase'
-
-const standardCard = 'border border-line bg-card drop-shadow-panel'
-const cardHeader = 'flex flex-col gap-[8px] border-b border-line/60 pb-[4px]'
-const cardFooter = 'border-t border-line/60 pt-[4px]'
-const headline = 'font-display text-xl font-medium tracking-[-0.5px] text-ink'
-const price = 'font-display text-xl font-semibold tracking-[-0.5px] whitespace-nowrap text-ink text-right'
-const monoLabel = 'font-label text-label-11 font-medium text-ink-soft'
-const summaryBox = 'flex flex-col justify-between self-start border border-line bg-panel p-[12px]'
-
-function Card({ className, children }: { className: string; children: ReactNode }) {
-  return (
-    <article className={`w-full ${className}`}>
-      <div className="flex flex-col gap-[12px] p-[20px]">{children}</div>
-    </article>
-  )
-}
-
-function ReferenceChip({ className, children }: { className: string; children: ReactNode }) {
-  return (
-    <span className={`px-[8px] py-[2px] font-label text-xs font-medium tracking-[0.3px] whitespace-nowrap ${className}`}>
-      {children}
-    </span>
-  )
-}
-
-function Issuer({ name, className = 'text-ink' }: { name: string; className?: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-[4px]">
-      <span className={`truncate text-body-13 font-semibold ${className}`}>{name}</span>
-      <Icon src={issuerVerifiedIcon} width={14.4} height={13.6} />
-    </div>
-  )
-}
-
-function Location({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex items-center gap-[4px]">
-      <Icon src={locationIcon} width={9.1} height={11.2} />
-      <span className="font-label text-label-11 font-medium whitespace-nowrap text-ink-soft">{children}</span>
-    </div>
-  )
-}
+import { cn } from '@/lib/utils'
+import { translate, useT } from '@/i18n/context'
+import { enumLabel, regionLabel } from '@/lib/format'
 
 /** "Ending in 4h 12m" from the auction's current close time. */
 function timeLeft(closesAt: string, now = Date.now()): string {
   const ms = new Date(closesAt).getTime() - now
-  if (ms <= 0) return 'Closing now'
+  if (ms <= 0) return translate('auctions', 'listing.closingNow')
   const minutes = Math.floor(ms / 60_000)
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
-  if (days > 0) return `Ending in ${days}d ${hours}h`
-  return `Ending in ${hours}h ${minutes % 60}m`
+  if (days > 0) return translate('auctions', 'listing.endsDays', { days, hours })
+  return translate('auctions', 'listing.endsHours', { hours, minutes: minutes % 60 })
 }
 
 function reference(auction: Auction): string {
@@ -73,147 +29,156 @@ function reference(auction: Auction): string {
 }
 
 function StatusChips({ auction }: { auction: Auction }) {
+  const t = useT('auctions')
+  const sealed = auction.auctionType === 'sealed_bid'
   if (auction.status === 'live') {
     return (
-      <div className="flex flex-wrap items-center gap-[4px]">
-        <span className="flex items-center gap-[6px] border border-forest bg-forest/10 px-[10px] py-[2px]">
-          <span className="size-[6px] rounded-full bg-forest" />
-          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-forest uppercase">
-            {auction.auctionType === 'sealed_bid' ? 'Sealed · Open' : 'Live Auction'}
-          </span>
-        </span>
-        <span className="flex items-center gap-[4px] border border-danger/30 bg-danger-tint/40 px-[8px] py-[2px]">
-          <Icon src={timerIcon} width={9.1} height={10.725} />
-          <span className="font-label text-xs font-medium whitespace-nowrap text-danger">{timeLeft(auction.closesAt)}</span>
-        </span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="default">
+          <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />
+          {sealed ? t('listing.sealedOpen') : t('listing.liveAuction')}
+        </Badge>
+        <Badge variant="warning">
+          <Timer aria-hidden />
+          {timeLeft(auction.closesAt)}
+        </Badge>
       </div>
     )
   }
   if (auction.status === 'awarded') {
     return (
-      <span className="flex w-fit items-center gap-[6px] bg-panel-4 px-[10px] py-[2px]">
-        <Icon src={awardedCheckIcon} width={11.2} height={11.2} />
-        <span className="font-label text-label-11 font-semibold whitespace-nowrap text-ink-strong uppercase">
-          Completed &amp; Awarded
-        </span>
-      </span>
+      <Badge variant="success">
+        <CircleCheck aria-hidden />
+        {t('listing.awarded')}
+      </Badge>
     )
   }
   const label =
     auction.status === 'scheduled'
-      ? `Opens ${formatDateTime(auction.opensAt)}`
+      ? t('listing.opens', { date: formatDateTime(auction.opensAt) })
       : auction.status === 'under_review'
-        ? 'Closed · Under review'
-        : `Closed ${formatDateTime(auction.closedAt ?? auction.closesAt)}`
+        ? t('listing.underReview')
+        : t('listing.closedOn', { date: formatDateTime(auction.closedAt ?? auction.closesAt) })
   return (
-    <div className="flex flex-wrap items-center gap-[4px]">
-      {auction.auctionType === 'sealed_bid' ? (
-        <span className="flex items-center gap-[4px] bg-navy px-[10px] py-[2px]">
-          <Icon src={sealedLockIcon} width={7.8} height={11.05} />
-          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-sidebar-foreground uppercase">Sealed Tender</span>
-        </span>
+    <div className="flex flex-wrap items-center gap-1.5">
+      {sealed ? (
+        <Badge variant="secondary">
+          <Lock aria-hidden />
+          {t('listing.sealedTender')}
+        </Badge>
       ) : null}
-      <span className="border border-line bg-panel-2 px-[8px] py-[2px] font-label text-xs whitespace-nowrap text-ink-soft">
-        {label}
-      </span>
+      <Badge variant={auction.status === 'scheduled' ? 'info' : 'muted'}>{label}</Badge>
     </div>
   )
 }
 
 function PriceSummary({ auction }: { auction: Auction }) {
+  const t = useT('auctions')
+  const tc = useT('common')
   const sealedHidden = auction.auctionType === 'sealed_bid' && !auction.sealedOpenedAt
   let caption: string
   let amount: string
   if (auction.status === 'awarded' && auction.winningAmount) {
-    caption = 'Final Sale Price'
+    caption = t('listing.finalPrice')
     amount = formatMoney(auction.winningAmount)
   } else if (auction.currentHighestBid && Number(auction.currentHighestBid) > 0 && !sealedHidden) {
-    caption = 'Current Highest Bid'
+    caption = t('listing.currentHighest')
     amount = formatMoney(auction.currentHighestBid)
   } else {
-    caption = sealedHidden ? 'Indicative Base Value' : 'Starting Price'
+    caption = sealedHidden ? t('listing.indicativeBase') : t('listing.startingPrice')
     amount = formatMoney(auction.startPrice)
   }
   return (
-    <div className={`col-span-12 md:col-span-5 ${summaryBox}`}>
-      <div className="flex flex-col items-end">
-        <span className={`${monoLabel} text-right uppercase`}>{caption}</span>
-        <span className={price}>{amount}</span>
-        <span className={`${monoLabel} pt-[2px] text-right`}>
-          {auction.bidCount} {auction.bidCount === 1 ? 'bid' : 'bids'}
-          {auction.auctionType === 'open_ascending' ? ` · increment ${formatMoney(auction.minIncrement)}` : ''}
-        </span>
-      </div>
+    <div className="rounded-md bg-muted/70 p-4 md:text-right">
+      <p className="eyebrow text-muted-foreground">{caption}</p>
+      <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">{amount}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {auction.bidCount === 1 ? tc('bidCountOne') : tc('bidCountOther', { count: auction.bidCount })}
+        {auction.auctionType === 'open_ascending'
+          ? ` · ${t('listing.increment', { amount: formatMoney(auction.minIncrement) })}`
+          : ''}
+      </p>
     </div>
   )
 }
 
 function AuctionListing({ auction, issuer, featured }: { auction: Auction; issuer: string; featured: boolean }) {
-  const cardClass = featured
-    ? 'border-2 border-primary bg-card drop-shadow-panel'
-    : auction.status === 'awarded' || auction.status === 'closed'
-      ? 'border border-line bg-panel/70'
-      : standardCard
+  const t = useT('auctions')
+  const finished = auction.status === 'awarded' || auction.status === 'closed'
   const cta =
     auction.status === 'live'
       ? auction.auctionType === 'sealed_bid'
-        ? 'Review & Submit Sealed Bid'
-        : 'View Auction & Bid'
+        ? t('listing.ctaSealed')
+        : t('listing.ctaLive')
       : auction.status === 'scheduled'
-        ? 'Prepare to Bid'
-        : 'View Results'
+        ? t('listing.ctaUpcoming')
+        : t('listing.ctaResults')
 
   return (
-    <Card className={cardClass}>
-      <div className={cardHeader}>
-        <div className="flex flex-wrap items-center gap-x-[12px] gap-y-1">
-          <ReferenceChip className="bg-panel-3 text-ink">{reference(auction)}</ReferenceChip>
-          <Issuer name={issuer} />
+    <Card
+      className={cn('flex flex-col gap-4 p-5', featured && 'border-primary/50 ring-1 ring-primary/30', finished && 'bg-card/70')}
+    >
+      <div className="flex flex-col gap-3 border-b pb-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+          <span className="rounded-sm bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+            {reference(auction)}
+          </span>
+          <span className="inline-flex min-w-0 items-center gap-1 font-medium">
+            <span className="truncate">{issuer}</span>
+            <BadgeCheck className="size-4 shrink-0 text-primary" aria-label={t('discovery.verifiedIssuer')} />
+          </span>
           {auction.region ? (
-            <>
-              <span className="text-sm text-line">|</span>
-              <Location>{auction.region}</Location>
-            </>
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <MapPin className="size-3.5" aria-hidden />
+              {regionLabel(auction.region)}
+            </span>
           ) : null}
         </div>
         <StatusChips auction={auction} />
       </div>
 
-      <div className="grid grid-cols-12 gap-[12px]">
-        <div className="col-span-12 flex min-w-0 flex-col gap-[4px] self-start md:col-span-7">
-          <h2 className={headline}>{auction.title}</h2>
+      <div className="grid gap-4 md:grid-cols-[1fr_minmax(0,15rem)]">
+        <div className="min-w-0 space-y-2">
+          <h2 className="text-xl leading-snug font-semibold">
+            <Link to={`/auctions/${auction.id}`} className="rounded-sm hover:text-primary">
+              {auction.title}
+            </Link>
+          </h2>
           {auction.description ? (
-            <p className="line-clamp-3 text-body-13 leading-[1.625] text-ink-soft">{auction.description}</p>
+            <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{auction.description}</p>
           ) : null}
-          <div className={`flex flex-wrap items-center gap-x-[12px] gap-y-1 pt-[4px] ${monoLabel}`}>
-            <p>
-              FORMAT: <strong className="font-bold">{auction.auctionType === 'sealed_bid' ? 'SEALED BID' : 'OPEN ASCENDING'}</strong>
-            </p>
-            <p>
-              CLOSES: <strong className="font-bold">{formatDateTime(auction.closesAt).toUpperCase()}</strong>
-            </p>
-          </div>
+          <dl className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-xs">
+            <div className="flex gap-1.5">
+              <dt className="text-muted-foreground">{t('listing.format')}</dt>
+              <dd className="font-medium">{enumLabel(auction.auctionType)}</dd>
+            </div>
+            <div className="flex gap-1.5">
+              <dt className="text-muted-foreground">{t('listing.closes')}</dt>
+              <dd className="font-medium">{formatDateTime(auction.closesAt)}</dd>
+            </div>
+          </dl>
         </div>
         <PriceSummary auction={auction} />
       </div>
 
-      <div className={`flex flex-col gap-[8px] sm:flex-row sm:items-center sm:justify-between ${cardFooter}`}>
-        <div className="flex items-center gap-[6px]">
-          <Icon src={bondIcon} width={12.8} height={12.8} />
-          <p className="text-body-13 text-ink-soft">
-            {Number(auction.depositAmount) > 0 ? (
-              <>
-                Required bid security: <span className="font-label font-bold text-ink">{formatMoney(auction.depositAmount)}</span>
-              </>
-            ) : (
-              'No bid security required'
-            )}
-          </p>
-        </div>
-        <Link to={`/auctions/${auction.id}`} className={`${buttonBase} gap-[6px] bg-primary px-[20px] py-[6px] text-primary-foreground hover:bg-primary/90`}>
-          <Icon src={auctionGavelIcon} width={11.2} height={12} />
-          {cta}
-        </Link>
+      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <ShieldCheck className="size-4 shrink-0" aria-hidden />
+          {Number(auction.depositAmount) > 0 ? (
+            <span>
+              {t('listing.bidSecurity')}{' '}
+              <span className="font-medium text-foreground tabular-nums">{formatMoney(auction.depositAmount)}</span>
+            </span>
+          ) : (
+            t('listing.noBidSecurity')
+          )}
+        </p>
+        <Button asChild variant={finished ? 'outline' : 'default'} className="w-full sm:w-auto">
+          <Link to={`/auctions/${auction.id}`}>
+            <Gavel aria-hidden />
+            {cta}
+          </Link>
+        </Button>
       </div>
     </Card>
   )
@@ -225,35 +190,44 @@ export function ListingFeed({
   loading,
   error,
   onRetry,
+  onClearFilters,
   footer,
 }: {
   auctions: Auction[]
   issuerName: (orgId: string) => string
   loading: boolean
-  error: string | null
+  error: unknown
   onRetry: () => void
+  onClearFilters?: () => void
   footer?: ReactNode
 }) {
+  const t = useT('auctions')
   let body: ReactNode
   if (loading) {
     body = Array.from({ length: 3 }, (_, index) => (
-      <div key={index} className={`h-[220px] animate-pulse ${standardCard}`} aria-hidden />
+      <Card key={index} className="space-y-4 p-5" aria-hidden>
+        <Skeleton className="h-5 w-2/5" />
+        <Skeleton className="h-7 w-3/4" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </Card>
     ))
   } else if (error) {
-    body = (
-      <div className={`${standardCard} flex flex-col items-start gap-2 p-[20px]`}>
-        <p className="text-body-13 text-danger">{error}</p>
-        <button type="button" onClick={onRetry} className={`${buttonBase} border border-primary px-[12px] py-[6px] text-primary`}>
-          Try again
-        </button>
-      </div>
-    )
+    body = <ErrorState error={error} onRetry={onRetry} />
   } else if (auctions.length === 0) {
     body = (
-      <div className={`${standardCard} p-[20px]`}>
-        <p className="font-display text-xl text-ink">No auctions match these filters</p>
-        <p className="text-body-13 text-ink-soft">Try another status, region or search term.</p>
-      </div>
+      <EmptyState
+        icon={SearchX}
+        title={t('discovery.emptyTitle')}
+        description={t('discovery.emptyBody')}
+        action={
+          onClearFilters ? (
+            <Button variant="outline" onClick={onClearFilters}>
+              {t('discovery.clearFilters')}
+            </Button>
+          ) : null
+        }
+      />
     )
   } else {
     body = auctions.map((auction, index) => (
@@ -267,7 +241,7 @@ export function ListingFeed({
   }
 
   return (
-    <section className="col-span-12 flex flex-col gap-[12px] lg:col-span-8" aria-live="polite">
+    <section className="flex min-w-0 flex-col gap-4" aria-label={t('discovery.results')} aria-busy={loading}>
       {body}
       {footer}
     </section>

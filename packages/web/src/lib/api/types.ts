@@ -14,8 +14,6 @@ export interface PublicProfile {
   phone: string | null;
   accountType: AccountType;
   businessName: string | null;
-  nationalId: string | null;
-  tinNumber: string | null;
   region: string | null;
   verificationStatus: VerificationStatus;
   platformRole: Role | null;
@@ -158,6 +156,8 @@ export interface DocumentRecord {
   checksumSha256: string;
   isPrivate: boolean;
   summary: string | null;
+  extractedText: string | null;
+  ocrStatus: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -176,8 +176,48 @@ export interface DepositRecord {
   verifiedAt: string | null;
   releasedAt: string | null;
   rejectionReason: string | null;
+  releaseReferenceNumber: string | null;
+  releaseDocumentId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChapaDepositInitiation {
+  depositId: string;
+  txRef: string;
+  checkoutUrl: string | null;
+  status: string;
+}
+
+export interface SettlementRecord {
+  id: string;
+  auctionId: string;
+  winnerId: string;
+  amount: string;
+  currency: "ETB";
+  status: "due" | "payment_pending" | "paid" | "cancelled" | "reconciliation_required";
+  dueAt: string;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChapaSettlementInitiation {
+  settlementId: string;
+  txRef: string;
+  checkoutUrl: string | null;
+  status: string;
+}
+
+export interface FinancialReconciliationSnapshot {
+  auctionId: string;
+  generatedAt: string;
+  snapshotSha256: string;
+  deposits: Array<{ status: string; instrumentType: string; count: string; amount: string }>;
+  providerPayments: Array<{ status: string; count: string; amount: string }>;
+  providerRefunds: Array<{ status: string; count: string; amount: string }>;
+  settlements: Array<{ status: string; count: string; amount: string }>;
+  exceptions: Array<{ issue: string; entityId: string; txRef: string | null; amount: string }>;
 }
 
 export interface NotificationRecord {
@@ -237,6 +277,7 @@ export interface VerificationRecord {
   userId: string;
   documentType: string;
   documentNumber: string;
+  documentId: string | null;
   status: VerificationStatus;
   decision: string | null;
   decisionReason: string | null;
@@ -295,7 +336,10 @@ export interface AutofetchSource {
   id: string;
   name: string;
   adapterType: string;
-  sourceUrl: string | null;
+  sourceUrl?: string | null;
+  isActive?: boolean;
+  lastFetchedAt?: string | null;
+  nextFetchAt?: string | null;
   createdAt?: string;
 }
 
@@ -315,12 +359,21 @@ export interface AutofetchPendingItem {
 
 export interface AutofetchPendingResult extends ItemList<AutofetchPendingItem> {
   total: number;
+  limit: number;
+  offset: number;
   hasMore: boolean;
 }
 export interface AutofetchFetchResult { queued: number; conflicts: number; errors: number }
 export interface AutofetchPendingDetail { item: AutofetchPendingItem & { description?: string; normalizedMetadata?: Record<string, unknown> }; conflicts: unknown[] }
 export interface AutofetchConflictSummary { conflicts: unknown[]; count: number; critical: number; high: number; medium: number; low: number }
-export interface AutofetchStats { total: number; pending: number; approved: number; rejected: number }
+export interface AutofetchStats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  published?: number;
+  expired?: number;
+}
 
 export interface AnomalyFlagRecord {
   id: string;

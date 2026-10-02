@@ -8,7 +8,10 @@ const service = new VerificationService();
 
 export const submitVerification: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
-  const result = await service.submit(auth.userId, req.body as SubmitVerificationRequest);
+  const result = await service.submit(
+    { userId: auth.userId, roles: auth.roles },
+    req.body as SubmitVerificationRequest,
+  );
   res.status(HttpStatus.CREATED).json(result);
 };
 

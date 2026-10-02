@@ -45,7 +45,7 @@ const NotFoundPage = lazy(() => import("@/pages/not-found-page"));
 
 function Fallback() {
   return (
-    <div className="p-6">
+    <div className="page-container py-10">
       <PageSkeleton />
     </div>
   );
@@ -65,12 +65,11 @@ export const router = createBrowserRouter([
   {
     element: <RootProviders />,
     children: [
-      // The discovery page carries its own header and footer (Figma design).
-      { path: "/auctions", element: <AuctionDiscoveryPage /> },
       {
         element: <PublicShell />,
         children: [
           { path: "/", element: <HomePage /> },
+          { path: "/auctions", element: <AuctionDiscoveryPage /> },
           { path: "/auctions/:id", element: <AuctionDetailPage /> },
           { path: "/reports/:id", element: <ReportPublicPage /> },
           { path: "/reset-password", element: <ResetPasswordPage /> },
@@ -82,6 +81,7 @@ export const router = createBrowserRouter([
               { path: "/forgot-password", element: <ForgotPasswordPage /> },
             ],
           },
+          { path: "*", element: <NotFoundPage /> },
         ],
       },
       {
@@ -177,7 +177,6 @@ export const router = createBrowserRouter([
         ],
       },
       { path: "/dashboard", element: <Navigate to="/app" replace /> },
-      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);

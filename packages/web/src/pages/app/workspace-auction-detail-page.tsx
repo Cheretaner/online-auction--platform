@@ -3,7 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
-import { QueryState } from "@/components/feedback/query-state";
+import { EmptyState, QueryState } from "@/components/feedback/query-state";
+import { ExternalLink, Pencil, ScanSearch, Scale, ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
@@ -22,34 +24,48 @@ import { LotsManager } from "@/features/workspace/lots-manager";
 import { ReportsPanel } from "@/features/workspace/reports-panel";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
-import { canApproveAuctions, canManageAuctions, formatDateTime, formatMoney, hasRole } from "@/lib/format";
+import { canApproveAuctions, canManageAuctions, enumLabel, formatDateTime, formatMoney, hasRole, regionLabel } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
-const CANCELLABLE = new Set(["draft", "pending_review", "scheduled", "live"]);
+const CANCELLABLE = new Set(["draft", "pending_review", "scheduled", "live", "closed", "under_review"]);
 const AWARDABLE = new Set(["closed", "under_review"]);
 
 export default function WorkspaceAuctionDetailPage() {
   const { id } = useParams();
   const auction = useAuction(id);
   const record = auction.data;
+  const t = useT("workspace");
   return (
     <div>
       <PageHeader
-        title={record?.title ?? "Auction details"}
-        description="Organization workspace"
+        back={{ to: "/app/auctions", label: t("detail.back") }}
+        title={record?.title ?? t("detail.fallbackTitle")}
+        meta={
+          record ? (
+            <>
+              <StatusBadge status={record.status} />
+              <Badge variant="outline">{enumLabel(record.auctionType)}</Badge>
+            </>
+          ) : null
+        }
         actions={
           record ? (
-            <div className="flex flex-wrap gap-2">
+            <>
               {record.status === "draft" ? (
                 <Button asChild variant="outline">
-                  <Link to={`/app/auctions/${record.id}/edit`}>Edit auction</Link>
+                  <Link to={`/app/auctions/${record.id}/edit`}>
+                    <Pencil aria-hidden /> {t("detail.edit")}
+                  </Link>
                 </Button>
               ) : null}
               {record.status !== "draft" && record.status !== "pending_review" ? (
-                <Button asChild variant="ghost">
-                  <Link to={`/auctions/${record.id}`}>Public page</Link>
+                <Button asChild variant="outline">
+                  <Link to={`/auctions/${record.id}`}>
+                    <ExternalLink aria-hidden /> {t("detail.publicPage")}
+                  </Link>
                 </Button>
               ) : null}
-            </div>
+            </>
           ) : null
         }
       />
@@ -72,21 +88,28 @@ function Workspace({ auction }: { auction: Auction }) {
   const openFlags = (anomalies.data?.items ?? []).filter((flag) => flag.status === "open").length;
   const openDisputes = (disputes.data?.items ?? []).filter((d) => d.status === "open" || d.status === "under_review").length;
   const reviewer = hasRole(roles, "compliance_officer", "org_admin", "super_admin");
+  const t = useT("workspace");
 
   return (
-    <div className="space-y-5">
-      <Overview auction={auction} />
+    <div className="space-y-6">
       <LifecycleActions auction={auction} />
+      <Overview auction={auction} />
       <Tabs defaultValue="lots">
-        <div className="overflow-x-auto">
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList>
-            <TabsTrigger value="lots">Lots</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="deposits">Deposits</TabsTrigger>
-            <TabsTrigger value="compliance">Compliance</TabsTrigger>
-            <TabsTrigger value="anomalies">Anomalies{openFlags ? ` (${openFlags})` : ""}</TabsTrigger>
-            <TabsTrigger value="disputes">Disputes{openDisputes ? ` (${openDisputes})` : ""}</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="lots">{t("detail.tabs.lots")}</TabsTrigger>
+            <TabsTrigger value="documents">{t("detail.tabs.documents")}</TabsTrigger>
+            <TabsTrigger value="deposits">{t("detail.tabs.deposits")}</TabsTrigger>
+            <TabsTrigger value="compliance">{t("detail.tabs.compliance")}</TabsTrigger>
+            <TabsTrigger value="anomalies">
+              {t("detail.tabs.anomalies")}
+              {openFlags ? <Badge variant="warning" className="px-1.5">{openFlags}</Badge> : null}
+            </TabsTrigger>
+            <TabsTrigger value="disputes">
+              {t("detail.tabs.disputes")}
+              {openDisputes ? <Badge variant="warning" className="px-1.5">{openDisputes}</Badge> : null}
+            </TabsTrigger>
+            <TabsTrigger value="reports">{t("detail.tabs.reports")}</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="lots" className="pt-4">
@@ -99,7 +122,7 @@ function Workspace({ auction }: { auction: Auction }) {
           {Number(auction.depositAmount) > 0 ? (
             <DepositReview auction={auction} />
           ) : (
-            <p className="text-sm text-muted-foreground">This auction does not require bid security.</p>
+            <EmptyState size="inline" icon={ShieldCheck} title={t("detail.noBidSecurity")} />
           )}
         </TabsContent>
         <TabsContent value="compliance" className="pt-4">
@@ -107,14 +130,14 @@ function Workspace({ auction }: { auction: Auction }) {
         </TabsContent>
         <TabsContent value="anomalies" className="pt-4">
           {(anomalies.data?.items ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No anomaly flags on this auction.</p>
+            <EmptyState size="inline" icon={ScanSearch} title={t("detail.noFlags")} />
           ) : (
             <AnomalyList items={anomalies.data?.items ?? []} showAuctionLink={false} />
           )}
         </TabsContent>
         <TabsContent value="disputes" className="pt-4">
           {(disputes.data?.items ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No disputes on this auction.</p>
+            <EmptyState size="inline" icon={Scale} title={t("detail.noDisputes")} />
           ) : (
             <DisputeList items={disputes.data?.items ?? []} showAuctionLink={false} />
           )}
@@ -128,33 +151,35 @@ function Workspace({ auction }: { auction: Auction }) {
 }
 
 function Overview({ auction }: { auction: Auction }) {
+  const t = useT("workspace");
+  const tc = useT("common");
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-lg">Overview</CardTitle>
-          <StatusBadge status={auction.status} />
-        </div>
+        <CardTitle>{t("detail.overview")}</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-        <Info label="Auction type" value={auction.auctionType.replaceAll("_", " ")} />
-        <Info label="Starting price" value={formatMoney(auction.startPrice)} />
-        <Info label="Minimum increment" value={formatMoney(auction.minIncrement)} />
-        <Info label="Reserve" value={auction.reservePrice ? formatMoney(auction.reservePrice) : "None"} />
+      <CardContent className="grid gap-x-6 gap-y-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <Info label={t("detail.auctionType")} value={enumLabel(auction.auctionType)} />
+        <Info label={t("detail.startingPrice")} value={formatMoney(auction.startPrice)} />
+        <Info label={t("detail.minIncrement")} value={formatMoney(auction.minIncrement)} />
+        <Info label={t("detail.reserve")} value={auction.reservePrice ? formatMoney(auction.reservePrice) : tc("none")} />
         <Info
-          label="Highest bid"
-          value={Number(auction.currentHighestBid ?? 0) > 0 ? formatMoney(auction.currentHighestBid) : "No bids yet"}
+          label={t("detail.highestBid")}
+          value={Number(auction.currentHighestBid ?? 0) > 0 ? formatMoney(auction.currentHighestBid) : t("detail.noBidsYet")}
         />
-        <Info label="Bids" value={String(auction.bidCount)} />
-        <Info label="Deposit" value={Number(auction.depositAmount) > 0 ? formatMoney(auction.depositAmount) : "None"} />
-        <Info label="Region" value={auction.region ?? "Not set"} />
-        <Info label="Opens" value={formatDateTime(auction.opensAt)} />
+        <Info label={t("detail.bids")} value={String(auction.bidCount)} />
         <Info
-          label="Closes"
-          value={`${formatDateTime(auction.closesAt)}${auction.extensionCount ? ` (extended ${auction.extensionCount}×)` : ""}`}
+          label={t("detail.deposit")}
+          value={Number(auction.depositAmount) > 0 ? formatMoney(auction.depositAmount) : tc("none")}
         />
-        {auction.winningAmount ? <Info label="Winning amount" value={formatMoney(auction.winningAmount)} /> : null}
-        {auction.cancellationReason ? <Info label="Cancelled because" value={auction.cancellationReason} /> : null}
+        <Info label={t("detail.region")} value={auction.region ? regionLabel(auction.region) : tc("notSet")} />
+        <Info label={t("detail.opens")} value={formatDateTime(auction.opensAt)} />
+        <Info
+          label={t("detail.closes")}
+          value={`${formatDateTime(auction.closesAt)}${auction.extensionCount ? ` ${t("detail.extended", { count: auction.extensionCount })}` : ""}`}
+        />
+        {auction.winningAmount ? <Info label={t("detail.winningAmount")} value={formatMoney(auction.winningAmount)} /> : null}
+        {auction.cancellationReason ? <Info label={t("detail.cancelledBecause")} value={auction.cancellationReason} /> : null}
       </CardContent>
     </Card>
   );
@@ -165,6 +190,8 @@ function LifecycleActions({ auction }: { auction: Auction }) {
   const action = useAuctionAction(auction.id);
   const [cancelling, setCancelling] = useState(false);
   const [awarding, setAwarding] = useState(false);
+  const t = useT("workspace");
+  const tc = useT("common");
 
   const run = (operation: () => Promise<unknown>, message: string, after?: () => void) =>
     void operation()
@@ -172,7 +199,7 @@ function LifecycleActions({ auction }: { auction: Auction }) {
         toast.success(message);
         after?.();
       })
-      .catch((error: unknown) => toast.error(getErrorMessage(error, "Action failed")));
+      .catch((error: unknown) => toast.error(getErrorMessage(error, tc("actionFailed"))));
 
   const manager = canManageAuctions(roles);
   const approver = canApproveAuctions(roles);
@@ -180,38 +207,38 @@ function LifecycleActions({ auction }: { auction: Auction }) {
 
   const buttons = [
     auction.status === "draft" && manager ? (
-      <Button key="submit" disabled={action.submit.isPending} onClick={() => run(() => action.submit.mutateAsync(), "Submitted for review")}>
-        Submit for review
+      <Button key="submit" loading={action.submit.isPending} onClick={() => run(() => action.submit.mutateAsync(), t("detail.submitted"))}>
+        {t("detail.submit")}
       </Button>
     ) : null,
     auction.status === "pending_review" && approver && !isCreator ? (
-      <Button key="approve" disabled={action.approve.isPending} onClick={() => run(() => action.approve.mutateAsync(), "Auction approved")}>
-        Approve auction
+      <Button key="approve" loading={action.approve.isPending} onClick={() => run(() => action.approve.mutateAsync(), t("detail.approved"))}>
+        {t("detail.approve")}
       </Button>
     ) : null,
     auction.status === "pending_review" && isCreator ? (
       <p key="two-person" className="self-center text-sm text-muted-foreground">
-        Another approver must approve this auction (two-person rule).
+        {t("detail.twoPerson")}
       </p>
     ) : null,
     auction.status === "closed" && auction.auctionType === "sealed_bid" && !auction.sealedOpenedAt ? (
       <Button
         key="open-sealed"
         variant="outline"
-        disabled={action.openSealed.isPending}
-        onClick={() => run(() => action.openSealed.mutateAsync(), "Sealed bids opened")}
+        loading={action.openSealed.isPending}
+        onClick={() => run(() => action.openSealed.mutateAsync(), t("detail.sealedOpened"))}
       >
-        Open sealed bids
+        {t("detail.openSealed")}
       </Button>
     ) : null,
     AWARDABLE.has(auction.status) && approver ? (
       <Button key="award" onClick={() => setAwarding(true)}>
-        Award auction
+        {t("detail.award")}
       </Button>
     ) : null,
     CANCELLABLE.has(auction.status) && manager ? (
-      <Button key="cancel" variant="destructive" onClick={() => setCancelling(true)}>
-        Cancel auction
+      <Button key="cancel" variant="destructive-outline" onClick={() => setCancelling(true)}>
+        {t("detail.cancel")}
       </Button>
     ) : null,
   ].filter(Boolean);
@@ -219,27 +246,28 @@ function LifecycleActions({ auction }: { auction: Auction }) {
   if (buttons.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {buttons}
+    <div className="flex flex-col gap-3 rounded-lg border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="eyebrow text-primary">{t("detail.nextStep")}</p>
+      <div className="flex flex-wrap gap-2">{buttons}</div>
       <ReasonDialog
         open={cancelling}
         onOpenChange={setCancelling}
-        title="Cancel auction"
-        description="Cancelling is final. Bidders are notified and the reason is published with the auction."
-        confirmLabel="Cancel auction"
+        title={t("detail.cancel")}
+        description={t("detail.cancelDescription")}
+        confirmLabel={t("detail.cancel")}
         destructive
         pending={action.cancel.isPending}
-        onConfirm={(reason) => run(() => action.cancel.mutateAsync({ reason }), "Auction cancelled", () => setCancelling(false))}
+        onConfirm={(reason) => run(() => action.cancel.mutateAsync({ reason }), t("detail.cancelled"), () => setCancelling(false))}
       />
       <ConfirmDialog
         open={awarding}
         onOpenChange={setAwarding}
-        title="Award auction"
-        description="Awarding is final. It is refused while a high-severity anomaly flag is open or the audit chain is broken."
-        confirmLabel="Award"
+        title={t("detail.award")}
+        description={t("detail.awardDescription")}
+        confirmLabel={t("detail.awardConfirm")}
         pending={action.transition.isPending}
         onConfirm={() =>
-          run(() => action.transition.mutateAsync({ status: "awarded" }), "Auction awarded", () => setAwarding(false))
+          run(() => action.transition.mutateAsync({ status: "awarded" }), t("detail.awarded"), () => setAwarding(false))
         }
       />
     </div>
@@ -249,8 +277,8 @@ function LifecycleActions({ auction }: { auction: Auction }) {
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-medium capitalize">{value}</p>
+      <p className="eyebrow text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium tabular-nums first-letter:uppercase">{value}</p>
     </div>
   );
 }

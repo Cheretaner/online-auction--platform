@@ -5,17 +5,51 @@ import { IdentityRepository } from "../identity/identity.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import { VerificationRepository } from "./verification.repository.js";
 import type { Verification } from "./verification.types.js";
+import * as documentService from "../document/document.service.js";
+import { ManualReviewIdentityProvider, type IdentityVerificationProvider } from "./identity-provider.js";
 
 export class VerificationService {
   private repository = new VerificationRepository();
   private identityRepo = new IdentityRepository();
+  constructor(private readonly identityProvider: IdentityVerificationProvider = new ManualReviewIdentityProvider()) {}
 
-  async submit(userId: string, data: SubmitVerificationRequest): Promise<Verification> {
-    const existingPending = await this.repository.getPendingVerification(userId);
+  async submit(user: { userId: string; roles: Role[] }, data: SubmitVerificationRequest): Promise<Verification> {
+    const evidence = await documentService.getDocument(data.documentId);
+    if (
+      !evidence ||
+      evidence.uploadedBy !== user.userId ||
+      !evidence.isPrivate ||
+      evidence.documentType !== "identity_document"
+    ) {
+      throw AppError.badRequest("KYC evidence must be a private document uploaded by you");
+    }
+    const screening = await this.identityProvider.precheck({
+      documentType: data.documentType,
+      documentNumber: data.documentNumber,
+      evidenceDocumentId: data.documentId,
+    });
+    const existingPending = await this.repository.getPendingVerification(user.userId);
     if (existingPending) {
       throw AppError.conflict("A pending verification already exists");
     }
-    return this.repository.createVerification(userId, data);
+    const verification = await this.repository.createVerification(user.userId, data);
+    await audit.appendAuditEvent({
+      auctionId: null,
+      actorId: user.userId,
+      actorRole: audit.actorRoleOf(user.roles),
+      entityType: "verification",
+      entityId: verification.id,
+      action: "verification.submitted",
+      payload: {
+        documentType: verification.documentType,
+        documentId: evidence.id,
+        evidenceChecksumSha256: evidence.checksumSha256,
+        provider: screening.provider,
+        providerOutcome: screening.outcome,
+        providerReference: screening.reference,
+      },
+    });
+    return verification;
   }
 
   async review(

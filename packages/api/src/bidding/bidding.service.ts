@@ -1,7 +1,7 @@
 import { env } from "../config/env.js";
 import { hashIp } from "../kernel/crypto.js";
 import { DOMAIN_EVENTS } from "../kernel/events.js";
-import { maxMoney } from "../kernel/money.js";
+import { compareMoney, maxMoney } from "../kernel/money.js";
 import { isUniqueViolation } from "../kernel/pg.js";
 import { primaryActorRole } from "../kernel/roles.js";
 import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
@@ -312,8 +312,22 @@ export async function openSealedBids(input: {
       return { openedAt: auction.sealedOpenedAt.toISOString(), alreadyOpen: true };
     }
 
-    const opened = await repo.markSealedOpened(auction.id, input.actorId);
     const leading = await repo.findLeadingBid(auction.id);
+    const reserveMet =
+      leading !== null &&
+      (auction.reservePrice === null || compareMoney(leading.amount, auction.reservePrice) >= 0);
+    const winnerId = reserveMet ? leading!.bidderId : null;
+    const winningAmount = reserveMet ? leading!.amount : null;
+    const cancellationReason = !reserveMet
+      ? auction.reservePrice
+        ? "Reserve price not met after sealed-bid opening"
+        : "No qualifying sealed bids"
+      : undefined;
+    const opened = await repo.markSealedOpened(auction.id, input.actorId, {
+      winnerId,
+      winningAmount,
+      cancellationReason,
+    });
 
     await audit.appendAuditEvent({
       auctionId: auction.id,
@@ -322,20 +336,66 @@ export async function openSealedBids(input: {
       entityType: "auction",
       entityId: auction.id,
       action: DOMAIN_EVENTS.SEALED_OPENED,
-      payload: { leadingBidId: leading?.id ?? null, leadingAmount: leading?.amount ?? null },
+      payload: {
+        leadingBidId: leading?.id ?? null,
+        winnerId,
+        winningAmount,
+        reservePrice: auction.reservePrice,
+        cancellationReason: cancellationReason ?? null,
+      },
     });
+
+    if (!reserveMet) {
+      await audit.appendAuditEvent({
+        auctionId: auction.id,
+        actorId: input.actorId,
+        actorRole: primaryActorRole(input.roles),
+        entityType: "auction",
+        entityId: auction.id,
+        action: "auction.cancelled",
+        payload: { reason: cancellationReason, afterSealedOpening: true },
+      });
+    }
 
     await enqueueOutbox({
       aggregateType: "auction",
       aggregateId: auction.id,
-      eventType: DOMAIN_EVENTS.SEALED_OPENED,
-      payload: { auctionId: auction.id, leadingBidId: leading?.id ?? null },
+      eventType: reserveMet ? DOMAIN_EVENTS.SEALED_OPENED : "auction.cancelled",
+      payload: { auctionId: auction.id, leadingBidId: leading?.id ?? null, winnerId, winningAmount },
     });
+
+    if (winnerId) {
+      await notifications.enqueueNotification({
+        userId: winnerId,
+        channel: "in_app",
+        type: "auction.won",
+        title: "You are the leading bidder",
+        message: `Your sealed bid is the highest qualifying offer for "${auction.title}". The result is provisional until it is reviewed and awarded.`,
+        relatedEntityType: "auction",
+        relatedEntityId: auction.id,
+      });
+    } else {
+      const officers = await repo.listOrgOfficerIds(auction.orgId);
+      await notifications.notifyMany(
+        officers.map((userId) => ({
+          userId,
+          channel: "in_app" as const,
+          type: "auction.cancelled",
+          title: "Auction cancelled after sealed-bid review",
+          message: `No sealed bid met the required reserve for "${auction.title}".`,
+          relatedEntityType: "auction",
+          relatedEntityId: auction.id,
+        })),
+      );
+    }
 
     return {
       openedAt: opened.sealedOpenedAt?.toISOString(),
       alreadyOpen: false,
       leadingBid: leading,
+      winnerId,
+      winningAmount,
+      reserveMet,
     };
   }, { userId: input.actorId, organizationId: input.organizationId });
 }

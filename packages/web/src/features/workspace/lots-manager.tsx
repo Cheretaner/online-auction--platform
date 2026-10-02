@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateAuctionItemRequest, ITEM_CONDITIONS } from "@auction/shared";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Lock, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { EmptyState, PageSkeleton } from "@/components/feedback/query-state";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,8 @@ import { useCategories } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { AuctionItem } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { formatMoney } from "@/lib/format";
+import { enumLabel, formatMoney } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 const NO_CATEGORY = "none";
 
@@ -41,18 +43,28 @@ export function LotsManager({ auctionId, editable }: { auctionId: string; editab
   const [editing, setEditing] = useState<AuctionItem | "new" | null>(null);
   const [deleting, setDeleting] = useState<AuctionItem | null>(null);
   const list = items.data?.items ?? [];
+  const t = useT("workspace");
 
   return (
     <div className="space-y-4">
       {editable ? (
         <Button onClick={() => setEditing("new")}>
-          <Plus className="size-4" aria-hidden /> Add lot
+          <Plus aria-hidden /> {t("lots.add")}
         </Button>
       ) : (
-        <p className="text-sm text-muted-foreground">Lots are locked once the auction leaves draft.</p>
+        <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Lock className="size-4" aria-hidden /> {t("lots.locked")}
+        </p>
       )}
-      {items.isLoading ? <p className="text-sm text-muted-foreground">Loading lots…</p> : null}
-      {!items.isLoading && list.length === 0 ? <p className="text-sm text-muted-foreground">No lots yet.</p> : null}
+      {items.isLoading ? <PageSkeleton rows={2} /> : null}
+      {!items.isLoading && list.length === 0 ? (
+        <EmptyState
+          size="inline"
+          icon={Package}
+          title={t("lots.emptyTitle")}
+          description={editable ? t("lots.emptyBody") : undefined}
+        />
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-2">
         {list.map((item) => (
           <Card key={item.id}>
@@ -61,20 +73,20 @@ export function LotsManager({ auctionId, editable }: { auctionId: string; editab
                 <p className="font-medium">{item.title}</p>
                 {editable ? (
                   <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" aria-label={`Edit ${item.title}`} onClick={() => setEditing(item)}>
+                    <Button size="icon-sm" variant="ghost" aria-label={t("lots.edit", { title: item.title })} onClick={() => setEditing(item)}>
                       <Pencil className="size-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" aria-label={`Delete ${item.title}`} onClick={() => setDeleting(item)}>
+                    <Button size="icon-sm" variant="ghost" className="text-destructive hover:bg-destructive/10" aria-label={t("lots.delete", { title: item.title })} onClick={() => setDeleting(item)}>
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
                 ) : null}
               </div>
               {item.description ? <p className="text-sm text-muted-foreground">{item.description}</p> : null}
-              <p className="text-xs text-muted-foreground">
-                Qty {item.quantity} {item.unit ?? ""}
-                {item.condition ? ` · ${item.condition.replaceAll("_", " ")}` : ""}
-                {item.estimatedValue ? ` · est. ${formatMoney(item.estimatedValue)}` : ""}
+              <p className="text-xs text-muted-foreground capitalize">
+                {t("lots.summary", { quantity: item.quantity, unit: item.unit ?? "" })}
+                {item.condition ? ` · ${enumLabel(item.condition)}` : ""}
+                {item.estimatedValue ? ` · ${t("lots.estimate", { amount: formatMoney(item.estimatedValue) })}` : ""}
               </p>
             </CardContent>
           </Card>
@@ -86,15 +98,16 @@ export function LotsManager({ auctionId, editable }: { auctionId: string; editab
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(open) => !open && setDeleting(null)}
-        title="Delete lot"
-        description={`Remove "${deleting?.title ?? ""}" from this auction?`}
-        confirmLabel="Delete"
+        title={t("lots.deleteTitle")}
+        description={t("lots.deleteDescription", { title: deleting?.title ?? "" })}
+        confirmLabel={t("lots.deleteTitle")}
+        destructive
         pending={remove.isPending}
         onConfirm={() =>
           deleting &&
           remove.mutate(deleting.id, {
             onSuccess: () => {
-              toast.success("Lot deleted");
+              toast.success(t("lots.deleted"));
               setDeleting(null);
             },
             onError: (error) => toast.error(getErrorMessage(error)),
@@ -124,13 +137,15 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
     },
   });
   const pending = create.isPending || update.isPending;
+  const t = useT("workspace");
+  const tc = useT("common");
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{item ? "Edit lot" : "Add lot"}</DialogTitle>
-          <DialogDescription>Describe the lot as bidders will see it.</DialogDescription>
+          <DialogTitle>{item ? t("lots.editTitle") : t("lots.addTitle")}</DialogTitle>
+          <DialogDescription>{t("lots.dialogDescription")}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form
@@ -141,7 +156,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               ) as typeof values;
               const done = {
                 onSuccess: () => {
-                  toast.success(item ? "Lot updated" : "Lot added");
+                  toast.success(item ? t("lots.updated") : t("lots.added"));
                   onClose();
                 },
                 onError: (error: unknown) => {
@@ -157,7 +172,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="title"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel>{t("lots.title")}</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -170,7 +185,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="description"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t("lots.description")}</FormLabel>
                   <FormControl>
                     <Textarea rows={3} {...field} value={field.value ?? ""} />
                   </FormControl>
@@ -183,7 +198,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantity</FormLabel>
+                  <FormLabel>{t("lots.quantity")}</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -201,9 +216,9 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="unit"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Unit</FormLabel>
+                  <FormLabel>{t("lots.unit")}</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. units, tonnes" {...field} value={field.value ?? ""} />
+                    <Input placeholder={t("lots.unitPlaceholder")} {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -214,17 +229,17 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="condition"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Condition</FormLabel>
+                  <FormLabel>{t("lots.condition")}</FormLabel>
                   <Select value={field.value ?? ""} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose" />
+                        <SelectValue placeholder={t("lots.choose")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {ITEM_CONDITIONS.map((condition) => (
                         <SelectItem key={condition} value={condition}>
-                          {condition.replaceAll("_", " ")}
+                          {enumLabel(condition)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -238,7 +253,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="estimatedValue"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Estimated value (ETB)</FormLabel>
+                  <FormLabel>{t("lots.estimatedValue", { currency: tc("currency") })}</FormLabel>
                   <FormControl>
                     <Input inputMode="decimal" {...field} value={field.value ?? ""} />
                   </FormControl>
@@ -251,7 +266,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="categoryId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
+                  <FormLabel>{t("lots.category")}</FormLabel>
                   <Select
                     value={field.value ?? NO_CATEGORY}
                     onValueChange={(value) => field.onChange(value === NO_CATEGORY ? undefined : value)}
@@ -262,7 +277,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={NO_CATEGORY}>Not set</SelectItem>
+                      <SelectItem value={NO_CATEGORY}>{t("lots.notSet")}</SelectItem>
                       {(categories.data?.items ?? []).map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
@@ -279,7 +294,7 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
               name="region"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Region</FormLabel>
+                  <FormLabel>{t("lots.region")}</FormLabel>
                   <FormControl>
                     <Input {...field} value={field.value ?? ""} />
                   </FormControl>
@@ -289,10 +304,10 @@ function LotDialog({ auctionId, item, onClose }: { auctionId: string; item: Auct
             />
             <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                {tc("cancel")}
               </Button>
-              <Button type="submit" disabled={pending}>
-                {pending ? "Saving…" : "Save lot"}
+              <Button type="submit" loading={pending}>
+                {pending ? t("lots.saving") : t("lots.save")}
               </Button>
             </DialogFooter>
           </form>

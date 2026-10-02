@@ -9,6 +9,7 @@ import type {
   GenerateReportRequest,
   OpenDisputeRequest,
   ReviewDepositRequest,
+  ReleaseDepositRequest,
   ReviewVerificationRequest,
   SubmitVerificationRequest,
 } from "@auction/shared";
@@ -22,6 +23,7 @@ import {
   documentsApi,
   notificationsApi,
   reportsApi,
+  settlementsApi,
   verificationApi,
   autofetchApi,
 } from "@/lib/api/resources";
@@ -154,6 +156,16 @@ export function useMyDeposits() {
   return useQuery({
     queryKey: queryKeys.deposits.mine,
     queryFn: () => depositsApi.listMine(),
+    refetchInterval: 15_000,
+    staleTime: QUERY_STALE_TIMES.short,
+  });
+}
+
+export function useDepositPaymentProviders() {
+  return useQuery({
+    queryKey: ["deposits", "providers"],
+    queryFn: () => depositsApi.providers(),
+    staleTime: QUERY_STALE_TIMES.long,
   });
 }
 
@@ -176,6 +188,32 @@ export function useCreateDeposit() {
   });
 }
 
+export function useInitiateChapaDeposit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { auctionId: string }) => depositsApi.initiateChapa(body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
+  });
+}
+
+export function useMySettlements(enabled = true) {
+  return useQuery({
+    queryKey: ["settlements", "mine"],
+    queryFn: () => settlementsApi.listMine(),
+    enabled,
+    staleTime: QUERY_STALE_TIMES.short,
+    refetchInterval: enabled ? 15_000 : false,
+  });
+}
+
+export function useInitiateChapaSettlement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (auctionId: string) => settlementsApi.initiateChapa(auctionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settlements"] }),
+  });
+}
+
 export function useReviewDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -188,7 +226,7 @@ export function useReviewDeposit() {
 export function useReleaseDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => depositsApi.release(id),
+    mutationFn: ({ id, body }: { id: string; body: ReleaseDepositRequest }) => depositsApi.release(id, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
   });
 }
@@ -295,6 +333,15 @@ export function useReports(auctionId?: string, enabled = true) {
   });
 }
 
+export function useFinancialReconciliation(auctionId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["reports", "financial-reconciliation", auctionId],
+    queryFn: () => reportsApi.financialReconciliation(auctionId),
+    enabled: Boolean(auctionId) && enabled,
+    staleTime: QUERY_STALE_TIMES.short,
+  });
+}
+
 export function useReport(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.reports.detail(id ?? ""),
@@ -380,17 +427,25 @@ export function useFetchAutofetchSource() {
     mutationFn: (sourceId: string) => autofetchApi.fetchSource(sourceId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
     },
   });
 }
 
-export function useAutofetchPending(enabled = true) {
+export function useAutofetchPending(offset = 0, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.autofetch.pending(),
-    queryFn: () => autofetchApi.pending(),
+    queryKey: queryKeys.autofetch.pending({ status: "pending", offset }),
+    queryFn: () => autofetchApi.pending({ status: "pending", limit: 50, offset }),
     enabled,
+  });
+}
+
+export function useAutofetchPendingDetail(id: string, enabled = true) {
+  return useQuery({
+    queryKey: [...queryKeys.autofetch.pending({ status: "pending" }), id, "detail"],
+    queryFn: () => autofetchApi.getPending(id),
+    enabled: enabled && Boolean(id),
   });
 }
 
@@ -407,7 +462,7 @@ export function useApproveAutofetchItem() {
   return useMutation({
     mutationFn: ({ id, auctionId }: { id: string; auctionId: string }) => autofetchApi.approve(id, auctionId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
       void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
     },
@@ -419,7 +474,7 @@ export function useRejectAutofetchItem() {
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => autofetchApi.reject(id, reason),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.pending() });
+      void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
     },
   });

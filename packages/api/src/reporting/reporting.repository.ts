@@ -14,6 +14,15 @@ export interface ReportRecord {
   publishedAt?: string;
 }
 
+export interface FinancialReconciliationSnapshot {
+  auctionId: string;
+  deposits: Array<{ status: string; instrumentType: string; count: string; amount: string }>;
+  providerPayments: Array<{ status: string; count: string; amount: string }>;
+  providerRefunds: Array<{ status: string; count: string; amount: string }>;
+  settlements: Array<{ status: string; count: string; amount: string }>;
+  exceptions: Array<{ issue: string; entityId: string; txRef: string | null; amount: string }>;
+}
+
 interface DbReport {
   id: string;
   auction_id: string;
@@ -130,4 +139,76 @@ export async function auctionSnapshot(auctionId: string): Promise<Record<string,
     [auctionId],
   );
   return row;
+}
+
+export async function financialReconciliation(auctionId: string): Promise<FinancialReconciliationSnapshot> {
+  const [deposits, providerPayments, providerRefunds, settlements, exceptions] = await Promise.all([
+    queryAll<{ status: string; instrument_type: string; count: string; amount: string }>(
+      `SELECT status, instrument_type, COUNT(*)::text AS count, COALESCE(SUM(amount), 0)::text AS amount
+         FROM deposits WHERE auction_id = $1 GROUP BY status, instrument_type ORDER BY status, instrument_type`,
+      [auctionId],
+    ),
+    queryAll<{ status: string; count: string; amount: string }>(
+      `SELECT pt.status, COUNT(*)::text AS count, COALESCE(SUM(pt.amount), 0)::text AS amount
+         FROM provider_transactions pt
+         LEFT JOIN deposits d ON d.id = pt.deposit_id
+         LEFT JOIN settlement_obligations s ON s.id = pt.settlement_id
+        WHERE COALESCE(d.auction_id, s.auction_id) = $1
+        GROUP BY pt.status ORDER BY pt.status`,
+      [auctionId],
+    ),
+    queryAll<{ status: string; count: string; amount: string }>(
+      `SELECT status, COUNT(*)::text AS count, COALESCE(SUM(amount), 0)::text AS amount
+         FROM provider_refunds WHERE auction_id = $1 GROUP BY status ORDER BY status`,
+      [auctionId],
+    ),
+    queryAll<{ status: string; count: string; amount: string }>(
+      `SELECT status, COUNT(*)::text AS count, COALESCE(SUM(amount), 0)::text AS amount
+         FROM settlement_obligations WHERE auction_id = $1 GROUP BY status ORDER BY status`,
+      [auctionId],
+    ),
+    queryAll<{ issue: string; entity_id: string; tx_ref: string | null; amount: string }>(
+      `SELECT 'successful_deposit_not_verified' AS issue, d.id::text AS entity_id, pt.tx_ref,
+              pt.amount::text AS amount
+         FROM provider_transactions pt JOIN deposits d ON d.id = pt.deposit_id
+        WHERE d.auction_id = $1 AND pt.status = 'succeeded' AND d.status NOT IN ('verified', 'released')
+       UNION ALL
+       SELECT 'refund_confirmed_deposit_not_released', d.id::text, pt.tx_ref, pr.amount::text
+         FROM provider_refunds pr
+         JOIN deposits d ON d.id = pr.deposit_id
+         JOIN provider_transactions pt ON pt.id = pr.provider_transaction_id
+        WHERE d.auction_id = $1 AND pr.status = 'refunded' AND d.status <> 'released'
+       UNION ALL
+       SELECT 'refund_requires_reconciliation', d.id::text, pt.tx_ref, pr.amount::text
+         FROM provider_refunds pr
+         JOIN deposits d ON d.id = pr.deposit_id
+         JOIN provider_transactions pt ON pt.id = pr.provider_transaction_id
+        WHERE d.auction_id = $1 AND pr.status IN ('reversed', 'failed', 'reconciliation_required')
+       UNION ALL
+       SELECT 'overdue_settlement_unpaid', s.id::text, NULL, s.amount::text
+         FROM settlement_obligations s
+        WHERE s.auction_id = $1 AND s.status IN ('due', 'payment_pending') AND s.due_at < NOW()
+       ORDER BY issue, entity_id`,
+      [auctionId],
+    ),
+  ]);
+
+  return {
+    auctionId,
+    deposits: deposits.map((row) => ({
+      status: row.status,
+      instrumentType: row.instrument_type,
+      count: row.count,
+      amount: row.amount,
+    })),
+    providerPayments,
+    providerRefunds,
+    settlements,
+    exceptions: exceptions.map((row) => ({
+      issue: row.issue,
+      entityId: row.entity_id,
+      txRef: row.tx_ref,
+      amount: row.amount,
+    })),
+  };
 }

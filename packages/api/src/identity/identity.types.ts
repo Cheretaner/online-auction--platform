@@ -19,7 +19,7 @@ export interface Profile {
 }
 
 /** Profile with the password hash stripped — the only shape sent over HTTP. */
-export type PublicProfile = Omit<Profile, "passwordHash">;
+export type PublicProfile = Omit<Profile, "passwordHash" | "nationalId" | "tinNumber">;
 
 export interface OrganizationMembership {
   organizationId: string;

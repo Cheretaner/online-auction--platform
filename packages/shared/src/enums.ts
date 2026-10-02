@@ -41,6 +41,7 @@ export const ERROR_CODES = [
   "BID_NOT_FOUND",
   "NOT_VERIFIED",
   "DEPOSIT_REQUIRED",
+  "DEPOSIT_REFUND_REQUIRED",
   "NOT_ELIGIBLE",
   "SELF_BIDDING",
   "SEALED_NOT_OPEN",
@@ -75,6 +76,8 @@ export const DOCUMENT_TYPES = [
   "inspection_report",
   "terms",
   "image",
+  "identity_document",
+  "deposit_release_evidence",
   "other",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
@@ -92,10 +95,51 @@ export const DEPOSIT_STATUS = ['pending', 'verified', 'rejected', 'released'] as
 export type DepositStatus = (typeof DEPOSIT_STATUS)[number];
 
 export const INSTRUMENT_TYPES = ['cpo', 'bank_guarantee', 'transfer'] as const;
-export type InstrumentType = (typeof INSTRUMENT_TYPES)[number];
+export const DEPOSIT_INSTRUMENT_TYPES = [...INSTRUMENT_TYPES, "chapa"] as const;
+export type InstrumentType = (typeof DEPOSIT_INSTRUMENT_TYPES)[number];
+
+// Snapshot of the National Bank of Ethiopia's published bank directory.
+export const ETHIOPIAN_BANKS = [
+  "Abay Bank S.C.",
+  "Addis Bank S.C",
+  "Ahadu Bank S.C.",
+  "Amhara Bank S.C.",
+  "Anbesa Bank",
+  "Awash Bank S.C.",
+  "Bank of Abyssinia",
+  "Berhan Bank S.C.",
+  "Bunna Bank S.C",
+  "Commercial Bank of Ethiopia",
+  "Cooperative Bank of Oromia",
+  "Dashen Bank S.C.",
+  "Development Bank of Ethiopia",
+  "Enat Bank S.C.",
+  "Gadaa Bank S.C.",
+  "Global Bank S.C",
+  "Goh Betoch Bank S.C.",
+  "Hibret Bank S.C.",
+  "Hijra Bank S.C.",
+  "Nib Int. Bank S.C.",
+  "Omo Bank S.C.",
+  "Oromia Bank S.C.",
+  "Rammis Bank S.C.",
+  "Shabelle Bank S.C.",
+  "Sidama Bank S.C.",
+  "Siinqee Bank S.C.",
+  "Siket Bank S.C",
+  "Tsedey Bank S.C.",
+  "Tsehay Bank S.C.",
+  "Wegagen Bank S.C.",
+  "ZamZam Bank S.C.",
+  "Zemen Bank S.C.",
+] as const;
+export type EthiopianBank = (typeof ETHIOPIAN_BANKS)[number];
 
 export const VERIFICATION_STATUS = ['unverified', 'pending', 'verified', 'rejected'] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUS)[number];
+
+export const VERIFICATION_DOCUMENT_TYPES = ["national_id", "kebele_id", "passport"] as const;
+export type VerificationDocumentType = (typeof VERIFICATION_DOCUMENT_TYPES)[number];
 
 export const VERIFICATION_DECISIONS = ['approved', 'rejected', 'resubmission_required'] as const;
 export type VerificationDecision = (typeof VERIFICATION_DECISIONS)[number];
@@ -112,7 +156,7 @@ export type AnomalyStatus = (typeof ANOMALY_STATUS)[number];
 export const DISPUTE_STATUS = ['open', 'under_review', 'resolved', 'rejected'] as const;
 export type DisputeStatus = (typeof DISPUTE_STATUS)[number];
 
-export const NOTIFICATION_CHANNEL = ['in_app', 'email', 'telegram'] as const;
+export const NOTIFICATION_CHANNEL = ['in_app', 'email', 'telegram', 'voice'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNEL)[number];
 
 export const NOTIFICATION_STATUS = ['pending', 'sent', 'failed', 'read'] as const;

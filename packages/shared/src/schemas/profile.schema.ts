@@ -16,8 +16,6 @@ export const ProfileResponse = z.object({
   phone: z.string().nullable(),
   accountType: z.enum(ACCOUNT_TYPES),
   businessName: z.string().nullable(),
-  nationalId: z.string().nullable(),
-  tinNumber: z.string().nullable(),
   region: z.string().nullable(),
   verificationStatus: z.enum(VERIFICATION_STATUS),
   isActive: z.boolean(),

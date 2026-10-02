@@ -12,6 +12,7 @@ import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
 import { authRateLimiter } from "../shared/middleware/rateLimit.middleware.js";
 import * as controller from "./identity.controller.js";
+import * as phoneController from "./phone-verification.controller.js";
 
 const router = Router();
 
@@ -43,5 +44,11 @@ router.get(
   requireAuth(["compliance_officer", "org_admin", "super_admin"]),
   asyncHandler(controller.getProfileById),
 );
+
+// Phone verification endpoints
+router.post("/phone/request-verification", requireAuth(), asyncHandler(phoneController.requestVerification));
+router.post("/phone/verify", requireAuth(), asyncHandler(phoneController.verifyPhone));
+router.get("/phone/status", requireAuth(), asyncHandler(phoneController.getStatus));
+router.delete("/phone", requireAuth(), asyncHandler(phoneController.removePhone));
 
 export default router;
