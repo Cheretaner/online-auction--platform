@@ -38,6 +38,7 @@ export class AutoFetchService {
     sourceId: string,
     organizationId: string
   ): Promise<{ queued: number; conflicts: number; errors: number }> {
+    let normalizationErrors = 0;
     try {
       logger.info({
         event: 'autofetch:fetch_started',
@@ -90,6 +91,11 @@ export class AutoFetchService {
       for (const fetched of fetchedItems) {
         try {
           const normalized = await adapter.normalize(fetched.metadata);
+          // The adapter's SourceFetch id is the canonical dedupe key. Some
+          // feeds do not repeat that generated key inside their metadata, so
+          // trusting normalize() alone produced a new timestamp ID on every
+          // run and re-imported the same notice endlessly.
+          normalized.externalId = fetched.externalId;
 
           if (adapter.isStale(normalized)) {
             logger.debug({
@@ -104,6 +110,7 @@ export class AutoFetchService {
 
           normalizedItems.push({ item: normalized, raw: fetched.metadata });
         } catch (error) {
+          normalizationErrors++;
           logger.error({
             event: 'autofetch:normalization_error',
             externalId: fetched.externalId,
@@ -194,7 +201,7 @@ export class AutoFetchService {
       return {
         queued: queuedItems.length,
         conflicts: conflictCount,
-        errors: fetchedItems.length - queuedItems.length,
+        errors: normalizationErrors,
       };
     } catch (error) {
       logger.error({
@@ -220,6 +227,9 @@ export class AutoFetchService {
     actor: { userId: string; organizationId?: string; roles: Role[] },
     auctionId: string
   ): Promise<AuctionItemRecord> {
+    let pending: Awaited<ReturnType<AutoFetchRepository["getPendingItemForOrganization"]>> = null;
+    let claimed = false;
+    let itemCreated = false;
     try {
       logger.info({
         event: 'autofetch:approval_started',
@@ -228,13 +238,15 @@ export class AutoFetchService {
       });
 
       // Get pending item
-      const pending = actor.organizationId
+      pending = actor.organizationId
         ? await this.autofetchRepo.getPendingItemForOrganization(pendingItemId, actor.organizationId)
         : actor.roles.includes('super_admin') ? await this.autofetchRepo.getPendingItemWithConflicts(pendingItemId) : null;
       if (!pending) {
         throw AppError.notFound('Pending item not found');
       }
       if (pending.status !== 'pending') throw AppError.conflict('Pending item has already been reviewed');
+      claimed = await this.autofetchRepo.claimPendingItem(pendingItemId, pending.organizationId);
+      if (!claimed) throw AppError.conflict('Pending item is already being reviewed');
 
       const metadata = pending.normalizedMetadata;
       const item = await auctionItemService.createAuctionItem(actor, auctionId, {
@@ -248,12 +260,15 @@ export class AutoFetchService {
         region: metadata.region,
         city: metadata.city,
       });
+      itemCreated = true;
+
+      // Mark the queue item before follow-up bookkeeping so a retry cannot
+      // create a second auction lot if review/audit logging is interrupted.
+      await this.autofetchRepo.updatePendingItemStatus(pendingItemId, 'approved');
+      claimed = false;
 
       // Record review
       await this.autofetchRepo.createReview(pendingItemId, actor.userId, 'approve', '');
-
-      // Update pending item status
-      await this.autofetchRepo.updatePendingItemStatus(pendingItemId, 'approved');
 
       // Clear conflicts now that it's approved
       await this.conflictService.clearConflicts(pendingItemId);
@@ -272,6 +287,16 @@ export class AutoFetchService {
 
       return item;
     } catch (error) {
+      if (pending && claimed && !itemCreated) {
+        await this.autofetchRepo.releasePendingItemClaim(pendingItemId, pending.organizationId).catch((releaseError) => {
+          logger.error({ err: releaseError, pendingItemId }, 'Could not release AutoFetch review claim');
+        });
+      }
+      if (pending && itemCreated && claimed) {
+        await this.autofetchRepo.updatePendingItemStatus(pendingItemId, 'approved').catch((statusError) => {
+          logger.error({ err: statusError, pendingItemId }, 'Could not finalize AutoFetch item after lot creation');
+        });
+      }
       logger.error({
         event: 'autofetch:approval_error',
         pendingItemId,
@@ -289,6 +314,8 @@ export class AutoFetchService {
     actor: { userId: string; organizationId?: string; roles: Role[] },
     reason: string
   ): Promise<void> {
+    let pending: Awaited<ReturnType<AutoFetchRepository["getPendingItemForOrganization"]>> = null;
+    let claimed = false;
     try {
       logger.info({
         event: 'autofetch:rejection_started',
@@ -296,19 +323,22 @@ export class AutoFetchService {
       });
 
       // Get pending item
-      const pending = actor.organizationId
+      pending = actor.organizationId
         ? await this.autofetchRepo.getPendingItemForOrganization(pendingItemId, actor.organizationId)
         : actor.roles.includes('super_admin') ? await this.autofetchRepo.getPendingItemWithConflicts(pendingItemId) : null;
       if (!pending) {
         throw AppError.notFound('Pending item not found');
       }
       if (pending.status !== 'pending') throw AppError.conflict('Pending item has already been reviewed');
+      claimed = await this.autofetchRepo.claimPendingItem(pendingItemId, pending.organizationId);
+      if (!claimed) throw AppError.conflict('Pending item is already being reviewed');
 
       // Record review
       await this.autofetchRepo.createReview(pendingItemId, actor.userId, 'reject', reason);
 
       // Update pending item status
       await this.autofetchRepo.updatePendingItemStatus(pendingItemId, 'rejected');
+      claimed = false;
 
       // Clear conflicts
       await this.conflictService.clearConflicts(pendingItemId);
@@ -324,6 +354,11 @@ export class AutoFetchService {
         pendingItemId,
       });
     } catch (error) {
+      if (pending && claimed) {
+        await this.autofetchRepo.releasePendingItemClaim(pendingItemId, pending.organizationId).catch((releaseError) => {
+          logger.error({ err: releaseError, pendingItemId }, 'Could not release AutoFetch review claim');
+        });
+      }
       logger.error({
         event: 'autofetch:rejection_error',
         pendingItemId,
@@ -402,6 +437,10 @@ export class AutoFetchService {
     }
   }
 
+  async getQueueStats(organizationId: string) {
+    return this.autofetchRepo.getQueueStats(organizationId);
+  }
+
   /**
    * Get all sources for an org
    */
@@ -432,12 +471,19 @@ export class AutoFetchService {
   ) {
     try {
       // Validate adapter exists
+      if (!adapterRegistry.has(config.adapterType)) {
+        throw AppError.badRequest(`Unsupported AutoFetch source type: ${config.adapterType}`);
+      }
       adapterRegistry.get(config.adapterType);
 
       // Validate adapter-specific config if adapter provides validator
       const adapter = adapterRegistry.get(config.adapterType);
       if (adapter.validateConfig) {
-        await adapter.validateConfig({ ...config.adapterConfig, url: config.sourceUrl ?? config.adapterConfig.url });
+        try {
+          await adapter.validateConfig({ ...config.adapterConfig, url: config.sourceUrl ?? config.adapterConfig.url });
+        } catch (error) {
+          throw AppError.badRequest(error instanceof Error ? error.message : 'Invalid AutoFetch source configuration');
+        }
       }
 
       const source = await this.autofetchRepo.createSource(organizationId, {

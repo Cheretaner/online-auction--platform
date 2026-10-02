@@ -10,6 +10,7 @@ import { optionalAuth, requireAuth, requireOrganization } from "../shared/middle
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
 import * as controller from "./auction.controller.js";
+import * as documentSearchController from "../document/document-search.controller.js";
 
 export const auctionRouter = Router();
 
@@ -20,6 +21,7 @@ const APPROVERS = ["org_admin", "compliance_officer", "super_admin"] as const;
 // factory registered a middleware that never called next() and hung.
 auctionRouter.get("/", optionalAuth(), validate(PublicAuctionListQuery, "query"), asyncHandler(controller.listPublic));
 auctionRouter.get("/:id", optionalAuth(), asyncHandler(controller.getById));
+auctionRouter.get("/:id/documents/search", requireAuth(), asyncHandler(documentSearchController.searchAuctionDocuments));
 
 auctionRouter.post(
   "/",

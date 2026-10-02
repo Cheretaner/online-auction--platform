@@ -156,6 +156,8 @@ export interface DocumentRecord {
   checksumSha256: string;
   isPrivate: boolean;
   summary: string | null;
+  extractedText: string | null;
+  ocrStatus: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -334,7 +336,10 @@ export interface AutofetchSource {
   id: string;
   name: string;
   adapterType: string;
-  sourceUrl: string | null;
+  sourceUrl?: string | null;
+  isActive?: boolean;
+  lastFetchedAt?: string | null;
+  nextFetchAt?: string | null;
   createdAt?: string;
 }
 
@@ -354,12 +359,21 @@ export interface AutofetchPendingItem {
 
 export interface AutofetchPendingResult extends ItemList<AutofetchPendingItem> {
   total: number;
+  limit: number;
+  offset: number;
   hasMore: boolean;
 }
 export interface AutofetchFetchResult { queued: number; conflicts: number; errors: number }
 export interface AutofetchPendingDetail { item: AutofetchPendingItem & { description?: string; normalizedMetadata?: Record<string, unknown> }; conflicts: unknown[] }
 export interface AutofetchConflictSummary { conflicts: unknown[]; count: number; critical: number; high: number; medium: number; low: number }
-export interface AutofetchStats { total: number; pending: number; approved: number; rejected: number }
+export interface AutofetchStats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  published?: number;
+  expired?: number;
+}
 
 export interface AnomalyFlagRecord {
   id: string;

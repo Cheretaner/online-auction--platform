@@ -50,7 +50,10 @@ export const getById: RequestHandler = async (req, res) => {
 
 export const listPublic: RequestHandler = async (req, res) => {
   const filters = req.query as unknown as PublicAuctionListQuery;
-  const page = await AuctionService.listPublicAuctions(filters);
+  const page = await AuctionService.listPublicAuctions({
+    ...filters,
+    includeDocumentSearch: filters.includeDocumentSearch === true,
+  });
   res.json({ items: page.items, total: page.total, limit: filters.limit, offset: filters.offset });
 };
 

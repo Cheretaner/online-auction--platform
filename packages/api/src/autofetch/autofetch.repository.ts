@@ -113,6 +113,37 @@ export class AutoFetchRepository {
     }
   }
 
+  async getQueueStats(organizationId: string): Promise<{
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    published: number;
+    expired: number;
+  }> {
+    const result = await this.pool.query(
+      `SELECT
+        COUNT(*)::INT AS total,
+        COUNT(*) FILTER (WHERE status = 'pending')::INT AS pending,
+        COUNT(*) FILTER (WHERE status = 'approved')::INT AS approved,
+        COUNT(*) FILTER (WHERE status = 'rejected')::INT AS rejected,
+        COUNT(*) FILTER (WHERE status = 'published')::INT AS published,
+        COUNT(*) FILTER (WHERE status = 'expired')::INT AS expired
+      FROM autofetch_pending_items
+      WHERE organization_id = $1`,
+      [organizationId],
+    );
+    const row = result.rows[0];
+    return {
+      total: row.total,
+      pending: row.pending,
+      approved: row.approved,
+      rejected: row.rejected,
+      published: row.published,
+      expired: row.expired,
+    };
+  }
+
   /**
    * Get active sources due for refetch
    */
@@ -201,7 +232,7 @@ export class AutoFetchRepository {
           raw_metadata, normalized_metadata, ai_confidence, estimated_value, category_suggestion
         )
         VALUES ${placeholders}
-        ON CONFLICT (source_id, external_id) DO NOTHING
+        ON CONFLICT (source_id, external_id) WHERE status IN ('pending', 'approved') DO NOTHING
         RETURNING *
       `;
 
@@ -255,6 +286,19 @@ export class AutoFetchRepository {
       if (filters.sourceId) {
         whereClause += ` AND api.source_id = $${params.length + 1}`;
         params.push(filters.sourceId);
+      }
+
+      if (filters.severityMin) {
+        const minimumSeverity = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 }[filters.severityMin as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'];
+        whereClause += ` AND EXISTS (
+          SELECT 1 FROM autofetch_conflicts acf
+          WHERE acf.pending_item_id = api.id
+            AND CASE acf.severity
+              WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2
+              WHEN 'HIGH' THEN 3 WHEN 'CRITICAL' THEN 4 ELSE 0
+            END >= $${params.length + 1}
+        )`;
+        params.push(minimumSeverity);
       }
 
       // Get total count
@@ -374,6 +418,26 @@ export class AutoFetchRepository {
       });
       throw error;
     }
+  }
+
+  async claimPendingItem(pendingItemId: string, organizationId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE autofetch_pending_items
+       SET status = 'processing', updated_at = NOW()
+       WHERE id = $1 AND organization_id = $2 AND status = 'pending'
+       RETURNING id`,
+      [pendingItemId, organizationId],
+    );
+    return result.rowCount === 1;
+  }
+
+  async releasePendingItemClaim(pendingItemId: string, organizationId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE autofetch_pending_items
+       SET status = 'pending', updated_at = NOW()
+       WHERE id = $1 AND organization_id = $2 AND status = 'processing'`,
+      [pendingItemId, organizationId],
+    );
   }
 
   /**

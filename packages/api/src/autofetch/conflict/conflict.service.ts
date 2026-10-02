@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../../shared/utils/logger.js';
+import { createHash } from 'node:crypto';
 import { ConflictFlag, ConflictSeverity, NormalizedItem } from '../types/index.js';
 import type { Auction } from '../../auction/auction.types.js';
 import type { AuctionItemRecord } from '../../auction/auction-item.types.js';
@@ -23,6 +24,18 @@ export class ConflictDetectionService {
 
   constructor(repository: ConflictRepository) {
     this.repo = repository;
+  }
+
+  private conflictId(pendingItemId: string, auctionId: string): string {
+    const namespace = Buffer.from('6ba7b8109dad11d180b400c04fd430c8', 'hex');
+    const bytes = createHash('sha1')
+      .update(Buffer.concat([namespace, Buffer.from(`autofetch-conflict:${pendingItemId}:${auctionId}`)]))
+      .digest()
+      .subarray(0, 16);
+    bytes[6] = (bytes[6]! & 0x0f) | 0x50;
+    bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+    const hex = bytes.toString('hex');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
 
   /**
@@ -70,7 +83,9 @@ export class ConflictDetectionService {
 
           if (matchResult.severity !== 'NONE') {
             const conflict: ConflictFlag = {
-              id: `conflict:${pendingItemId}:${auction.id}`,
+              // UUID-shaped and deterministic so the repository's primary
+              // key conflict handling deduplicates repeated matches.
+              id: this.conflictId(pendingItemId, auction.id),
               pendingItemId,
               conflictingAuctionId: auction.id,
               conflictType: this.determineConflictType(matchResult),

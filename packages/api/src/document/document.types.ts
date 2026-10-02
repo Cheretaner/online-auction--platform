@@ -12,6 +12,8 @@ export interface DocumentRecord {
   checksumSha256: string;
   isPrivate: boolean;
   summary: string | null;
+  extractedText: string | null;
+  ocrStatus: string;
   createdAt: string;
   updatedAt: string;
 }
