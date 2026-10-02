@@ -282,3 +282,16 @@ database you can throw away.**
 
 `scripts/test-all-endpoints.mjs` walks every endpoint against a running API.
 Set `ADMIN_EMAIL` to the API's `BOOTSTRAP_SUPER_ADMIN_EMAIL`.
+
+## Transparency and open data
+
+`GET /api/v1/audit/public/auctions/:auctionId/verify` publicly verifies the
+hash chain for a closed or awarded auction. It returns chain integrity, event
+count, head hash, and check time without exposing the underlying audit events.
+
+`GET /api/v1/open-data/auctions?limit=100&offset=0` provides paginated JSON
+for published auctions. It includes public auction facts and organization
+names, never bidder names, profile IDs, or account data. `GET
+/api/v1/open-data/weekly.csv` downloads the previous completed Monday-to-Monday
+UTC window of closed and awarded auctions. The CSV excludes bidder identity
+fields and protects spreadsheet users from formula injection.

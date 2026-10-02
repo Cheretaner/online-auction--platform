@@ -12,6 +12,7 @@ import { BidderReadinessPanel } from "@/features/bidding/bidder-readiness";
 import { useBidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { OpenDisputeButton } from "@/features/disputes/open-dispute-dialog";
 import { AuctionDocuments } from "@/features/documents/auction-documents";
+import { AuctionTransparencyPanel } from "@/features/auctions/auction-transparency-panel";
 import type { Auction } from "@/lib/api/types";
 import { formatDateTime, formatMoney, hasRole } from "@/lib/format";
 import { subscribeToEvents } from "@/lib/realtime/sse";
@@ -67,6 +68,8 @@ export default function AuctionDetailPage() {
             <Metric label="Bids" value={String(record.bidCount)} />
             <Metric label={record.status === "scheduled" ? "Opens" : "Closes"} value={formatDateTime(record.status === "scheduled" ? record.opensAt : record.closesAt)} />
           </div>
+
+          <AuctionTransparencyPanel auctionId={record.id} status={record.status} />
 
           <Card>
             <CardHeader>

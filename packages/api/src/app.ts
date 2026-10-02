@@ -36,6 +36,7 @@ import { createAutofetchRouter } from "./autofetch/autofetch.routes.js";
 import { getPool } from "./infrastructure/database/pool.js";
 import path from "node:path";
 import { chapaWebhook } from "./payments/chapa.controller.js";
+import { openDataRouter } from "./open-data/open-data.routes.js";
 
 export function createApp(): express.Express {
   const app = express();
@@ -95,6 +96,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/documents", documentRouter);
   app.use("/api/v1/verifications", verificationRouter);
   app.use("/api/v1/audit", auditRouter);
+  app.use("/api/v1/open-data", openDataRouter);
   app.use("/api/v1/ai", aiRouter);
   app.use("/api/v1/compliance", complianceRouter);
   app.use("/api/v1/notifications", notificationRouter);
