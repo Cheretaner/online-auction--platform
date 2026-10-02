@@ -17,15 +17,10 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useMyVerification, useSubmitVerification } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { canReviewKyc, formatDateTime } from "@/lib/format";
+import { canReviewKyc, enumLabel, formatDateTime } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
-const DOCUMENT_OPTIONS = [
-  { value: "national_id", label: "Fayda national ID" },
-  { value: "kebele_id", label: "Kebele ID" },
-  { value: "passport", label: "Passport" },
-  { value: "driving_license", label: "Driving licence" },
-  { value: "business_license", label: "Business licence (companies)" },
-];
+const DOCUMENT_OPTIONS = ["national_id", "kebele_id", "passport", "driving_license", "business_license"] as const;
 
 export default function KycPage() {
   const { session, roles } = useAuth();
@@ -33,16 +28,17 @@ export default function KycPage() {
   const record = verification.data;
   const status = session?.user.verificationStatus === "verified" ? "verified" : (record?.status ?? "unverified");
   const canSubmit = status === "unverified" || status === "rejected";
+  const t = useT("account");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Identity verification"
-        description="Bids are accepted only from verified bidders. You verify once and can then bid on any auction."
+        title={t("kyc.title")}
+        description={t("kyc.description")}
         actions={
           canReviewKyc(roles) ? (
             <Button asChild variant="outline">
-              <Link to="/app/kyc/review">Review queue</Link>
+              <Link to="/app/kyc/review">{t("kyc.reviewQueue")}</Link>
             </Button>
           ) : null
         }
@@ -51,7 +47,7 @@ export default function KycPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Your status</CardTitle>
+            <CardTitle>{t("kyc.yourStatus")}</CardTitle>
             <StatusBadge status={status} />
           </div>
         </CardHeader>
@@ -61,31 +57,30 @@ export default function KycPage() {
           ) : status === "verified" ? (
             <Alert variant="success">
               <CircleCheck aria-hidden />
-              <AlertTitle>You are verified</AlertTitle>
-              <AlertDescription>You can bid on any auction once its bid security requirement is met.</AlertDescription>
+              <AlertTitle>{t("kyc.verifiedTitle")}</AlertTitle>
+              <AlertDescription>{t("kyc.verifiedBody")}</AlertDescription>
             </Alert>
           ) : status === "pending" && record ? (
             <Alert variant="warning">
               <Clock aria-hidden />
-              <AlertTitle>Under review</AlertTitle>
+              <AlertTitle>{t("kyc.pendingTitle")}</AlertTitle>
               <AlertDescription>
-                Submitted {formatDateTime(record.createdAt)} ({record.documentType.replaceAll("_", " ")}). A compliance
-                officer will review it; you will get a notification when they decide.
+                {t("kyc.pendingBody", { date: formatDateTime(record.createdAt), document: enumLabel(record.documentType) })}
               </AlertDescription>
             </Alert>
           ) : status === "unverified" ? (
             <Alert>
               <ShieldAlert aria-hidden />
-              <AlertTitle>Not verified yet</AlertTitle>
-              <AlertDescription>Submit one identity document below. You only need to do this once.</AlertDescription>
+              <AlertTitle>{t("kyc.unverifiedTitle")}</AlertTitle>
+              <AlertDescription>{t("kyc.unverifiedBody")}</AlertDescription>
             </Alert>
           ) : null}
           {status === "rejected" && record ? (
             <Alert variant="destructive">
               <XCircle aria-hidden />
-              <AlertTitle>Not accepted</AlertTitle>
+              <AlertTitle>{t("kyc.rejectedTitle")}</AlertTitle>
               <AlertDescription>
-                {record.decisionReason ?? "No reason was given."} Correct the details and submit again.
+                {record.decisionReason ?? t("kyc.noReason")} {t("kyc.correctAndResubmit")}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -99,6 +94,7 @@ export default function KycPage() {
 
 function SubmitForm() {
   const submit = useSubmitVerification();
+  const t = useT("account");
   const form = useForm({
     resolver: zodResolver(SubmitVerificationRequest),
     defaultValues: { documentType: "national_id", documentNumber: "" },
@@ -106,8 +102,8 @@ function SubmitForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Submit your document</CardTitle>
-        <CardDescription>Enter the number exactly as printed. Only compliance officers can see it.</CardDescription>
+        <CardTitle>{t("kyc.submitTitle")}</CardTitle>
+        <CardDescription>{t("kyc.submitDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -115,7 +111,7 @@ function SubmitForm() {
             className="grid gap-4 sm:grid-cols-2"
             onSubmit={form.handleSubmit((values) =>
               submit.mutate(values, {
-                onSuccess: () => toast.success("Submitted for review"),
+                onSuccess: () => toast.success(t("kyc.submitted")),
                 onError: (error) => {
                   if (!applyApiFieldErrors(error, form.setError)) toast.error(getErrorMessage(error));
                 },
@@ -127,7 +123,7 @@ function SubmitForm() {
               name="documentType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document</FormLabel>
+                  <FormLabel>{t("kyc.document")}</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -136,8 +132,8 @@ function SubmitForm() {
                     </FormControl>
                     <SelectContent>
                       {DOCUMENT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                        <SelectItem key={option} value={option}>
+                          {option === "business_license" ? t("kyc.businessLicence") : enumLabel(option)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -151,7 +147,7 @@ function SubmitForm() {
               name="documentNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document number</FormLabel>
+                  <FormLabel>{t("kyc.documentNumber")}</FormLabel>
                   <FormControl>
                     <Input autoComplete="off" {...field} />
                   </FormControl>
@@ -161,7 +157,7 @@ function SubmitForm() {
             />
             <div className="sm:col-span-2">
               <Button type="submit" loading={submit.isPending}>
-                {submit.isPending ? "Submitting…" : "Submit for verification"}
+                {submit.isPending ? t("kyc.submitting") : t("kyc.submit")}
               </Button>
             </div>
           </form>

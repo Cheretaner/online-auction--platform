@@ -8,12 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAiAssist } from "@/features/ai/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/context";
 
-const SUGGESTIONS = [
-  "Which steps are still missing before this auction can be awarded?",
-  "Draft a neutral description for a 1970s mechanical wristwatch lot.",
-  "What should I verify before accepting a high-value bank transfer?",
-];
+const SUGGESTIONS = ["suggestion1", "suggestion2", "suggestion3"] as const;
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -31,6 +28,7 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
   const assist = useAiAssist();
   const [prompt, setPrompt] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const t = useT("tools");
 
   function ask(value?: string) {
     const question = (value ?? prompt).trim();
@@ -52,17 +50,17 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="size-4 text-primary" aria-hidden /> Assistant
+          <Sparkles className="size-4 text-primary" aria-hidden /> {t("assistant.title")}
         </CardTitle>
         <CardDescription>
-          Advice on listings, rules and bidding. It cannot place bids or change records.
-          {auctionTitle ? ` Answering about “${auctionTitle}”.` : " No auction context — answers stay generic."}
+          {t("assistant.description")}{" "}
+          {auctionTitle ? t("assistant.about", { title: auctionTitle }) : t("assistant.generic")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {turns.length === 0 ? (
           <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map((suggestion) => (
+            {SUGGESTIONS.map((key) => t(`assistant.${key}`)).map((suggestion) => (
               <Button
                 key={suggestion}
                 type="button"
@@ -86,10 +84,10 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
                 )}
               >
                 <p className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                  {turn.role === "user" ? "You" : "Assistant"}
+                  {turn.role === "user" ? t("assistant.you") : t("assistant.title")}
                   {turn.provider ? (
                     <Badge variant="outline" className="font-mono">
-                      {turn.fallback || turn.provider === "stub" ? "rule-based fallback" : turn.provider}
+                      {turn.fallback || turn.provider === "stub" ? t("assistant.fallback") : turn.provider}
                     </Badge>
                   ) : null}
                 </p>
@@ -98,7 +96,7 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
             ))}
             {assist.isPending ? (
               <li className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircle className="size-4 animate-spin" aria-hidden /> Thinking…
+                <LoaderCircle className="size-4 animate-spin" aria-hidden /> {t("assistant.thinking")}
               </li>
             ) : null}
           </ul>
@@ -110,7 +108,7 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
             ask();
           }}
         >
-          <Label htmlFor="ai-prompt">Ask the assistant</Label>
+          <Label htmlFor="ai-prompt">{t("assistant.ask")}</Label>
           <Textarea
             id="ai-prompt"
             rows={3}
@@ -122,13 +120,13 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
                 ask();
               }
             }}
-            placeholder="e.g. What must happen before I can award this auction?"
+            placeholder={t("assistant.placeholder")}
           />
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">Enter sends · Shift+Enter starts a new line</p>
+            <p className="text-xs text-muted-foreground">{t("assistant.keys")}</p>
             <Button type="submit" disabled={assist.isPending || prompt.trim().length === 0}>
               <Send aria-hidden />
-              Ask
+              {t("assistant.send")}
             </Button>
           </div>
         </form>

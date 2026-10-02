@@ -12,18 +12,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useLogout } from "@/features/auth/queries";
+import { useT } from "@/i18n/context";
 
 export function UserMenu() {
   const { session, isAuthenticated } = useAuth();
   const logout = useLogout();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const t = useT("layout");
   const inWorkspace = pathname.startsWith("/app");
 
   if (!isAuthenticated || !session) {
     return (
       <Button asChild variant="outline" size="sm">
-        <Link to="/login">Sign in</Link>
+        <Link to="/login">{t("user.signIn")}</Link>
       </Button>
     );
   }
@@ -38,7 +40,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-10 gap-2 px-1.5 sm:px-2" aria-label={`Account menu for ${session.user.fullName}`}>
+        <Button variant="ghost" className="h-10 gap-2 px-1.5 sm:px-2" aria-label={t("user.accountMenu", { name: session.user.fullName })}>
           <Avatar className="size-8">
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
@@ -55,14 +57,14 @@ export function UserMenu() {
           <DropdownMenuItem asChild>
             <Link to="/app">
               <LayoutDashboard />
-              Workspace
+              {t("user.workspace")}
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
           <Link to="/app/profile">
             <UserRound />
-            Profile
+            {t("user.profile")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -73,7 +75,7 @@ export function UserMenu() {
           }}
         >
           <LogOut />
-          Sign out
+          {t("user.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

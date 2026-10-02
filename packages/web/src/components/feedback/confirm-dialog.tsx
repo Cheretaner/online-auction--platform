@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
+import { useT } from "@/i18n/context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,7 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Confirm",
+  confirmLabel,
   onConfirm,
   onOpenChange,
   pending,
@@ -31,6 +32,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT("common");
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -39,7 +41,7 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{t("cancel")}</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending}
             className={destructive ? buttonVariants({ variant: "destructive" }) : undefined}
@@ -49,7 +51,7 @@ export function ConfirmDialog({
               onConfirm();
             }}
           >
-            {pending ? "Working…" : confirmLabel}
+            {pending ? t("working") : (confirmLabel ?? t("confirm"))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -3,6 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/context";
+
+function CloseLabel() {
+  const t = useT("common");
+  return <span className="sr-only">{t("close")}</span>;
+}
 
 export const Sheet = SheetPrimitive.Root;
 export const SheetTrigger = SheetPrimitive.Trigger;
@@ -41,7 +47,7 @@ export function SheetContent({
         {children}
         <SheetPrimitive.Close className="absolute top-3 right-3 grid size-9 cursor-pointer place-items-center rounded-md opacity-80 transition-[opacity,background-color] hover:bg-black/10 hover:opacity-100">
           <X className="size-4" />
-          <span className="sr-only">Close</span>
+          <CloseLabel />
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
     </SheetPortal>

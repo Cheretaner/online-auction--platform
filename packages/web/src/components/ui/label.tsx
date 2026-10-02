@@ -1,6 +1,7 @@
 import * as LabelPrimitive from "@radix-ui/react-label";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/context";
 
 export function Label({ className, ...props }: ComponentProps<typeof LabelPrimitive.Root>) {
   return (
@@ -16,7 +17,8 @@ export function Label({ className, ...props }: ComponentProps<typeof LabelPrimit
 
 /** Quiet "(optional)" marker so required fields don't need an asterisk. */
 export function OptionalHint() {
-  return <span className="ml-1 font-normal text-muted-foreground">(optional)</span>;
+  const t = useT("common");
+  return <span className="ml-1 font-normal text-muted-foreground">{t("optional")}</span>;
 }
 
 /** Help text under a field. */

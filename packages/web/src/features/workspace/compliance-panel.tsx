@@ -10,6 +10,7 @@ import { useComplianceChecks, useRunCompliance } from "@/features/operations/que
 import { getErrorMessage } from "@/lib/api/errors";
 import type { ComplianceCheckRecord } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 function findingText(finding: ComplianceCheckRecord["findings"][number]): string {
   if (typeof finding === "string") return finding;
@@ -21,6 +22,7 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
   const run = useRunCompliance();
   const [notes, setNotes] = useState("");
   const id = useId();
+  const t = useT("workspace");
   const items = checks.data?.items ?? [];
 
   return (
@@ -34,7 +36,7 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
               { auctionId, notes: notes.trim() || undefined },
               {
                 onSuccess: () => {
-                  toast.success("Compliance check recorded");
+                  toast.success(t("compliance.recorded"));
                   setNotes("");
                 },
                 onError: (error) => toast.error(getErrorMessage(error)),
@@ -43,18 +45,18 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
           }}
         >
           <Label htmlFor={id}>
-            Notes for this check
+            {t("compliance.notes")}
             <OptionalHint />
           </Label>
           <Textarea id={id} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
           <Button type="submit" loading={run.isPending}>
-            {run.isPending ? "Running…" : "Run compliance check"}
+            {run.isPending ? t("compliance.running") : t("compliance.run")}
           </Button>
         </form>
       ) : null}
       {checks.isLoading ? <PageSkeleton rows={2} /> : null}
       {!checks.isLoading && items.length === 0 ? (
-        <EmptyState size="inline" icon={ClipboardCheck} title="No compliance checks run yet" />
+        <EmptyState size="inline" icon={ClipboardCheck} title={t("compliance.empty")} />
       ) : null}
       <ul className="space-y-3">
         {items.map((check) => (
@@ -70,7 +72,7 @@ export function CompliancePanel({ auctionId, canRun }: { auctionId: string; canR
                 ))}
               </ul>
             ) : (
-              <p className="mt-2 text-muted-foreground">No findings.</p>
+              <p className="mt-2 text-muted-foreground">{t("compliance.noFindings")}</p>
             )}
             {check.notes ? <p className="mt-2 text-muted-foreground">{check.notes}</p> : null}
           </li>

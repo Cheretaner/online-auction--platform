@@ -20,6 +20,7 @@ import {
   useUnreadCount,
 } from "@/features/operations/queries";
 import { canManageAuctions, statusLabel } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 export default function DashboardPage() {
   const { session, roles, organizationId } = useAuth();
@@ -27,17 +28,18 @@ export default function DashboardPage() {
   const verification = useMyVerification();
   const deposits = useMyDeposits();
   const unread = useUnreadCount();
+  const t = useT("workspace");
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title={`Welcome, ${session?.user.fullName.split(" ")[0] ?? "there"}`}
-        description="Your account, eligibility, and activity across Cheretanet auctions."
+        title={t("dashboard.welcome", { name: session?.user.fullName.split(" ")[0] ?? t("dashboard.there") })}
+        description={t("dashboard.description")}
         actions={
           canManageAuctions(roles) ? (
             <Button asChild>
               <Link to="/app/auctions/new">
-                <Plus aria-hidden /> Create auction
+                <Plus aria-hidden /> {t("dashboard.createAuction")}
               </Link>
             </Button>
           ) : null
@@ -48,47 +50,47 @@ export default function DashboardPage() {
         <Alert variant="warning">
           <Building2 aria-hidden />
           <AlertDescription className="text-foreground">
-            Choose an organization in the top bar to manage its auctions and complete organization actions.
+            {t("dashboard.chooseOrg")}
           </AlertDescription>
         </Alert>
       ) : null}
 
       <section
-        aria-label="Account overview"
+        aria-label={t("dashboard.overview")}
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
       >
         <StatCard
-          label="Live auctions"
+          label={t("dashboard.liveAuctions")}
           value={auctions.data ? String(auctions.data.total) : "—"}
-          hint="Open for bidding now"
+          hint={t("dashboard.liveHint")}
           icon={Gavel}
           href="/auctions?status=live"
           loading={auctions.isLoading}
         />
         <StatCard
-          label="Identity check"
+          label={t("dashboard.identity")}
           value={statusLabel(
             verification.data?.status ??
               session?.user.verificationStatus ??
               "unverified",
           )}
-          hint="Review your verification"
+          hint={t("dashboard.identityHint")}
           icon={CheckCircle2}
           href="/app/kyc"
           loading={verification.isLoading}
         />
         <StatCard
-          label="My deposits"
+          label={t("dashboard.deposits")}
           value={deposits.data ? String(deposits.data.items.length) : "—"}
-          hint="Review deposit records"
+          hint={t("dashboard.depositsHint")}
           icon={Wallet}
           href="/app/deposits"
           loading={deposits.isLoading}
         />
         <StatCard
-          label="Unread messages"
+          label={t("dashboard.unread")}
           value={unread.data ? String(unread.data.count) : "—"}
-          hint="Open notifications"
+          hint={t("dashboard.unreadHint")}
           icon={Bell}
           href="/app/notifications"
           loading={unread.isLoading}
@@ -98,9 +100,9 @@ export default function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="h-full">
           <CardHeader>
-            <CardTitle>Your access</CardTitle>
+            <CardTitle>{t("dashboard.access")}</CardTitle>
             <CardDescription>
-              Permissions available to your current account.
+              {t("dashboard.accessDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -114,7 +116,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                No organization roles are assigned to this account yet.
+                {t("dashboard.noRoles")}
               </p>
             )}
           </CardContent>
@@ -122,13 +124,13 @@ export default function DashboardPage() {
 
         <Card className="h-full">
           <CardHeader>
-            <CardTitle>Quick links</CardTitle>
-            <CardDescription>Pick up where you need to.</CardDescription>
+            <CardTitle>{t("dashboard.quickLinks")}</CardTitle>
+            <CardDescription>{t("dashboard.quickLinksDescription")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
-            <QuickLink to="/auctions" label="Browse public auctions" />
-            <QuickLink to="/app/kyc" label="Identity verification" />
-            <QuickLink to="/app/notifications" label="Notifications" />
+            <QuickLink to="/auctions" label={t("dashboard.browse")} />
+            <QuickLink to="/app/kyc" label={t("dashboard.verify")} />
+            <QuickLink to="/app/notifications" label={t("dashboard.notifications")} />
           </CardContent>
         </Card>
       </div>

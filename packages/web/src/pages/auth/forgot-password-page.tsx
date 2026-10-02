@@ -8,30 +8,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRequestPasswordReset } from "@/features/auth/queries";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
 
 export default function ForgotPasswordPage() {
   const id = useId();
   const [email, setEmail] = useState("");
   const request = useRequestPasswordReset();
+  const t = useT("auth");
 
   return (
     <AuthCard
-      eyebrow="Account recovery"
-      title="Reset your password"
-      description="We will email you a link to choose a new password. The link works for 30 minutes."
+      eyebrow={t("forgot.eyebrow")}
+      title={t("forgot.title")}
+      description={t("forgot.description")}
       footer={
         <Link to="/login" className={authLinkClass}>
-          Back to sign in
+          {t("forgot.back")}
         </Link>
       }
     >
           {request.isSuccess ? (
             <Alert variant="success">
               <MailCheck aria-hidden />
-              <AlertTitle>Check your email</AlertTitle>
+              <AlertTitle>{t("forgot.checkEmail")}</AlertTitle>
               <AlertDescription>
-                If <strong className="text-foreground">{email}</strong> has an account, a reset link is on its way.
-                Check your inbox and spam folder.
+                {t("forgot.sentBody", { email })}
               </AlertDescription>
             </Alert>
           ) : (
@@ -43,12 +44,12 @@ export default function ForgotPasswordPage() {
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor={id}>Email</Label>
+                <Label htmlFor={id}>{t("email")}</Label>
                 <Input id={id} type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
               </div>
               {request.isError ? <p role="alert" className="text-sm text-destructive">{getErrorMessage(request.error)}</p> : null}
               <Button type="submit" size="lg" className="w-full" loading={request.isPending}>
-                {request.isPending ? "Sending…" : "Send reset link"}
+                {request.isPending ? t("forgot.submitting") : t("forgot.submit")}
               </Button>
             </form>
           )}

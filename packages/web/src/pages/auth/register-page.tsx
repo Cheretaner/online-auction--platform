@@ -26,6 +26,8 @@ import {
 import { useRegisterMutation } from "@/features/auth/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
+import { enumLabel } from "@/lib/format";
 
 type RegisterFormValues = {
   email: string;
@@ -76,6 +78,7 @@ const registerResolver: Resolver<RegisterFormValues> = async (values, context, o
 export default function RegisterPage() {
   const navigate = useNavigate();
   const register = useRegisterMutation();
+  const t = useT("auth");
   const form = useForm<RegisterFormValues>({
     resolver: registerResolver,
     defaultValues: {
@@ -95,14 +98,14 @@ export default function RegisterPage() {
   return (
     <AuthCard
       wide
-      eyebrow="Bidder registration"
-      title="Create your bidder account"
-      description="One account lets you take part in any auction on Cheretanet. You will verify your identity once, from your workspace, before your first bid."
+      eyebrow={t("register.eyebrow")}
+      title={t("register.title")}
+      description={t("register.description")}
       footer={
         <>
-          Already registered?{" "}
+          {t("register.already")}{" "}
           <Link to="/login" className={authLinkClass}>
-            Sign in
+            {t("register.signIn")}
           </Link>
         </>
       }
@@ -116,7 +119,7 @@ export default function RegisterPage() {
                   navigate("/app", { replace: true });
                 } catch (error) {
                   if (!applyApiFieldErrors(error, form.setError)) {
-                    toast.error(getErrorMessage(error, "Registration failed"));
+                    toast.error(getErrorMessage(error, t("register.failed")));
                   }
                 }
               })}
@@ -126,7 +129,7 @@ export default function RegisterPage() {
                 name="fullName"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel>Full name</FormLabel>
+                    <FormLabel>{t("register.fullName")}</FormLabel>
                     <FormControl>
                       <Input autoComplete="name" {...field} />
                     </FormControl>
@@ -139,7 +142,7 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("email")}</FormLabel>
                     <FormControl>
                       <Input type="email" autoComplete="email" {...field} />
                     </FormControl>
@@ -152,7 +155,7 @@ export default function RegisterPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("password")}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -160,7 +163,7 @@ export default function RegisterPage() {
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription>At least 8 characters.</FormDescription>
+                    <FormDescription>{t("register.passwordHint")}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -170,7 +173,7 @@ export default function RegisterPage() {
                 name="accountType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Account type</FormLabel>
+                    <FormLabel>{t("register.accountType")}</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
@@ -178,8 +181,8 @@ export default function RegisterPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="individual">Individual</SelectItem>
-                        <SelectItem value="business">Business</SelectItem>
+                        <SelectItem value="individual">{enumLabel("individual")}</SelectItem>
+                        <SelectItem value="business">{enumLabel("business")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -192,11 +195,11 @@ export default function RegisterPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Phone
+                      {t("register.phone")}
                       <OptionalHint />
                     </FormLabel>
                     <FormControl>
-                      <Input type="tel" autoComplete="tel" placeholder="+251 9…" {...field} />
+                      <Input type="tel" autoComplete="tel" placeholder={t("register.phonePlaceholder")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -209,7 +212,7 @@ export default function RegisterPage() {
                     name="businessName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Business name</FormLabel>
+                        <FormLabel>{t("register.businessName")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -222,7 +225,7 @@ export default function RegisterPage() {
                     name="tinNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>TIN (taxpayer ID)</FormLabel>
+                        <FormLabel>{t("register.tin")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -238,7 +241,7 @@ export default function RegisterPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        National ID
+                        {t("register.nationalId")}
                         <OptionalHint />
                       </FormLabel>
                       <FormControl>
@@ -255,7 +258,7 @@ export default function RegisterPage() {
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
                     <FormLabel>
-                      Region
+                      {t("register.region")}
                       <OptionalHint />
                     </FormLabel>
                     <FormControl>
@@ -271,7 +274,7 @@ export default function RegisterPage() {
                 className="mt-2 sm:col-span-2"
                 loading={register.isPending}
               >
-                {register.isPending ? "Creating account…" : "Create account"}
+                {register.isPending ? t("register.submitting") : t("register.submit")}
               </Button>
             </form>
           </Form>

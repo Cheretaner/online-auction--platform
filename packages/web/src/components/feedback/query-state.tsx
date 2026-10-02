@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getErrorMessage, isApiError } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/context";
 
 export function PageSkeleton({ rows = 4, className }: { rows?: number; className?: string }) {
+  const t = useT("common");
   return (
     <div className={cn("space-y-3", className)} aria-busy="true" aria-live="polite">
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">{t("loading")}</span>
       {Array.from({ length: rows }).map((_, index) => (
         <Skeleton key={index} className="h-16 w-full rounded-lg" />
       ))}
@@ -77,16 +79,18 @@ export function ErrorState({
   onRetry?: () => void;
   className?: string;
 }) {
+  const t = useT("layout");
+  const tc = useT("common");
   const forbidden = isApiError(error) && error.isForbidden;
   const notFound = isApiError(error) && error.isNotFound;
   const offline = isApiError(error) && error.isOffline;
   const title = forbidden
-    ? "You do not have access"
+    ? t("feedback.noAccess")
     : notFound
-      ? "Not found"
+      ? t("feedback.notFound")
       : offline
-        ? "You appear to be offline"
-        : "Something went wrong";
+        ? t("feedback.offline")
+        : t("feedback.somethingWrong");
   return (
     <Alert variant="destructive" className={className}>
       <AlertTriangle aria-hidden />
@@ -95,7 +99,7 @@ export function ErrorState({
         <span>{getErrorMessage(error)}</span>
         {onRetry ? (
           <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-            Try again
+            {tc("tryAgain")}
           </Button>
         ) : null}
       </AlertDescription>
@@ -104,11 +108,12 @@ export function ErrorState({
 }
 
 export function OfflineBanner({ online }: { online: boolean }) {
+  const t = useT("common");
   if (online) return null;
   return (
     <div role="status" className="flex items-center gap-2 bg-warning px-4 py-2 text-sm font-medium text-warning-foreground">
       <WifiOff className="size-4 shrink-0" aria-hidden />
-      You are offline. Cached pages may still work; live auction data will not update.
+      {t("offline")}
     </div>
   );
 }
@@ -136,12 +141,13 @@ export function QueryState({
   onRetry?: () => void;
   children: ReactNode;
 }) {
+  const t = useT("layout");
   if (isLoading) return <PageSkeleton />;
   if (isError) return <ErrorState error={error} onRetry={onRetry} />;
   if (isEmpty)
     return (
       <EmptyState
-        title={emptyTitle ?? "Nothing here yet"}
+        title={emptyTitle ?? t("feedback.nothingYet")}
         description={emptyDescription}
         action={emptyAction}
         icon={emptyIcon}

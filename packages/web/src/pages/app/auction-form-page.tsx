@@ -34,10 +34,11 @@ import {
   useUpdateAuction,
 } from "@/features/auctions/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { toDatetimeLocalValue } from "@/lib/format";
+import { enumLabel, toDatetimeLocalValue } from "@/lib/format";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useEffect } from "react";
 import type { z } from "zod";
+import { useT } from "@/i18n/context";
 
 export default function AuctionFormPage() {
   const { id } = useParams();
@@ -47,6 +48,8 @@ export default function AuctionFormPage() {
   const create = useCreateAuction();
   const update = useUpdateAuction(id ?? "");
   const navigate = useNavigate();
+  const t = useT("workspace");
+  const tc = useT("common");
 
   const form = useForm<z.input<typeof CreateAuctionRequest>, unknown, z.output<typeof CreateAuctionRequest>>({
     resolver: zodResolver(CreateAuctionRequest),
@@ -92,19 +95,19 @@ export default function AuctionFormPage() {
   return (
     <div>
       <PageHeader
-        back={isEdit && id ? { to: `/app/auctions/${id}`, label: "Back to auction" } : { to: "/app/auctions", label: "Workspace auctions" }}
-        title={isEdit ? "Amend auction" : "Create auction"}
+        back={isEdit && id ? { to: `/app/auctions/${id}`, label: t("form.backToAuction") } : { to: "/app/auctions", label: t("form.backToList") }}
+        title={isEdit ? t("form.amendTitle") : t("form.createTitle")}
         description={
           isEdit
-            ? "Drafts can be changed freely until they are submitted for review."
-            : "Saved as a draft. Add lots and documents next, then submit it for review."
+            ? t("form.amendDescription")
+            : t("form.createDescription")
         }
       />
       {!organizationId ? (
         <EmptyState
           icon={Building2}
-          title="Choose an organization first"
-          description="Auctions belong to an organization. Pick one with the organization switcher in the top bar."
+          title={t("list.chooseOrgTitle")}
+          description={t("list.chooseOrgBody")}
         />
       ) : (
         <Form {...form}>
@@ -125,11 +128,11 @@ export default function AuctionFormPage() {
                     opensAt: values.opensAt.toISOString(),
                     closesAt: values.closesAt.toISOString(),
                   });
-                  toast.success("Auction updated");
+                  toast.success(t("form.updated"));
                   navigate(`/app/auctions/${id}`);
                 } else {
                   const created = await create.mutateAsync(values);
-                  toast.success("Auction created");
+                  toast.success(t("form.created"));
                   navigate(`/app/auctions/${created.id}`);
                 }
               } catch (error) {
@@ -141,8 +144,8 @@ export default function AuctionFormPage() {
           >
             <Card>
               <CardHeader>
-                <CardTitle>Basics</CardTitle>
-                <CardDescription>What is being sold, as bidders will see it.</CardDescription>
+                <CardTitle>{t("form.basics")}</CardTitle>
+                <CardDescription>{t("form.basicsDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5 sm:grid-cols-2">
     <FormField
@@ -150,7 +153,7 @@ export default function AuctionFormPage() {
                   name="title"
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
-                      <FormLabel>Title</FormLabel>
+                      <FormLabel>{t("form.title")}</FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
@@ -164,13 +167,13 @@ export default function AuctionFormPage() {
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
                       <FormLabel>
-                        Description
+                        {t("form.description")}
                         <OptionalHint />
                       </FormLabel>
                       <FormControl>
                         <Textarea rows={5} {...field} />
                       </FormControl>
-                      <FormDescription>Condition, location and anything bidders must know before taking part.</FormDescription>
+                      <FormDescription>{t("form.descriptionHint")}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -181,7 +184,7 @@ export default function AuctionFormPage() {
                     name="auctionType"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Auction format</FormLabel>
+                        <FormLabel>{t("form.format")}</FormLabel>
                         <Select
                           value={field.value}
                           onValueChange={field.onChange}
@@ -194,12 +197,12 @@ export default function AuctionFormPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="open_ascending">
-                              Open ascending
+                              {enumLabel("open_ascending")}
                             </SelectItem>
-                            <SelectItem value="sealed_bid">Sealed bid</SelectItem>
+                            <SelectItem value="sealed_bid">{enumLabel("sealed_bid")}</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormDescription>Cannot be changed after the auction is created.</FormDescription>
+                        <FormDescription>{t("form.formatHint")}</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -211,7 +214,7 @@ export default function AuctionFormPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Region
+                        {t("form.region")}
                         <OptionalHint />
                       </FormLabel>
                       <FormControl>
@@ -225,8 +228,8 @@ export default function AuctionFormPage() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Pricing and bid security</CardTitle>
-                <CardDescription>Amounts in Ethiopian birr.</CardDescription>
+                <CardTitle>{t("form.pricing")}</CardTitle>
+                <CardDescription>{t("form.pricingDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5 sm:grid-cols-2">
     <FormField
@@ -234,11 +237,11 @@ export default function AuctionFormPage() {
                   name="startPrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start price (ETB)</FormLabel>
+                      <FormLabel>{t("form.startPrice", { currency: tc("currency") })}</FormLabel>
                       <FormControl>
                         <Input inputMode="decimal" className="tabular-nums" {...field} />
                       </FormControl>
-                      <FormDescription>The lowest acceptable first bid.</FormDescription>
+                      <FormDescription>{t("form.startPriceHint")}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -248,11 +251,11 @@ export default function AuctionFormPage() {
                   name="minIncrement"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Minimum increment (ETB)</FormLabel>
+                      <FormLabel>{t("form.increment", { currency: tc("currency") })}</FormLabel>
                       <FormControl>
                         <Input inputMode="decimal" className="tabular-nums" {...field} />
                       </FormControl>
-                      <FormDescription>Each new bid must beat the highest by at least this much.</FormDescription>
+                      <FormDescription>{t("form.incrementHint")}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -262,11 +265,11 @@ export default function AuctionFormPage() {
                   name="depositAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bid security (ETB)</FormLabel>
+                      <FormLabel>{t("form.deposit", { currency: tc("currency") })}</FormLabel>
                       <FormControl>
                         <Input inputMode="decimal" className="tabular-nums" {...field} />
                       </FormControl>
-                      <FormDescription>CPO or guarantee bidders must lodge. Use 0 for none.</FormDescription>
+                      <FormDescription>{t("form.depositHint")}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -275,8 +278,8 @@ export default function AuctionFormPage() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Schedule</CardTitle>
-                <CardDescription>Times are in your local time zone. A second person must approve the auction before it opens.</CardDescription>
+                <CardTitle>{t("form.schedule")}</CardTitle>
+                <CardDescription>{t("form.scheduleDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5 sm:grid-cols-2">
     <FormField
@@ -284,7 +287,7 @@ export default function AuctionFormPage() {
                   name="opensAt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bidding opens</FormLabel>
+                      <FormLabel>{t("form.opens")}</FormLabel>
                       <FormControl>
                         <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
                       </FormControl>
@@ -297,7 +300,7 @@ export default function AuctionFormPage() {
                   name="closesAt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bidding closes</FormLabel>
+                      <FormLabel>{t("form.closes")}</FormLabel>
                       <FormControl>
                         <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
                       </FormControl>
@@ -309,10 +312,10 @@ export default function AuctionFormPage() {
             </Card>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={() => navigate(isEdit && id ? `/app/auctions/${id}` : "/app/auctions")}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
-                {isEdit ? "Save changes" : "Create draft auction"}
+                {isEdit ? t("form.save") : t("form.create")}
               </Button>
             </div>
           </form>

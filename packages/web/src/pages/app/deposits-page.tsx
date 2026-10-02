@@ -6,16 +6,18 @@ import { QueryState } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMyDeposits } from "@/features/operations/queries";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 export default function DepositsPage() {
   const deposits = useMyDeposits();
   const items = deposits.data?.items ?? [];
+  const t = useT("account");
   return (
     <div>
       <PageHeader
-        title="Bid security deposits"
-        description="Deposits you registered. Submit a new one from the auction you want to bid on."
+        title={t("deposits.title")}
+        description={t("deposits.description")}
       />
       <QueryState
         isLoading={deposits.isLoading}
@@ -23,11 +25,11 @@ export default function DepositsPage() {
         error={deposits.error}
         isEmpty={items.length === 0}
         emptyIcon={Wallet}
-        emptyTitle="No deposits yet"
-        emptyDescription="Open an auction that requires bid security and submit your CPO or guarantee there."
+        emptyTitle={t("deposits.emptyTitle")}
+        emptyDescription={t("deposits.emptyBody")}
         emptyAction={
           <Button asChild variant="outline">
-            <Link to="/auctions?status=live">Browse live auctions</Link>
+            <Link to="/auctions?status=live">{t("deposits.browseLive")}</Link>
           </Button>
         }
         onRetry={() => void deposits.refetch()}
@@ -40,18 +42,18 @@ export default function DepositsPage() {
                   <p className="text-base font-semibold tabular-nums">
                     {formatMoney(deposit.amount)}
                     <span className="eyebrow ml-2 align-middle text-muted-foreground">
-                      {deposit.instrumentType.replaceAll("_", " ")}
+                      {enumLabel(deposit.instrumentType)}
                     </span>
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {deposit.issuingBank} · Ref {deposit.referenceNumber}
+                    {t("deposits.reference", { bank: deposit.issuingBank, reference: deposit.referenceNumber })}
                   </p>
-                  <p className="text-xs text-muted-foreground">Submitted {formatDateTime(deposit.createdAt)}</p>
+                  <p className="text-xs text-muted-foreground">{t("deposits.submittedOn", { date: formatDateTime(deposit.createdAt) })}</p>
                   {deposit.status === "rejected" && deposit.rejectionReason ? (
-                    <p className="text-sm text-destructive">Rejected: {deposit.rejectionReason}</p>
+                    <p className="text-sm text-destructive">{t("deposits.rejected", { reason: deposit.rejectionReason })}</p>
                   ) : null}
                   <Link className="inline-block pt-1 text-sm font-medium text-primary underline-offset-4 hover:underline" to={`/auctions/${deposit.auctionId}`}>
-                    View auction
+                    {t("deposits.viewAuction")}
                   </Link>
                 </div>
                 <StatusBadge status={deposit.status} />

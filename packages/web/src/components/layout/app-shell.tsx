@@ -13,20 +13,23 @@ import { getAppNav, NAV_GROUPS } from "@/components/layout/nav-items";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useUnreadCount } from "@/features/operations/queries";
 import { cn } from "@/lib/utils";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { useT } from "@/i18n/context";
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { roles } = useAuth();
   const unread = useUnreadCount(true);
   const items = getAppNav(roles);
+  const t = useT("layout");
   return (
-    <nav aria-label="Workspace" className="flex flex-col gap-5 px-3 py-4">
+    <nav aria-label={t("nav.workspaceNav")} className="flex flex-col gap-5 px-3 py-4">
       {NAV_GROUPS.map((group) => {
         const groupItems = items.filter((item) => item.group === group);
         if (groupItems.length === 0) return null;
         return (
           <div key={group}>
             {group !== "Overview" ? (
-              <p className="eyebrow mb-1.5 px-3 text-sidebar-foreground/50">{group}</p>
+              <p className="eyebrow mb-1.5 px-3 text-sidebar-foreground/50">{t(`nav.groups.${group}`)}</p>
             ) : null}
             <ul className="flex flex-col gap-0.5">
               {groupItems.map((item) => {
@@ -47,11 +50,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                       }
                     >
                       <Icon className="size-4 shrink-0" aria-hidden />
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="flex-1 truncate">{t(`nav.${item.label}`)}</span>
                       {count ? (
                         <span className="min-w-5 rounded-full bg-highlight px-1.5 text-center text-xs leading-5 font-semibold text-inverse">
                           {count}
-                          <span className="sr-only"> unread</span>
+                          <span className="sr-only"> {t("nav.unread")}</span>
                         </span>
                       ) : null}
                     </NavLink>
@@ -79,13 +82,14 @@ function SidebarScroll({ children }: { children: ReactNode }) {
 }
 
 function SidebarFooter() {
+  const t = useT("layout");
   return (
     <div className="shrink-0 border-t border-sidebar-border p-3">
       <Link
         to="/auctions"
         className="flex min-h-10 items-center justify-between rounded-md px-3 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-highlight focus-visible:ring-offset-sidebar"
       >
-        Public auction site
+        {t("nav.publicSite")}
         <ArrowUpRight className="size-4" aria-hidden />
       </Link>
     </div>
@@ -95,9 +99,10 @@ function SidebarFooter() {
 function NotificationsButton() {
   const unread = useUnreadCount(true);
   const count = unread.data?.count ?? 0;
+  const t = useT("layout");
   return (
     <Button asChild variant="ghost" size="icon" className="relative">
-      <Link to="/app/notifications" aria-label={count ? `Notifications, ${count} unread` : "Notifications"}>
+      <Link to="/app/notifications" aria-label={count ? t("nav.notificationsUnread", { count }) : t("nav.notifications")}>
         <Bell />
         {count ? (
           <span className="absolute top-2 right-2 size-2 rounded-full bg-destructive ring-2 ring-background" aria-hidden />
@@ -111,6 +116,8 @@ export function AppShell() {
   const [online, setOnline] = useState(navigator.onLine);
   const [open, setOpen] = useState(false);
   const { session } = useAuth();
+  const t = useT("layout");
+  const tc = useT("common");
   const needsOrg = !session?.organizationId && (session?.organizations.length ?? 0) > 0;
 
   useEffect(() => {
@@ -140,13 +147,13 @@ export function AppShell() {
           href="#main-content"
           className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
         >
-          Skip to content
+          {tc("skipToContent")}
         </a>
         <OfflineBanner online={online} />
         <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-6 lg:px-8">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="-ml-2 lg:hidden" aria-label="Open navigation">
+              <Button variant="ghost" size="icon" className="-ml-2 lg:hidden" aria-label={t("nav.openNavigation")}>
                 <Menu />
               </Button>
             </SheetTrigger>
@@ -155,8 +162,8 @@ export function AppShell() {
               className="w-72 gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
             >
               <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
-                <SheetTitle className="sr-only">Workspace navigation</SheetTitle>
-                <SheetDescription className="sr-only">Pages available to your account</SheetDescription>
+                <SheetTitle className="sr-only">{t("nav.workspaceNav")}</SheetTitle>
+                <SheetDescription className="sr-only">{t("nav.workspaceNavDescription")}</SheetDescription>
                 <BrandLogo tone="inverse" to="/app" />
               </div>
               <SidebarScroll>
@@ -173,10 +180,11 @@ export function AppShell() {
           </div>
           {needsOrg ? (
             <Badge variant="warning" className="hidden md:inline-flex">
-              Choose an organization to manage auctions
+              {t("nav.chooseOrg")}
             </Badge>
           ) : null}
           <div className="ml-auto flex items-center gap-1">
+            <LanguageSwitcher />
             <ThemeToggle />
             <NotificationsButton />
             <UserMenu />

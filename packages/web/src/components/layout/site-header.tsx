@@ -7,15 +7,17 @@ import { BrandLogo } from "@/components/layout/brand-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserMenu } from "@/components/layout/user-menu";
 import { useAuth } from "@/features/auth/auth-provider";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { useT } from "@/i18n/context";
 import { cn } from "@/lib/utils";
 
 type NavKey = "browse" | "live" | "results" | "guide";
 
-const NAV: Array<{ key: NavKey; label: string; to: string }> = [
-  { key: "browse", label: "Browse auctions", to: "/auctions" },
-  { key: "live", label: "Live now", to: "/auctions?status=live" },
-  { key: "results", label: "Results", to: "/auctions?status=awarded" },
-  { key: "guide", label: "How it works", to: "/auctions#how-to-participate" },
+const NAV: Array<{ key: NavKey; label: "browse" | "live" | "results" | "howItWorks"; to: string }> = [
+  { key: "browse", label: "browse", to: "/auctions" },
+  { key: "live", label: "live", to: "/auctions?status=live" },
+  { key: "results", label: "results", to: "/auctions?status=awarded" },
+  { key: "guide", label: "howItWorks", to: "/auctions#how-to-participate" },
 ];
 
 /** Which public nav item the current URL belongs to. */
@@ -44,23 +46,24 @@ function useAddisClock() {
 
 function UtilityBar() {
   const time = useAddisClock();
+  const t = useT("layout");
   return (
     <div className="hidden border-b bg-muted/60 md:block">
       <div className="page-container flex h-8 items-center justify-between text-xs text-muted-foreground">
         <p className="inline-flex items-center gap-2">
           <span className="size-1.5 rounded-full bg-primary" aria-hidden />
-          Transparent public auction portal · Ethiopia
+          {t("header.tagline")}
         </p>
         <div className="flex items-center gap-4">
           <p className="inline-flex items-center gap-1.5">
             <Clock className="size-3.5" aria-hidden />
-            <span className="font-mono tabular-nums">EAT {time}</span>
-            <span className="hidden lg:inline">(Addis Ababa)</span>
+            <span className="tabular-nums">{t("header.eat", { time })}</span>
+            <span className="hidden lg:inline">{t("header.addis")}</span>
           </p>
           <span className="h-3 w-px bg-border" aria-hidden />
           <Link to="/auctions#how-to-participate" className="inline-flex items-center gap-1.5 hover:text-foreground">
             <HelpCircle className="size-3.5" aria-hidden />
-            How it works
+            {t("header.howItWorks")}
           </Link>
         </div>
       </div>
@@ -69,6 +72,7 @@ function UtilityBar() {
 }
 
 function SearchBox({ className }: { className?: string }) {
+  const t = useT("layout");
   const location = useLocation();
   const navigate = useNavigate();
   const current = new URLSearchParams(location.search).get("q") ?? "";
@@ -98,7 +102,7 @@ function SearchBox({ className }: { className?: string }) {
   return (
     <div role="search" className={cn("relative", className)}>
       <label htmlFor="site-search" className="sr-only">
-        Search auctions
+        {t("header.searchLabel")}
       </label>
       <Search
         className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
@@ -109,7 +113,7 @@ function SearchBox({ className }: { className?: string }) {
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="Search auctions and tenders…"
+        placeholder={t("header.searchPlaceholder")}
         className="h-10 w-full rounded-md border border-input bg-card pr-3 pl-9 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:ring-offset-0"
       />
     </div>
@@ -118,6 +122,7 @@ function SearchBox({ className }: { className?: string }) {
 
 function NavLinks({ orientation, onNavigate }: { orientation: "row" | "column"; onNavigate?: () => void }) {
   const active = useActiveNav();
+  const t = useT("layout");
   return (
     <ul className={cn("flex", orientation === "row" ? "items-center gap-1" : "flex-col gap-1")}>
       {NAV.map((item) => {
@@ -139,7 +144,7 @@ function NavLinks({ orientation, onNavigate }: { orientation: "row" | "column"; 
                     : "bg-primary/10 text-primary hover:bg-primary/10"),
               )}
             >
-              {item.label}
+              {t(`header.${item.label}`)}
             </Link>
           </li>
         );
@@ -151,39 +156,41 @@ function NavLinks({ orientation, onNavigate }: { orientation: "row" | "column"; 
 function MobileMenu() {
   const [open, setOpen] = useState(false);
   const { isAuthenticated } = useAuth();
+  const t = useT("layout");
   const close = () => setOpen(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open menu">
+        <Button variant="ghost" size="icon" className="lg:hidden" aria-label={t("header.openMenu")}>
           <Menu />
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-80 max-w-[85vw] gap-6">
         <SheetHeader>
-          <SheetTitle>Menu</SheetTitle>
-          <SheetDescription className="sr-only">Site navigation and account actions</SheetDescription>
+          <SheetTitle>{t("header.menu")}</SheetTitle>
+          <SheetDescription className="sr-only">{t("header.menuDescription")}</SheetDescription>
         </SheetHeader>
-        <nav aria-label="Main">
+        <nav aria-label={t("header.menu")}>
           <NavLinks orientation="column" onNavigate={close} />
         </nav>
+        <LanguageSwitcher className="w-fit" />
         <div className="mt-auto flex flex-col gap-2 border-t pt-5">
           {isAuthenticated ? (
             <Button asChild>
               <Link to="/app" onClick={close}>
-                <LayoutDashboard aria-hidden /> Open workspace
+                <LayoutDashboard aria-hidden /> {t("header.openWorkspace")}
               </Link>
             </Button>
           ) : (
             <>
               <Button asChild>
                 <Link to="/register" onClick={close}>
-                  Register as bidder
+                  {t("header.register")}
                 </Link>
               </Button>
               <Button asChild variant="outline">
                 <Link to="/login" onClick={close}>
-                  Sign in
+                  {t("header.signIn")}
                 </Link>
               </Button>
             </>
@@ -198,6 +205,8 @@ const NO_RETURN = new Set(["/", "/login", "/register", "/forgot-password", "/res
 
 export function SiteHeader() {
   const { isAuthenticated } = useAuth();
+  const t = useT("layout");
+  const tc = useT("common");
   const { pathname, search } = useLocation();
   // After signing in, come back to the auction or listing the visitor was reading.
   const signInState = NO_RETURN.has(pathname) ? undefined : { from: `${pathname}${search}` };
@@ -210,22 +219,23 @@ export function SiteHeader() {
         href="#main-content"
         className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
       >
-        Skip to content
+        {tc("skipToContent")}
       </a>
       <UtilityBar />
       <div className="page-container flex h-16 items-center gap-4 lg:gap-6">
         <BrandLogo />
-        <nav aria-label="Main" className="hidden lg:block">
+        <nav aria-label={t("header.menu")} className="hidden lg:block">
           <NavLinks orientation="row" />
         </nav>
         {showSearch ? <SearchBox className="ml-auto hidden w-full max-w-xs md:block xl:max-w-sm" /> : null}
         <div className={cn("flex items-center gap-1 sm:gap-2", !showSearch && "ml-auto", showSearch && "ml-auto md:ml-0")}>
+          <LanguageSwitcher className="hidden sm:inline-flex" />
           <ThemeToggle />
           {isAuthenticated ? (
             <>
               <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
                 <Link to="/app">
-                  <LayoutDashboard aria-hidden /> Workspace
+                  <LayoutDashboard aria-hidden /> {t("header.workspace")}
                 </Link>
               </Button>
               <UserMenu />
@@ -234,11 +244,11 @@ export function SiteHeader() {
             <>
               <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
                 <Link to="/login" state={signInState}>
-                  Sign in
+                  {t("header.signIn")}
                 </Link>
               </Button>
               <Button asChild size="sm" className="hidden sm:inline-flex">
-                <Link to="/register">Register as bidder</Link>
+                <Link to="/register">{t("header.register")}</Link>
               </Button>
             </>
           )}

@@ -5,19 +5,21 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { DisputeList } from "@/features/disputes/dispute-list";
 import { useDisputes } from "@/features/operations/queries";
 import { isOfficer } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 export default function DisputesPage() {
   const { roles } = useAuth();
   const disputes = useDisputes();
   const items = disputes.data?.items ?? [];
+  const t = useT("account");
   return (
     <div>
       <PageHeader
-        title="Disputes"
+        title={t("disputes.title")}
         description={
           isOfficer(roles)
-            ? "Disputes raised on your organization's auctions. Take one to review it, then record a decision."
-            : "Disputes you raised and the decisions on them. Raise a new one from the auction page."
+            ? t("disputes.officerDescription")
+            : t("disputes.bidderDescription")
         }
       />
       <QueryState
@@ -26,8 +28,8 @@ export default function DisputesPage() {
         error={disputes.error}
         isEmpty={items.length === 0}
         emptyIcon={Scale}
-        emptyTitle="No disputes"
-        emptyDescription={isOfficer(roles) ? "Nothing has been raised on your organization's auctions." : "If an auction was run unfairly, raise a dispute from its page."}
+        emptyTitle={t("disputes.emptyTitle")}
+        emptyDescription={isOfficer(roles) ? t("disputes.officerEmpty") : t("disputes.bidderEmpty")}
         onRetry={() => void disputes.refetch()}
       >
         <DisputeList items={items} />

@@ -6,14 +6,16 @@ import { ResourcePage } from "@/components/feedback/resource-page";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { CheckCheck } from "lucide-react";
+import { useT } from "@/i18n/context";
 export default function NotificationsPage() {
   const query = useNotifications();
   const markAll = useMarkAllNotificationsRead();
+  const t = useT("account");
   return (
     <ResourcePage
-      title="Notifications"
-      description="Updates about your auctions, deposits, identity checks and disputes."
-      emptyDescription="You will be notified here when something needs your attention."
+      title={t("lists.notificationsTitle")}
+      description={t("lists.notificationsDescription")}
+      emptyDescription={t("lists.notificationsEmpty")}
       query={query}
     >
       <div className="mb-5 flex justify-end">
@@ -24,12 +26,12 @@ export default function NotificationsPage() {
           disabled={!query.data?.items.length}
           onClick={() =>
             markAll.mutate(undefined, {
-              onSuccess: () => toast.success("Notifications marked as read"),
+              onSuccess: () => toast.success(t("lists.markedAll")),
               onError: (error) => toast.error(error.message),
             })
           }
         >
-          <CheckCheck aria-hidden /> Mark all as read
+          <CheckCheck aria-hidden /> {t("lists.markAll")}
         </Button>
       </div>
     </ResourcePage>

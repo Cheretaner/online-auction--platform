@@ -4,6 +4,8 @@ import { QueryState } from "@/components/feedback/query-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { getErrorMessage } from "@/lib/api/errors";
+import { translate, useT } from "@/i18n/context";
+import { intlLocale } from "@/i18n/core";
 
 type ResourceQuery<T> = {
   data?: T;
@@ -17,7 +19,7 @@ export function ResourcePage<T>({
   title,
   description,
   query,
-  emptyDescription = "Records will appear here as soon as there is activity on your account.",
+  emptyDescription,
   children,
 }: {
   title: string;
@@ -26,6 +28,7 @@ export function ResourcePage<T>({
   query: ResourceQuery<{ items: T[] } | T | null>;
   children?: ReactNode;
 }) {
+  const t = useT("layout");
   const data = query.data;
   const rows =
     data &&
@@ -45,8 +48,8 @@ export function ResourcePage<T>({
         isError={query.isError}
         error={query.error}
         isEmpty={rows.length === 0}
-        emptyTitle={`No ${title.toLowerCase()} yet`}
-        emptyDescription={emptyDescription}
+        emptyTitle={t("feedback.noRecordsYet", { title: title.toLowerCase() })}
+        emptyDescription={emptyDescription ?? t("feedback.recordsHint")}
         onRetry={() => void query.refetch()}
       >
         <div className="space-y-3">
@@ -92,7 +95,7 @@ function ResourceRecord({ value }: { value: unknown }) {
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0">
           <p className="leading-snug font-medium first-letter:uppercase">
-            {titleEntry ? String(titleEntry[1] ?? "Untitled") : "Record"}
+            {titleEntry ? String(titleEntry[1] ?? translate("layout", "feedback.untitled")) : translate("layout", "feedback.record")}
           </p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 text-xs text-muted-foreground sm:grid-cols-2">
             {entries
@@ -123,14 +126,14 @@ function humanize(value: string) {
 }
 
 function formatRecordValue(key: string, value: unknown) {
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? translate("common", "yes") : translate("common", "no");
   if (typeof value === "number") return new Intl.NumberFormat().format(value);
   if (
     typeof value === "string" &&
     key.endsWith("At") &&
     !Number.isNaN(Date.parse(value))
   ) {
-    return new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat(intlLocale(), {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(value));

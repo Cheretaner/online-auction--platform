@@ -3,6 +3,8 @@ import { Card } from '@/components/ui/card'
 import { NativeSelect } from '@/components/ui/native-select'
 import { useCategories, useOrganizations } from '@/features/operations/queries'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n/context'
+import { regionLabel } from '@/lib/format'
 import { ETHIOPIAN_REGIONS, STATUS_TABS, useDiscoveryFilters } from './use-discovery-filters'
 
 function FilterSelect({
@@ -41,6 +43,7 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
   const { filters, update } = useDiscoveryFilters()
   const categories = useCategories()
   const organizations = useOrganizations()
+  const t = useT('auctions')
 
   return (
     <Card className="flex flex-col gap-4 p-4 sm:p-5">
@@ -48,13 +51,13 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
         <div
           className="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-1 lg:pb-0"
           role="group"
-          aria-label="Filter by auction status"
+          aria-label={t('discovery.statusFilter')}
         >
-          {STATUS_TABS.map(({ value, label }) => {
+          {STATUS_TABS.map(({ value, key }) => {
             const active = filters.status === value
             return (
               <button
-                key={label}
+                key={key}
                 type="button"
                 aria-pressed={active}
                 onClick={() => update({ status: value })}
@@ -65,7 +68,7 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
-                {label}
+                {t(`discovery.tabs.${key}`)}
                 {active && total !== undefined ? (
                   <span className="rounded-sm bg-primary-foreground/20 px-1.5 text-xs tabular-nums">{total}</span>
                 ) : null}
@@ -75,34 +78,34 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
         </div>
         <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
           <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
-          Only auctions approved under the two-person rule are listed
+          {t('discovery.twoPerson')}
         </p>
       </div>
 
       <div className="grid gap-3 border-t pt-4 sm:grid-cols-3">
         <FilterSelect
           id="filter-category"
-          label="Category"
+          label={t('discovery.category')}
           value={filters.categoryId}
           onChange={(categoryId) => update({ categoryId })}
-          allLabel="All categories"
+          allLabel={t('discovery.allCategories')}
           options={(categories.data?.items ?? []).map((category) => ({ value: category.id, label: category.name }))}
         />
         <FilterSelect
           id="filter-issuer"
-          label="Issuer"
+          label={t('discovery.issuer')}
           value={filters.orgId}
           onChange={(orgId) => update({ orgId })}
-          allLabel="All organizations"
+          allLabel={t('discovery.allIssuers')}
           options={(organizations.data?.items ?? []).map((org) => ({ value: org.id, label: org.name }))}
         />
         <FilterSelect
           id="filter-region"
-          label="Region"
+          label={t('discovery.region')}
           value={filters.region}
           onChange={(region) => update({ region })}
-          allLabel="All regions"
-          options={ETHIOPIAN_REGIONS.map((region) => ({ value: region, label: region }))}
+          allLabel={t('discovery.allRegions')}
+          options={ETHIOPIAN_REGIONS.map((region) => ({ value: region, label: regionLabel(region) }))}
         />
       </div>
     </Card>

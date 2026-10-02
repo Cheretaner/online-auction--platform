@@ -27,17 +27,15 @@ import {
 import { getErrorMessage } from "@/lib/api/errors";
 import type { OrganizationRecord } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { hasRole } from "@/lib/format";
+import { enumLabel, hasRole, regionLabel } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
-const MEMBER_ROLES = [
-  { value: "auction_officer", label: "Auction officer" },
-  { value: "compliance_officer", label: "Compliance officer" },
-  { value: "org_admin", label: "Organization admin" },
-] as const;
+const MEMBER_ROLES = ["auction_officer", "compliance_officer", "org_admin"] as const;
 
 export default function OrganizationsPage() {
   const { roles, session } = useAuth();
   const superAdmin = hasRole(roles, "super_admin");
+  const t = useT("tools");
   const orgs = useOrganizations();
   // Org admins manage their own organization only; the API enforces it.
   const visible = (orgs.data?.items ?? []).filter(
@@ -47,11 +45,11 @@ export default function OrganizationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Organizations"
+        title={t("orgs.title")}
         description={
           superAdmin
-            ? "Onboard institutions and give their staff officer roles."
-            : "Manage who can act for your organization."
+            ? t("orgs.superDescription")
+            : t("orgs.adminDescription")
         }
       />
       {superAdmin ? <CreateOrganizationCard /> : null}
@@ -61,7 +59,7 @@ export default function OrganizationsPage() {
         error={orgs.error}
         isEmpty={visible.length === 0}
         emptyIcon={Building2}
-        emptyTitle="No organizations"
+        emptyTitle={t("orgs.empty")}
         onRetry={() => void orgs.refetch()}
       >
         <div className="space-y-4">
@@ -76,6 +74,7 @@ export default function OrganizationsPage() {
 
 function CreateOrganizationCard() {
   const create = useCreateOrganization();
+  const t = useT("tools");
   const form = useForm({
     resolver: zodResolver(CreateOrganizationRequest),
     defaultValues: {
@@ -105,8 +104,8 @@ function CreateOrganizationCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Onboard an organization</CardTitle>
-        <CardDescription>Creates the institution. Add its staff afterwards under Manage members.</CardDescription>
+        <CardTitle>{t("orgs.onboard")}</CardTitle>
+        <CardDescription>{t("orgs.onboardDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -115,7 +114,7 @@ function CreateOrganizationCard() {
             onSubmit={form.handleSubmit((values) =>
               create.mutate(values, {
                 onSuccess: () => {
-                  toast.success("Organization created");
+                  toast.success(t("orgs.created"));
                   form.reset();
                 },
                 onError: (error) => {
@@ -124,13 +123,13 @@ function CreateOrganizationCard() {
               }),
             )}
           >
-            {text("name", "Name")}
+            {text("name", t("orgs.name"))}
             <FormField
               control={form.control}
               name="orgType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type</FormLabel>
+                  <FormLabel>{t("orgs.type")}</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -140,7 +139,7 @@ function CreateOrganizationCard() {
                     <SelectContent>
                       {ORG_TYPES.map((type) => (
                         <SelectItem key={type} value={type}>
-                          {type.replaceAll("_", " ")}
+                          {enumLabel(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -149,13 +148,13 @@ function CreateOrganizationCard() {
                 </FormItem>
               )}
             />
-            {text("tinNumber", "TIN")}
-            {text("region", "Region")}
-            {text("contactEmail", "Contact email", "email")}
-            {text("contactPhone", "Contact phone", "tel")}
+            {text("tinNumber", t("orgs.tin"))}
+            {text("region", t("orgs.region"))}
+            {text("contactEmail", t("orgs.contactEmail"), "email")}
+            {text("contactPhone", t("orgs.contactPhone"), "tel")}
             <div className="sm:col-span-2">
               <Button type="submit" loading={create.isPending}>
-                {create.isPending ? "Creating…" : "Create organization"}
+                {create.isPending ? t("orgs.creating") : t("orgs.create")}
               </Button>
             </div>
           </form>
@@ -167,6 +166,7 @@ function CreateOrganizationCard() {
 
 function OrganizationCard({ org }: { org: OrganizationRecord }) {
   const [expanded, setExpanded] = useState(false);
+  const t = useT("tools");
   return (
     <Card>
       <CardContent className="space-y-4 p-4 sm:p-5">
@@ -175,11 +175,11 @@ function OrganizationCard({ org }: { org: OrganizationRecord }) {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-base font-semibold">{org.name}</p>
               <Badge variant="secondary" className="capitalize">
-                {org.orgType.replaceAll("_", " ")}
+                {enumLabel(org.orgType)}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {org.region} · TIN <span className="font-mono">{org.taxpayerId}</span>
+              {regionLabel(org.region)} · {t("orgs.tin")} <span className="font-mono">{org.taxpayerId}</span>
             </p>
             <p className="text-xs text-muted-foreground">
               {org.contactEmail} · {org.contactPhone}
@@ -191,7 +191,7 @@ function OrganizationCard({ org }: { org: OrganizationRecord }) {
             aria-expanded={expanded}
             onClick={() => setExpanded((value) => !value)}
           >
-            {expanded ? "Hide members" : "Manage members"}
+            {expanded ? t("orgs.hideMembers") : t("orgs.manageMembers")}
             <ChevronDown className={expanded ? "rotate-180 transition-transform" : "transition-transform"} aria-hidden />
           </Button>
         </div>
@@ -207,7 +207,8 @@ function Members({ orgId }: { orgId: string }) {
   const remove = useRemoveOrgMember(orgId);
   const id = useId();
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<(typeof MEMBER_ROLES)[number]["value"]>("auction_officer");
+  const [role, setRole] = useState<(typeof MEMBER_ROLES)[number]>("auction_officer");
+  const t = useT("tools");
   const [removing, setRemoving] = useState<{ userId: string; label: string } | null>(null);
 
   return (
@@ -227,13 +228,13 @@ function Members({ orgId }: { orgId: string }) {
             </span>
             <span className="flex shrink-0 items-center gap-1">
               <Badge variant="muted" className="hidden capitalize sm:inline-flex">
-                {member.role.replaceAll("_", " ")}
+                {enumLabel(member.role)}
               </Badge>
             <Button
               size="icon-sm"
               variant="ghost"
               className="text-destructive hover:bg-destructive/10"
-              aria-label={`Remove ${member.fullName ?? member.email ?? "member"}`}
+              aria-label={t("orgs.remove", { name: member.fullName ?? member.email ?? t("orgs.member") })}
               onClick={() => setRemoving({ userId: member.userId, label: member.fullName ?? member.email ?? member.userId })}
             >
               <Trash2 />
@@ -250,7 +251,7 @@ function Members({ orgId }: { orgId: string }) {
             { email: email.trim(), role },
             {
               onSuccess: () => {
-                toast.success("Member added. They must sign in again to get the new role.");
+                toast.success(t("orgs.memberAdded"));
                 setEmail("");
               },
               onError: (error) => toast.error(getErrorMessage(error)),
@@ -259,41 +260,41 @@ function Members({ orgId }: { orgId: string }) {
         }}
       >
         <div className="space-y-1.5">
-          <Label htmlFor={`${id}-email`}>Email of a registered user</Label>
+          <Label htmlFor={`${id}-email`}>{t("orgs.memberEmail")}</Label>
           <Input id={`${id}-email`} type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor={`${id}-role`}>Role</Label>
+          <Label htmlFor={`${id}-role`}>{t("orgs.role")}</Label>
           <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
             <SelectTrigger id={`${id}-role`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {MEMBER_ROLES.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                <SelectItem key={option} value={option}>
+                  {enumLabel(option)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <Button type="submit" loading={add.isPending}>
-          {add.isPending ? null : <UserPlus aria-hidden />} Add member
+          {add.isPending ? null : <UserPlus aria-hidden />} {t("orgs.addMember")}
         </Button>
       </form>
       <ConfirmDialog
         open={removing !== null}
         onOpenChange={(open) => !open && setRemoving(null)}
-        title="Remove member"
-        description={`${removing?.label ?? ""} will lose their role in this organization.`}
-        confirmLabel="Remove member"
+        title={t("orgs.removeTitle")}
+        description={t("orgs.removeDescription", { name: removing?.label ?? "" })}
+        confirmLabel={t("orgs.removeTitle")}
         destructive
         pending={remove.isPending}
         onConfirm={() =>
           removing &&
           remove.mutate(removing.userId, {
             onSuccess: () => {
-              toast.success("Member removed");
+              toast.success(t("orgs.removed"));
               setRemoving(null);
             },
             onError: (error) => toast.error(getErrorMessage(error)),

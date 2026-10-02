@@ -15,13 +15,8 @@ import type { BidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { formatMoney } from "@/lib/format";
-
-const INSTRUMENT_LABELS: Record<(typeof INSTRUMENT_TYPES)[number], string> = {
-  cpo: "CPO (certified payment order)",
-  bank_guarantee: "Bank guarantee",
-  transfer: "Bank transfer",
-};
+import { enumLabel, formatMoney } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 function Step({ state, title, children }: { state: "done" | "waiting" | "todo" | "failed"; title: string; children?: React.ReactNode }) {
   const Icon = state === "done" ? CheckCircle2 : state === "waiting" ? Clock : state === "failed" ? XCircle : Circle;
@@ -46,6 +41,7 @@ function Step({ state, title, children }: { state: "done" | "waiting" | "todo" |
 
 export function BidderReadinessPanel({ auction, readiness }: { auction: Auction; readiness: BidderReadiness }) {
   const { kycStatus, depositRequired, deposit } = readiness;
+  const t = useT("auctions");
   const acceptsDeposits = auction.status === "scheduled" || auction.status === "live";
 
   const kycState = kycStatus === "verified" ? "done" : kycStatus === "pending" ? "waiting" : kycStatus === "rejected" ? "failed" : "todo";
@@ -59,41 +55,42 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
 
   return (
     <ol className="space-y-4">
-      <Step state={kycState} title="Identity verified">
+      <Step state={kycState} title={t("readiness.identity")}>
         {kycStatus === "verified" ? null : (
           <p className="text-sm text-muted-foreground">
             {kycStatus === "pending"
-              ? "Your documents are with the compliance team. You can bid once they approve them."
+              ? t("readiness.kycPending")
               : kycStatus === "rejected"
-                ? "Your verification was not accepted. Check the reason and submit again."
-                : "Verify your identity once to bid on any auction."}{" "}
+                ? t("readiness.kycRejected")
+                : t("readiness.kycTodo")}{" "}
             <Link to="/app/kyc" className="font-medium text-primary underline-offset-4 hover:underline">
-              {kycStatus === "pending" ? "View status" : "Verify identity"}
+              {kycStatus === "pending" ? t("readiness.viewStatus") : t("readiness.verify")}
             </Link>
           </p>
         )}
       </Step>
       {depositRequired ? (
-        <Step state={depositState} title={`Bid security of ${formatMoney(auction.depositAmount)}`}>
+        <Step state={depositState} title={t("readiness.bidSecurity", { amount: formatMoney(auction.depositAmount) })}>
           {deposit ? (
             <p className="text-sm text-muted-foreground">
-              {deposit.status === "pending" && `Submitted (${deposit.referenceNumber}). The organization is checking it.`}
-              {deposit.status === "verified" && `Verified (${deposit.referenceNumber}).`}
-              {deposit.status === "released" && "Released back to you."}
-              {deposit.status === "rejected" && `Rejected: ${deposit.rejectionReason ?? "no reason given"}.`}
+              {deposit.status === "pending" && t("readiness.depositPending", { reference: deposit.referenceNumber })}
+              {deposit.status === "verified" && t("readiness.depositVerified", { reference: deposit.referenceNumber })}
+              {deposit.status === "released" && t("readiness.depositReleased")}
+              {deposit.status === "rejected" &&
+                t("readiness.depositRejected", { reason: deposit.rejectionReason ?? t("readiness.noReason") })}
             </p>
           ) : null}
           {(!deposit || deposit.status === "rejected") && acceptsDeposits ? (
             deposit?.status === "rejected" ? (
               <p className="text-sm text-muted-foreground">
-                Contact the organization to register a corrected instrument; only one deposit per auction is accepted.
+                {t("readiness.depositRejectedHelp")}
               </p>
             ) : (
               <DepositForm auction={auction} />
             )
           ) : null}
           {!deposit && !acceptsDeposits ? (
-            <p className="text-sm text-muted-foreground">This auction no longer accepts deposits.</p>
+            <p className="text-sm text-muted-foreground">{t("readiness.noLongerAccepting")}</p>
           ) : null}
         </Step>
       ) : null}
@@ -106,6 +103,8 @@ function DepositForm({ auction }: { auction: Auction }) {
   const upload = useUploadDocument();
   const [proof, setProof] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const t = useT("auctions");
+  const tc = useT("common");
   const form = useForm({
     resolver: zodResolver(CreateDepositRequest),
     defaultValues: {
@@ -135,7 +134,7 @@ function DepositForm({ auction }: { auction: Auction }) {
               documentId = (await upload.mutateAsync(data)).id;
             }
             await create.mutateAsync({ ...values, documentId });
-            toast.success("Deposit submitted for verification");
+            toast.success(t("readiness.submitted"));
           } catch (error) {
             if (!applyApiFieldErrors(error, form.setError)) toast.error(getErrorMessage(error));
           } finally {
@@ -148,7 +147,7 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Amount (ETB)</FormLabel>
+              <FormLabel>{t("readiness.amount", { currency: tc("currency") })}</FormLabel>
               <FormControl>
                 <Input inputMode="decimal" {...field} />
               </FormControl>
@@ -161,7 +160,7 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="instrumentType"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Instrument</FormLabel>
+              <FormLabel>{t("readiness.instrument")}</FormLabel>
               <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger>
@@ -171,7 +170,7 @@ function DepositForm({ auction }: { auction: Auction }) {
                 <SelectContent>
                   {INSTRUMENT_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {INSTRUMENT_LABELS[type]}
+                      {enumLabel(type)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -185,9 +184,9 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="issuingBank"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Issuing bank and branch</FormLabel>
+              <FormLabel>{t("readiness.bank")}</FormLabel>
               <FormControl>
-                <Input placeholder="e.g. Commercial Bank of Ethiopia, Bole" {...field} />
+                <Input placeholder={t("readiness.bankPlaceholder")} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -198,9 +197,9 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="referenceNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Reference number</FormLabel>
+              <FormLabel>{t("readiness.reference")}</FormLabel>
               <FormControl>
-                <Input placeholder="As printed on the instrument" {...field} />
+                <Input placeholder={t("readiness.referencePlaceholder")} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -208,7 +207,7 @@ function DepositForm({ auction }: { auction: Auction }) {
         />
         <div className="space-y-1.5 @md:col-span-2">
           <Label htmlFor={`deposit-proof-${auction.id}`}>
-            Scan or photo of the instrument
+            {t("readiness.proof")}
             <OptionalHint />
           </Label>
           <Input
@@ -217,11 +216,11 @@ function DepositForm({ auction }: { auction: Auction }) {
             accept="image/*,application/pdf"
             onChange={(event) => setProof(event.target.files?.[0] ?? null)}
           />
-          <FieldHint>Recommended. Only you and the organization's officers can see this file.</FieldHint>
+          <FieldHint>{t("readiness.proofHint")}</FieldHint>
         </div>
         <div className="@md:col-span-2">
           <Button type="submit" loading={submitting}>
-            {submitting ? "Submitting…" : "Submit deposit"}
+            {submitting ? t("readiness.submitting") : t("readiness.submit")}
           </Button>
         </div>
       </form>

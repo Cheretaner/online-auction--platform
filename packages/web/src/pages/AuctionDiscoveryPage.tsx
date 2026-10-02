@@ -8,18 +8,20 @@ import { TenderSidebar } from '../components/discovery/TenderSidebar'
 import { PAGE_SIZE, useDiscoveryFilters } from '../components/discovery/use-discovery-filters'
 import { usePublicAuctions } from '@/features/auctions/queries'
 import { useOrganizations } from '@/features/operations/queries'
+import { useT } from '@/i18n/context'
 
 export default function AuctionDiscoveryPage() {
   const { filters, update, apiParams } = useDiscoveryFilters()
   const auctions = usePublicAuctions(apiParams)
   const organizations = useOrganizations()
   const location = useLocation()
+  const t = useT('auctions')
 
   const orgNames = useMemo(
     () => new Map((organizations.data?.items ?? []).map((org) => [org.id, org.name])),
     [organizations.data],
   )
-  const issuerName = (orgId: string) => orgNames.get(orgId) ?? 'Verified issuer'
+  const issuerName = (orgId: string) => orgNames.get(orgId) ?? t('discovery.verifiedIssuer')
 
   const items = auctions.data?.items ?? []
   const total = auctions.data?.total
@@ -33,8 +35,8 @@ export default function AuctionDiscoveryPage() {
   return (
     <div>
       <PageHeader
-        title={filters.q ? `Results for “${filters.q}”` : 'Browse public auctions'}
-        description="Every listing names its issuing organization, the bid security it requires and when bidding closes."
+        title={filters.q ? t('discovery.resultsFor', { query: filters.q }) : t('discovery.title')}
+        description={t('discovery.description')}
       />
       <div className="flex flex-col gap-6">
         <SearchFilterBar total={total} />
@@ -53,7 +55,7 @@ export default function AuctionDiscoveryPage() {
                 page={filters.page}
                 pages={pages}
                 total={total}
-                noun="auctions"
+                noun={t('discovery.noun')}
                 onChange={(page) => {
                   update({ page })
                   window.scrollTo({ top: 0, behavior: 'smooth' })

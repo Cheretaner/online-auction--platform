@@ -12,7 +12,8 @@ import { useAuctionDocuments, useUploadDocument } from "@/features/operations/qu
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
-import { formatDateTime } from "@/lib/format";
+import { enumLabel, formatDateTime } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,15 +23,17 @@ function formatSize(bytes: number) {
 
 export function DocumentRow({ doc }: { doc: DocumentRecord }) {
   const [busy, setBusy] = useState(false);
+  const t = useT("auctions");
+  const tc = useT("common");
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 border-b py-3 first:pt-0 last:border-0 last:pb-0">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
-          {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Private" /> : null}
+          {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("documents.private")} /> : null}
           {doc.fileName}
         </p>
         <p className="text-xs text-muted-foreground capitalize">
-          {doc.documentType.replaceAll("_", " ")} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
+          {enumLabel(doc.documentType)} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
         </p>
       </div>
       <Button
@@ -40,12 +43,12 @@ export function DocumentRow({ doc }: { doc: DocumentRecord }) {
         onClick={() => {
           setBusy(true);
           downloadDocument(doc.id, doc.fileName)
-            .catch((error: unknown) => toast.error(getErrorMessage(error, "Download failed")))
+            .catch((error: unknown) => toast.error(getErrorMessage(error, tc("downloadFailed"))))
             .finally(() => setBusy(false));
         }}
       >
         {busy ? null : <Download aria-hidden />}
-        {busy ? "Downloading…" : "Download"}
+        {busy ? tc("downloading") : tc("download")}
       </Button>
     </li>
   );
@@ -59,6 +62,8 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState<DocumentType>("specification");
   const [publicDoc, setPublicDoc] = useState(true);
+  const t = useT("auctions");
+  const tc = useT("common");
 
   const items = docs.data?.items ?? [];
 
@@ -69,7 +74,7 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
       ) : docs.isError ? (
         <ErrorState error={docs.error} onRetry={() => void docs.refetch()} />
       ) : items.length === 0 ? (
-        <EmptyState size="inline" icon={FolderOpen} title="No documents published yet" />
+        <EmptyState size="inline" icon={FolderOpen} title={t("documents.none")} />
       ) : (
         <ul>
           {items.map((doc) => (
@@ -85,7 +90,7 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
             event.preventDefault();
             const file = fileRef.current?.files?.[0];
             if (!file) {
-              toast.error("Choose a file to upload");
+              toast.error(t("documents.chooseFile"));
               return;
             }
             const form = new FormData();
@@ -95,19 +100,19 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
             form.set("isPrivate", publicDoc ? "false" : "true");
             upload.mutate(form, {
               onSuccess: () => {
-                toast.success("Document uploaded");
+                toast.success(t("documents.uploaded"));
                 if (fileRef.current) fileRef.current.value = "";
               },
-              onError: (error) => toast.error(getErrorMessage(error, "Upload failed")),
+              onError: (error) => toast.error(getErrorMessage(error, tc("uploadFailed"))),
             });
           }}
         >
           <div className="space-y-1.5">
-            <Label htmlFor={`doc-file-${auctionId}`}>File</Label>
+            <Label htmlFor={`doc-file-${auctionId}`}>{t("documents.file")}</Label>
             <Input id={`doc-file-${auctionId}`} ref={fileRef} type="file" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`doc-type-${auctionId}`}>Type</Label>
+            <Label htmlFor={`doc-type-${auctionId}`}>{t("documents.type")}</Label>
             <Select value={docType} onValueChange={(value) => setDocType(value as DocumentType)}>
               <SelectTrigger id={`doc-type-${auctionId}`} className="capitalize">
                 <SelectValue />
@@ -115,20 +120,20 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
               <SelectContent>
                 {DOCUMENT_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
-                    {type.replaceAll("_", " ")}
+                    {enumLabel(type)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <Button type="submit" loading={upload.isPending}>
-            {upload.isPending ? "Uploading…" : "Upload"}
+            {upload.isPending ? t("documents.uploading") : t("documents.upload")}
           </Button>
           <div className="flex items-start gap-3 sm:col-span-3">
             <Switch id={`doc-public-${auctionId}`} checked={publicDoc} onCheckedChange={setPublicDoc} />
             <div>
-              <Label htmlFor={`doc-public-${auctionId}`}>Publish to bidders</Label>
-              <FieldHint>Up to 20 MB. Turn off for internal documents only staff should see.</FieldHint>
+              <Label htmlFor={`doc-public-${auctionId}`}>{t("documents.publish")}</Label>
+              <FieldHint>{t("documents.publishHint")}</FieldHint>
             </div>
           </div>
         </form>

@@ -23,6 +23,7 @@ import {
 } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
+import { useT } from "@/i18n/context";
 
 type PendingItem = NonNullable<ReturnType<typeof useAutofetchPending>["data"]>["items"][number];
 
@@ -35,31 +36,32 @@ export default function AutofetchPage() {
   const fetchSource = useFetchAutofetchSource();
   const sourceItems = sources.data?.items ?? [];
   const pendingItems = pending.data?.items ?? [];
+  const t = useT("tools");
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="AutoFetch review"
-        description="Connect public feeds, fetch new notices, and verify each one before it becomes an auction item."
+        title={t("autofetch.title")}
+        description={t("autofetch.description")}
       />
 
-      <section aria-label="Queue totals" className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Pending review" value={String(stats.data?.pending ?? 0)} icon={Inbox} loading={stats.isLoading} />
-        <StatCard label="Approved" value={String(stats.data?.approved ?? 0)} icon={CheckCircle2} loading={stats.isLoading} />
-        <StatCard label="Rejected" value={String(stats.data?.rejected ?? 0)} icon={XCircle} loading={stats.isLoading} />
+      <section aria-label={t("autofetch.totals")} className="grid gap-4 sm:grid-cols-3">
+        <StatCard label={t("autofetch.pending")} value={String(stats.data?.pending ?? 0)} icon={Inbox} loading={stats.isLoading} />
+        <StatCard label={t("autofetch.approved")} value={String(stats.data?.approved ?? 0)} icon={CheckCircle2} loading={stats.isLoading} />
+        <StatCard label={t("autofetch.rejected")} value={String(stats.data?.rejected ?? 0)} icon={XCircle} loading={stats.isLoading} />
       </section>
 
       <section className="space-y-4">
         <SectionHeader
-          title="Verification queue"
-          description="Pick the auction each verified notice should be added to, or reject it with a reason."
+          title={t("autofetch.queue")}
+          description={t("autofetch.queueDescription")}
         />
         {pending.isLoading ? (
           <PageSkeleton rows={2} />
         ) : pending.isError ? (
           <ErrorState error={pending.error} onRetry={() => void pending.refetch()} />
         ) : pendingItems.length === 0 ? (
-          <EmptyState size="inline" icon={Inbox} title="The verification queue is empty" />
+          <EmptyState size="inline" icon={Inbox} title={t("autofetch.queueEmpty")} />
         ) : (
           <ul className="space-y-4">
             {pendingItems.map((item) => (
@@ -72,11 +74,11 @@ export default function AutofetchPage() {
       </section>
 
       <section className="space-y-4">
-        <SectionHeader title="Connected sources" />
+        <SectionHeader title={t("autofetch.sources")} />
         {sources.isLoading ? (
           <PageSkeleton rows={2} />
         ) : sourceItems.length === 0 ? (
-          <EmptyState size="inline" icon={Radar} title="No sources configured yet" description="Add one below." />
+          <EmptyState size="inline" icon={Radar} title={t("autofetch.noSources")} description={t("autofetch.addBelow")} />
         ) : (
           <ul className="divide-y rounded-lg border bg-card shadow-xs">
             {sourceItems.map((source) => (
@@ -94,13 +96,13 @@ export default function AutofetchPage() {
                   disabled={fetchSource.isPending}
                   onClick={() =>
                     fetchSource.mutate(source.id, {
-                      onSuccess: () => toast.success(`Fetch finished for ${source.name}. New notices appear in the queue.`),
+                      onSuccess: () => toast.success(t("autofetch.fetchFinished", { name: source.name })),
                       onError: (error) => toast.error(getErrorMessage(error)),
                     })
                   }
                 >
                   {fetchSource.isPending && fetchSource.variables === source.id ? null : <RefreshCw aria-hidden />}
-                  Fetch now
+                  {t("autofetch.fetch")}
                 </Button>
               </li>
             ))}
@@ -118,6 +120,7 @@ function AddSourceForm() {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [adapterType, setAdapterType] = useState("rss-feed");
+  const t = useT("tools");
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -125,7 +128,7 @@ function AddSourceForm() {
       { name, adapterType, sourceUrl: url, adapterConfig: {} },
       {
         onSuccess: () => {
-          toast.success("Source added");
+          toast.success(t("autofetch.sourceAdded"));
           setName("");
           setUrl("");
         },
@@ -137,17 +140,17 @@ function AddSourceForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Add a source</CardTitle>
-        <CardDescription>Any public RSS, Atom or JSON feed that publishes auction or tender notices.</CardDescription>
+        <CardTitle>{t("autofetch.addSource")}</CardTitle>
+        <CardDescription>{t("autofetch.addSourceDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4 md:grid-cols-[1fr_1.4fr_14rem_auto] md:items-end" onSubmit={submit}>
           <div className="space-y-1.5">
-            <Label htmlFor={`${id}-name`}>Source name</Label>
+            <Label htmlFor={`${id}-name`}>{t("autofetch.sourceName")}</Label>
             <Input id={`${id}-name`} required value={name} onChange={(event) => setName(event.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`${id}-url`}>Feed URL</Label>
+            <Label htmlFor={`${id}-url`}>{t("autofetch.feedUrl")}</Label>
             <Input
               id={`${id}-url`}
               required
@@ -158,14 +161,14 @@ function AddSourceForm() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`${id}-type`}>Feed type</Label>
+            <Label htmlFor={`${id}-type`}>{t("autofetch.feedType")}</Label>
             <NativeSelect id={`${id}-type`} value={adapterType} onChange={(event) => setAdapterType(event.target.value)}>
-              <option value="rss-feed">RSS / Atom feed</option>
-              <option value="json-feed">JSON feed</option>
+              <option value="rss-feed">{t("autofetch.rss")}</option>
+              <option value="json-feed">{t("autofetch.json")}</option>
             </NativeSelect>
           </div>
           <Button type="submit" loading={createSource.isPending}>
-            Add source
+            {t("autofetch.add")}
           </Button>
         </form>
       </CardContent>
@@ -181,6 +184,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const [auctionId, setAuctionId] = useState("");
   const [reason, setReason] = useState("");
   const conflicts = item.conflictCount ?? 0;
+  const t = useT("tools");
 
   return (
     <Card>
@@ -189,11 +193,14 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
           <div className="min-w-0">
             <h3 className="text-lg leading-snug font-semibold">{item.title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              {item.source ?? "Imported source"} · confidence {item.confidenceScore ?? 0}%
+              {t("autofetch.confidence", {
+                source: item.source ?? t("autofetch.importedSource"),
+                score: item.confidenceScore ?? 0,
+              })}
             </p>
           </div>
           <Badge variant={item.highSeverityConflicts ? "destructive" : conflicts ? "warning" : "muted"}>
-            {conflicts} {conflicts === 1 ? "conflict" : "conflicts"}
+            {conflicts === 1 ? t("autofetch.conflictsOne") : t("autofetch.conflictsOther", { count: conflicts })}
           </Badge>
         </div>
 
@@ -206,16 +213,16 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               approve.mutate(
                 { id: item.id, auctionId },
                 {
-                  onSuccess: () => toast.success("Verified and added to the auction"),
+                  onSuccess: () => toast.success(t("autofetch.verifiedAdded")),
                   onError: (error) => toast.error(getErrorMessage(error)),
                 },
               );
             }}
           >
             <div className="min-w-0 flex-1 space-y-1.5">
-              <Label htmlFor={`${id}-auction`}>Add to auction</Label>
+              <Label htmlFor={`${id}-auction`}>{t("autofetch.addToAuction")}</Label>
               <NativeSelect id={`${id}-auction`} value={auctionId} onChange={(event) => setAuctionId(event.target.value)}>
-                <option value="">Choose an auction…</option>
+                <option value="">{t("autofetch.chooseAuction")}</option>
                 {auctions.map((auction) => (
                   <option key={auction.id} value={auction.id}>
                     {auction.title}
@@ -224,7 +231,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               </NativeSelect>
             </div>
             <Button type="submit" disabled={!auctionId || reject.isPending} loading={approve.isPending}>
-              Verify and add
+              {t("autofetch.verifyAdd")}
             </Button>
           </form>
 
@@ -236,14 +243,14 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               reject.mutate(
                 { id: item.id, reason: reason.trim() },
                 {
-                  onSuccess: () => toast.success("Notice rejected"),
+                  onSuccess: () => toast.success(t("autofetch.noticeRejected")),
                   onError: (error) => toast.error(getErrorMessage(error)),
                 },
               );
             }}
           >
             <div className="min-w-0 flex-1 space-y-1.5">
-              <Label htmlFor={`${id}-reason`}>Rejection reason</Label>
+              <Label htmlFor={`${id}-reason`}>{t("autofetch.rejectionReason")}</Label>
               <Input id={`${id}-reason`} value={reason} onChange={(event) => setReason(event.target.value)} />
             </div>
             <Button
@@ -252,7 +259,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               disabled={!reason.trim() || approve.isPending}
               loading={reject.isPending}
             >
-              Reject
+              {t("autofetch.reject")}
             </Button>
           </form>
         </div>

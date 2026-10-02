@@ -2,6 +2,12 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/context";
+
+function CloseLabel() {
+  const t = useT("common");
+  return <span className="sr-only">{t("close")}</span>;
+}
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
@@ -35,7 +41,7 @@ export function DialogContent({
         {children}
         <DialogPrimitive.Close className="absolute top-3 right-3 grid size-9 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
           <X className="size-4" />
-          <span className="sr-only">Close</span>
+          <CloseLabel />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPortal>

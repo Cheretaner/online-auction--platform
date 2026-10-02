@@ -23,9 +23,29 @@ import { hasRole, isOfficer } from "@/lib/format";
 
 export type NavGroup = "Overview" | "Participation" | "Manage" | "Oversight" | "Tools" | "Account";
 
+/** Keys into the `layout.nav` dictionary. */
+export type NavLabel =
+  | "overview"
+  | "notifications"
+  | "kyc"
+  | "deposits"
+  | "documents"
+  | "disputes"
+  | "workspaceAuctions"
+  | "autofetch"
+  | "organizations"
+  | "categories"
+  | "kycReview"
+  | "anomalyReview"
+  | "reports"
+  | "audit"
+  | "aiAssistant"
+  | "telegram"
+  | "profile";
+
 export interface NavItem {
   to: string;
-  label: string;
+  label: NavLabel;
   icon: typeof Home;
   group: NavGroup;
   roles?: Role[];
@@ -37,23 +57,23 @@ export const NAV_GROUPS: NavGroup[] = ["Overview", "Participation", "Manage", "O
 
 export function getAppNav(roles: Role[]): NavItem[] {
   const items: NavItem[] = [
-    { to: "/app", label: "Overview", icon: LayoutDashboard, group: "Overview", match: "exact" },
-    { to: "/app/notifications", label: "Notifications", icon: Bell, group: "Overview" },
-    { to: "/app/kyc", label: "Identity (KYC)", icon: Shield, group: "Participation", match: "exact" },
-    { to: "/app/deposits", label: "Deposits", icon: Wallet, group: "Participation" },
-    { to: "/app/documents", label: "Documents", icon: FolderOpen, group: "Participation" },
-    { to: "/app/disputes", label: "Disputes", icon: Scale, group: "Participation" },
-    { to: "/app/auctions", label: "Workspace auctions", icon: Gavel, group: "Manage", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
-    { to: "/app/autofetch", label: "AutoFetch", icon: Radar, group: "Manage", roles: ["org_admin", "compliance_officer", "auction_officer"] },
-    { to: "/app/organizations", label: "Organizations", icon: Building2, group: "Manage", roles: ["org_admin", "super_admin"] },
-    { to: "/app/categories", label: "Categories", icon: Landmark, group: "Manage", roles: ["super_admin"] },
-    { to: "/app/kyc/review", label: "KYC review", icon: ShieldCheck, group: "Oversight", roles: ["compliance_officer", "org_admin", "super_admin"] },
-    { to: "/app/ai", label: "Anomaly review", icon: ScanSearch, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
-    { to: "/app/reports", label: "Reports", icon: FileText, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
-    { to: "/app/audit", label: "Audit ledger", icon: ScrollText, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
-    { to: "/app/ai-assistant", label: "AI assistant", icon: Sparkles, group: "Tools" },
-    { to: "/app/telegram", label: "Telegram", icon: Send, group: "Tools" },
-    { to: "/app/profile", label: "Profile", icon: UserRound, group: "Account" },
+    { to: "/app", label: "overview", icon: LayoutDashboard, group: "Overview", match: "exact" },
+    { to: "/app/notifications", label: "notifications", icon: Bell, group: "Overview" },
+    { to: "/app/kyc", label: "kyc", icon: Shield, group: "Participation", match: "exact" },
+    { to: "/app/deposits", label: "deposits", icon: Wallet, group: "Participation" },
+    { to: "/app/documents", label: "documents", icon: FolderOpen, group: "Participation" },
+    { to: "/app/disputes", label: "disputes", icon: Scale, group: "Participation" },
+    { to: "/app/auctions", label: "workspaceAuctions", icon: Gavel, group: "Manage", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
+    { to: "/app/autofetch", label: "autofetch", icon: Radar, group: "Manage", roles: ["org_admin", "compliance_officer", "auction_officer"] },
+    { to: "/app/organizations", label: "organizations", icon: Building2, group: "Manage", roles: ["org_admin", "super_admin"] },
+    { to: "/app/categories", label: "categories", icon: Landmark, group: "Manage", roles: ["super_admin"] },
+    { to: "/app/kyc/review", label: "kycReview", icon: ShieldCheck, group: "Oversight", roles: ["compliance_officer", "org_admin", "super_admin"] },
+    { to: "/app/ai", label: "anomalyReview", icon: ScanSearch, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
+    { to: "/app/reports", label: "reports", icon: FileText, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
+    { to: "/app/audit", label: "audit", icon: ScrollText, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
+    { to: "/app/ai-assistant", label: "aiAssistant", icon: Sparkles, group: "Tools" },
+    { to: "/app/telegram", label: "telegram", icon: Send, group: "Tools" },
+    { to: "/app/profile", label: "profile", icon: UserRound, group: "Account" },
   ];
 
   return items.filter((item) => {

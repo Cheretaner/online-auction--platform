@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import mark from "@/assets/images/cheretanet.png";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/context";
 
 /**
  * Cheretanet lockup: the emblem on a white tile plus a live-text wordmark.
@@ -20,10 +21,11 @@ export function BrandLogo({
   compact?: boolean;
   className?: string;
 }) {
+  const t = useT("layout");
   return (
     <Link
       to={to}
-      aria-label="Cheretanet home"
+      aria-label={t("header.home")}
       className={cn("inline-flex shrink-0 items-center gap-2.5 rounded-md", className)}
     >
       <span className="grid size-9 place-items-center rounded-md bg-white p-1 shadow-xs ring-1 ring-black/5">

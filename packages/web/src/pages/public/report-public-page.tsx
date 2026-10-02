@@ -5,7 +5,8 @@ import { QueryState } from "@/components/feedback/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useReport } from "@/features/operations/queries";
-import { formatDateTime } from "@/lib/format";
+import { enumLabel, formatDateTime } from "@/lib/format";
+import { translate, useT } from "@/i18n/context";
 
 function humanize(key: string) {
   return key
@@ -20,7 +21,7 @@ function isPlain(value: unknown): value is string | number | boolean | null {
 
 function formatValue(key: string, value: string | number | boolean | null) {
   if (value === null || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? translate("common", "yes") : translate("common", "no");
   if (typeof value === "number") return new Intl.NumberFormat("en-US").format(value);
   if (/(At|Date)$/.test(key) && !Number.isNaN(Date.parse(value))) return formatDateTime(value);
   return value.replaceAll("_", " ");
@@ -74,31 +75,32 @@ function ReportBody({ data }: { data: unknown }) {
 export default function ReportPublicPage() {
   const { id } = useParams();
   const report = useReport(id);
+  const t = useT("auctions");
   return (
     <QueryState isLoading={report.isLoading} isError={report.isError} error={report.error} onRetry={() => report.refetch()}>
       {report.data ? (
         <div className="mx-auto max-w-4xl">
           <PageHeader
-            back={{ to: "/auctions?status=awarded", label: "Published results" }}
-            title={<span className="capitalize">{report.data.reportType.replaceAll("_", " ")} report</span>}
+            back={{ to: "/auctions?status=awarded", label: t("report.back") }}
+            title={t("report.title", { type: enumLabel(report.data.reportType) })}
             meta={
               <>
                 <Badge variant="outline">
-                  <FileText aria-hidden /> Version {report.data.reportVersion}
+                  <FileText aria-hidden /> {t("report.version", { version: report.data.reportVersion })}
                 </Badge>
                 {report.data.chainVerified ? (
                   <Badge variant="success">
-                    <ShieldCheck aria-hidden /> Audit chain verified
+                    <ShieldCheck aria-hidden /> {t("report.chainVerified")}
                   </Badge>
                 ) : (
-                  <Badge variant="warning">Audit chain not verified</Badge>
+                  <Badge variant="warning">{t("report.chainNotVerified")}</Badge>
                 )}
               </>
             }
             description={
               report.data.publishedAt
-                ? `Published ${formatDateTime(report.data.publishedAt)}`
-                : "This report is not public yet."
+                ? t("report.published", { date: formatDateTime(report.data.publishedAt) })
+                : t("report.notPublic")
             }
           />
           <ReportBody data={report.data.reportData} />

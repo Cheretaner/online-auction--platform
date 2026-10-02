@@ -10,11 +10,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useLoginMutation } from "@/features/auth/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const login = useLoginMutation();
+  const t = useT("auth");
   const form = useForm({
     resolver: zodResolver(LoginRequest),
     defaultValues: { email: "", password: "" },
@@ -22,14 +24,14 @@ export default function LoginPage() {
 
   return (
     <AuthCard
-      eyebrow="Welcome back"
-      title="Sign in to Cheretanet"
-      description="Bid on auctions, track your deposits, or manage your organization's auctions."
+      eyebrow={t("login.eyebrow")}
+      title={t("login.title")}
+      description={t("login.description")}
       footer={
         <>
-          New to Cheretanet?{" "}
+          {t("login.newHere")}{" "}
           <Link to="/register" className={authLinkClass}>
-            Create a bidder account
+            {t("login.createAccount")}
           </Link>
         </>
       }
@@ -44,7 +46,7 @@ export default function LoginPage() {
                   navigate(to, { replace: true });
                 } catch (error) {
                   if (!applyApiFieldErrors(error, form.setError)) {
-                    toast.error(getErrorMessage(error, "Sign in failed"));
+                    toast.error(getErrorMessage(error, t("login.failed")));
                   }
                 }
               })}
@@ -54,7 +56,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("email")}</FormLabel>
                     <FormControl>
                       <Input type="email" autoComplete="email" {...field} />
                     </FormControl>
@@ -68,9 +70,9 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center justify-between">
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t("password")}</FormLabel>
                       <Link to="/forgot-password" className={`text-xs ${authLinkClass}`}>
-                        Forgot password?
+                        {t("login.forgot")}
                       </Link>
                     </div>
                     <FormControl>
@@ -81,7 +83,7 @@ export default function LoginPage() {
                 )}
               />
               <Button type="submit" size="lg" className="w-full" loading={login.isPending}>
-                {login.isPending ? "Signing in…" : "Sign in"}
+                {login.isPending ? t("login.submitting") : t("login.submit")}
               </Button>
             </form>
           </Form>

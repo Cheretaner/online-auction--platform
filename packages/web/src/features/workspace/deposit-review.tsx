@@ -10,7 +10,8 @@ import { useAuctionDeposits, useReleaseDeposit, useReviewDeposit } from "@/featu
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction, DepositRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 const RELEASABLE = new Set(["closed", "awarded", "cancelled"]);
 
@@ -21,6 +22,8 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const review = useReviewDeposit();
   const release = useReleaseDeposit();
   const [rejecting, setRejecting] = useState<DepositRecord | null>(null);
+  const t = useT("workspace");
+  const tc = useT("common");
   const items = deposits.data?.items ?? [];
 
   if (deposits.isLoading) return <PageSkeleton rows={2} />;
@@ -30,15 +33,15 @@ export function DepositReview({ auction }: { auction: Auction }) {
       <EmptyState
         size="inline"
         icon={Wallet}
-        title="No deposits registered yet"
-        description="Bidders register their CPO or guarantee from the public auction page."
+        title={t("deposits.emptyTitle")}
+        description={t("deposits.emptyBody")}
       />
     );
 
   const verify = (deposit: DepositRecord) =>
     review.mutate(
       { id: deposit.id, body: { decision: "verified" } },
-      { onSuccess: () => toast.success("Deposit verified"), onError: (error) => toast.error(getErrorMessage(error)) },
+      { onSuccess: () => toast.success(t("deposits.verified")), onError: (error) => toast.error(getErrorMessage(error)) },
     );
 
   return (
@@ -46,11 +49,11 @@ export function DepositReview({ auction }: { auction: Auction }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Instrument</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Submitted</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead>{t("deposits.instrument")}</TableHead>
+            <TableHead>{t("deposits.amount")}</TableHead>
+            <TableHead>{t("deposits.submitted")}</TableHead>
+            <TableHead>{t("deposits.status")}</TableHead>
+            <TableHead className="text-right">{t("deposits.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -60,13 +63,13 @@ export function DepositReview({ auction }: { auction: Auction }) {
               <TableRow key={deposit.id}>
                 <TableCell>
                   <p className="font-medium">
-                    {deposit.instrumentType.replaceAll("_", " ").toUpperCase()} · {deposit.referenceNumber}
+                    {enumLabel(deposit.instrumentType)} · {deposit.referenceNumber}
                   </p>
                   <p className="text-xs text-muted-foreground">{deposit.issuingBank}</p>
                 </TableCell>
                 <TableCell className={short ? "text-destructive tabular-nums" : "tabular-nums"}>
                   {formatMoney(deposit.amount)}
-                  {short ? <span className="block text-xs">below required {formatMoney(auction.depositAmount)}</span> : null}
+                  {short ? <span className="block text-xs">{t("deposits.belowRequired", { amount: formatMoney(auction.depositAmount) })}</span> : null}
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(deposit.createdAt)}</TableCell>
                 <TableCell>
@@ -81,20 +84,20 @@ export function DepositReview({ auction }: { auction: Auction }) {
                         variant="ghost"
                         onClick={() =>
                           downloadDocument(deposit.documentId!, `deposit-${deposit.referenceNumber}`).catch((error: unknown) =>
-                            toast.error(getErrorMessage(error, "Download failed")),
+                            toast.error(getErrorMessage(error, tc("downloadFailed"))),
                           )
                         }
                       >
-                        View proof
+                        {t("deposits.viewProof")}
                       </Button>
                     ) : null}
                     {deposit.status === "pending" ? (
                       <>
                         <Button size="sm" disabled={review.isPending} onClick={() => verify(deposit)}>
-                          Verify
+                          {t("deposits.verify")}
                         </Button>
                         <Button size="sm" variant="destructive-outline" onClick={() => setRejecting(deposit)}>
-                          Reject
+                          {t("deposits.reject")}
                         </Button>
                       </>
                     ) : null}
@@ -105,12 +108,12 @@ export function DepositReview({ auction }: { auction: Auction }) {
                         disabled={release.isPending}
                         onClick={() =>
                           release.mutate(deposit.id, {
-                            onSuccess: () => toast.success("Deposit released"),
+                            onSuccess: () => toast.success(t("deposits.released")),
                             onError: (error) => toast.error(getErrorMessage(error)),
                           })
                         }
                       >
-                        Release
+                        {t("deposits.release")}
                       </Button>
                     ) : null}
                   </div>
@@ -123,9 +126,9 @@ export function DepositReview({ auction }: { auction: Auction }) {
       <ReasonDialog
         open={rejecting !== null}
         onOpenChange={(open) => !open && setRejecting(null)}
-        title="Reject deposit"
-        description="The bidder sees this reason and cannot bid until a valid deposit is verified."
-        confirmLabel="Reject deposit"
+        title={t("deposits.rejectTitle")}
+        description={t("deposits.rejectDescription")}
+        confirmLabel={t("deposits.rejectTitle")}
         destructive
         pending={review.isPending}
         onConfirm={(reason) =>
@@ -134,7 +137,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
             { id: rejecting.id, body: { decision: "rejected", rejectionReason: reason } },
             {
               onSuccess: () => {
-                toast.success("Deposit rejected");
+                toast.success(t("deposits.rejected"));
                 setRejecting(null);
               },
               onError: (error) => toast.error(getErrorMessage(error)),

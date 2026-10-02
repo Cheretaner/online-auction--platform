@@ -9,16 +9,18 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { Auction } from '@/lib/api/types'
 import { formatDateTime, formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { translate, useT } from '@/i18n/context'
+import { enumLabel, regionLabel } from '@/lib/format'
 
 /** "Ending in 4h 12m" from the auction's current close time. */
 function timeLeft(closesAt: string, now = Date.now()): string {
   const ms = new Date(closesAt).getTime() - now
-  if (ms <= 0) return 'Closing now'
+  if (ms <= 0) return translate('auctions', 'listing.closingNow')
   const minutes = Math.floor(ms / 60_000)
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
-  if (days > 0) return `Ends in ${days}d ${hours}h`
-  return `Ends in ${hours}h ${minutes % 60}m`
+  if (days > 0) return translate('auctions', 'listing.endsDays', { days, hours })
+  return translate('auctions', 'listing.endsHours', { hours, minutes: minutes % 60 })
 }
 
 function reference(auction: Auction): string {
@@ -27,13 +29,14 @@ function reference(auction: Auction): string {
 }
 
 function StatusChips({ auction }: { auction: Auction }) {
+  const t = useT('auctions')
   const sealed = auction.auctionType === 'sealed_bid'
   if (auction.status === 'live') {
     return (
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="default">
           <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />
-          {sealed ? 'Sealed bids open' : 'Live auction'}
+          {sealed ? t('listing.sealedOpen') : t('listing.liveAuction')}
         </Badge>
         <Badge variant="warning">
           <Timer aria-hidden />
@@ -46,22 +49,22 @@ function StatusChips({ auction }: { auction: Auction }) {
     return (
       <Badge variant="success">
         <CircleCheck aria-hidden />
-        Completed &amp; awarded
+        {t('listing.awarded')}
       </Badge>
     )
   }
   const label =
     auction.status === 'scheduled'
-      ? `Opens ${formatDateTime(auction.opensAt)}`
+      ? t('listing.opens', { date: formatDateTime(auction.opensAt) })
       : auction.status === 'under_review'
-        ? 'Closed · under review'
-        : `Closed ${formatDateTime(auction.closedAt ?? auction.closesAt)}`
+        ? t('listing.underReview')
+        : t('listing.closedOn', { date: formatDateTime(auction.closedAt ?? auction.closesAt) })
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {sealed ? (
         <Badge variant="secondary">
           <Lock aria-hidden />
-          Sealed tender
+          {t('listing.sealedTender')}
         </Badge>
       ) : null}
       <Badge variant={auction.status === 'scheduled' ? 'info' : 'muted'}>{label}</Badge>
@@ -70,17 +73,19 @@ function StatusChips({ auction }: { auction: Auction }) {
 }
 
 function PriceSummary({ auction }: { auction: Auction }) {
+  const t = useT('auctions')
+  const tc = useT('common')
   const sealedHidden = auction.auctionType === 'sealed_bid' && !auction.sealedOpenedAt
   let caption: string
   let amount: string
   if (auction.status === 'awarded' && auction.winningAmount) {
-    caption = 'Final sale price'
+    caption = t('listing.finalPrice')
     amount = formatMoney(auction.winningAmount)
   } else if (auction.currentHighestBid && Number(auction.currentHighestBid) > 0 && !sealedHidden) {
-    caption = 'Current highest bid'
+    caption = t('listing.currentHighest')
     amount = formatMoney(auction.currentHighestBid)
   } else {
-    caption = sealedHidden ? 'Indicative base value' : 'Starting price'
+    caption = sealedHidden ? t('listing.indicativeBase') : t('listing.startingPrice')
     amount = formatMoney(auction.startPrice)
   }
   return (
@@ -88,23 +93,26 @@ function PriceSummary({ auction }: { auction: Auction }) {
       <p className="eyebrow text-muted-foreground">{caption}</p>
       <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">{amount}</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        {auction.bidCount} {auction.bidCount === 1 ? 'bid' : 'bids'}
-        {auction.auctionType === 'open_ascending' ? ` · increment ${formatMoney(auction.minIncrement)}` : ''}
+        {auction.bidCount === 1 ? tc('bidCountOne') : tc('bidCountOther', { count: auction.bidCount })}
+        {auction.auctionType === 'open_ascending'
+          ? ` · ${t('listing.increment', { amount: formatMoney(auction.minIncrement) })}`
+          : ''}
       </p>
     </div>
   )
 }
 
 function AuctionListing({ auction, issuer, featured }: { auction: Auction; issuer: string; featured: boolean }) {
+  const t = useT('auctions')
   const finished = auction.status === 'awarded' || auction.status === 'closed'
   const cta =
     auction.status === 'live'
       ? auction.auctionType === 'sealed_bid'
-        ? 'Review & submit sealed bid'
-        : 'View auction & bid'
+        ? t('listing.ctaSealed')
+        : t('listing.ctaLive')
       : auction.status === 'scheduled'
-        ? 'Prepare to bid'
-        : 'View results'
+        ? t('listing.ctaUpcoming')
+        : t('listing.ctaResults')
 
   return (
     <Card
@@ -117,12 +125,12 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
           </span>
           <span className="inline-flex min-w-0 items-center gap-1 font-medium">
             <span className="truncate">{issuer}</span>
-            <BadgeCheck className="size-4 shrink-0 text-primary" aria-label="Verified issuer" />
+            <BadgeCheck className="size-4 shrink-0 text-primary" aria-label={t('discovery.verifiedIssuer')} />
           </span>
           {auction.region ? (
             <span className="inline-flex items-center gap-1 text-muted-foreground">
               <MapPin className="size-3.5" aria-hidden />
-              {auction.region}
+              {regionLabel(auction.region)}
             </span>
           ) : null}
         </div>
@@ -141,11 +149,11 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
           ) : null}
           <dl className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-xs">
             <div className="flex gap-1.5">
-              <dt className="text-muted-foreground">Format</dt>
-              <dd className="font-medium">{auction.auctionType === 'sealed_bid' ? 'Sealed bid' : 'Open ascending'}</dd>
+              <dt className="text-muted-foreground">{t('listing.format')}</dt>
+              <dd className="font-medium">{enumLabel(auction.auctionType)}</dd>
             </div>
             <div className="flex gap-1.5">
-              <dt className="text-muted-foreground">Closes</dt>
+              <dt className="text-muted-foreground">{t('listing.closes')}</dt>
               <dd className="font-medium">{formatDateTime(auction.closesAt)}</dd>
             </div>
           </dl>
@@ -158,11 +166,11 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
           <ShieldCheck className="size-4 shrink-0" aria-hidden />
           {Number(auction.depositAmount) > 0 ? (
             <span>
-              Bid security:{' '}
+              {t('listing.bidSecurity')}{' '}
               <span className="font-medium text-foreground tabular-nums">{formatMoney(auction.depositAmount)}</span>
             </span>
           ) : (
-            'No bid security required'
+            t('listing.noBidSecurity')
           )}
         </p>
         <Button asChild variant={finished ? 'outline' : 'default'} className="w-full sm:w-auto">
@@ -193,6 +201,7 @@ export function ListingFeed({
   onClearFilters?: () => void
   footer?: ReactNode
 }) {
+  const t = useT('auctions')
   let body: ReactNode
   if (loading) {
     body = Array.from({ length: 3 }, (_, index) => (
@@ -209,12 +218,12 @@ export function ListingFeed({
     body = (
       <EmptyState
         icon={SearchX}
-        title="No auctions match these filters"
-        description="Try another status, region or search term."
+        title={t('discovery.emptyTitle')}
+        description={t('discovery.emptyBody')}
         action={
           onClearFilters ? (
             <Button variant="outline" onClick={onClearFilters}>
-              Clear all filters
+              {t('discovery.clearFilters')}
             </Button>
           ) : null
         }
@@ -232,7 +241,7 @@ export function ListingFeed({
   }
 
   return (
-    <section className="flex min-w-0 flex-col gap-4" aria-label="Auction results" aria-busy={loading}>
+    <section className="flex min-w-0 flex-col gap-4" aria-label={t('discovery.results')} aria-busy={loading}>
       {body}
       {footer}
     </section>

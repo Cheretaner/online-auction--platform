@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { FieldHint, Label } from "@/components/ui/label";
 import { useConfirmPasswordReset } from "@/features/auth/queries";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
 
 export default function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -16,17 +17,18 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const reset = useConfirmPasswordReset();
+  const t = useT("auth");
   const mismatch = confirm.length > 0 && confirm !== password;
   const tooShort = password.length > 0 && password.length < 8;
 
   if (!token) {
     return (
       <AuthCard
-        title="This link is incomplete"
-        description="Open the link from your email again, or ask for a new one."
+        title={t("reset.incompleteTitle")}
+        description={t("reset.incompleteBody")}
       >
         <Button asChild className="w-full">
-          <Link to="/forgot-password">Request a new link</Link>
+          <Link to="/forgot-password">{t("reset.requestNew")}</Link>
         </Button>
       </AuthCard>
     );
@@ -34,9 +36,9 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthCard
-      eyebrow="Account recovery"
-      title="Choose a new password"
-      description="After this you are signed out on every device and sign in with the new password."
+      eyebrow={t("reset.eyebrow")}
+      title={t("reset.title")}
+      description={t("reset.description")}
     >
           <form
             className="space-y-4"
@@ -47,7 +49,7 @@ export default function ResetPasswordPage() {
                 { token, password },
                 {
                   onSuccess: () => {
-                    toast.success("Password changed. Sign in with your new password.");
+                    toast.success(t("reset.changed"));
                     navigate("/login", { replace: true });
                   },
                 },
@@ -55,29 +57,29 @@ export default function ResetPasswordPage() {
             }}
           >
             <div className="space-y-2">
-              <Label htmlFor={`${id}-new`}>New password</Label>
+              <Label htmlFor={`${id}-new`}>{t("reset.newPassword")}</Label>
               <Input id={`${id}-new`} aria-invalid={tooShort || undefined} type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
               {tooShort ? (
-                <p role="alert" className="text-xs font-medium text-destructive">Use at least 8 characters.</p>
+                <p role="alert" className="text-xs font-medium text-destructive">{t("reset.tooShort")}</p>
               ) : (
-                <FieldHint>At least 8 characters.</FieldHint>
+                <FieldHint>{t("reset.hint")}</FieldHint>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor={`${id}-confirm`}>Repeat new password</Label>
+              <Label htmlFor={`${id}-confirm`}>{t("reset.repeat")}</Label>
               <Input id={`${id}-confirm`} aria-invalid={mismatch || undefined} type="password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} />
-              {mismatch ? <p role="alert" className="text-xs font-medium text-destructive">The passwords do not match.</p> : null}
+              {mismatch ? <p role="alert" className="text-xs font-medium text-destructive">{t("reset.mismatch")}</p> : null}
             </div>
             {reset.isError ? (
               <p role="alert" className="text-sm text-destructive">
                 {getErrorMessage(reset.error)}{" "}
                 <Link to="/forgot-password" className="font-medium underline underline-offset-4">
-                  Request a new link
+                  {t("reset.requestNew")}
                 </Link>
               </p>
             ) : null}
             <Button type="submit" size="lg" className="w-full" loading={reset.isPending} disabled={mismatch || password.length < 8}>
-              {reset.isPending ? "Saving…" : "Set new password"}
+              {reset.isPending ? t("reset.submitting") : t("reset.submit")}
             </Button>
           </form>
     </AuthCard>

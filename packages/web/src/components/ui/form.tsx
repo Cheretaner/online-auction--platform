@@ -11,6 +11,7 @@ import {
   type FieldValues,
 } from "react-hook-form";
 import { cn } from "@/lib/utils";
+import { localizeSchemaMessage } from "@/i18n/zod-error-map";
 
 export const Form = FormProvider;
 
@@ -90,7 +91,7 @@ export function FormDescription({ className, ...props }: HTMLAttributes<HTMLPara
 
 export function FormMessage({ className, children, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   const { error, formMessageId } = useFormField();
-  const body = error ? String(error.message) : children;
+  const body = error ? localizeSchemaMessage(String(error.message)) : children;
   if (!body) return null;
   return (
     <p id={formMessageId} role={error ? "alert" : undefined} className={cn("flex items-center gap-1.5 text-xs leading-5 font-medium text-destructive", className)} {...props}>

@@ -88,8 +88,9 @@
 }
 
 @theme inline {
-  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Newsreader", ui-serif, Georgia, serif;
+  /* Ethiopic fallbacks: the Latin faces have no Ge'ez glyphs, so Amharic text uses Noto. */
+  --font-sans: "Hanken Grotesk", "Noto Sans Ethiopic", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Newsreader", "Noto Serif Ethiopic", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --color-background: var(--background);
@@ -184,4 +185,18 @@
 /* Small uppercase label for metadata, eyebrows and table headings. */
 @utility eyebrow {
   @apply font-mono text-[11px] leading-4 font-medium tracking-[0.08em] uppercase;
+}
+
+/* Ge'ez script has no letter case and suffers under wide tracking and a
+   monospace face, so Amharic labels use the sans face at a readable size. */
+:lang(am) .eyebrow {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+/* Ethiopic glyphs need a little more line height than Latin text. */
+:lang(am) body {
+  line-height: 1.6;
 }

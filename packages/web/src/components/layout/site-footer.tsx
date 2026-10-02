@@ -1,30 +1,34 @@
 import { ArrowUpRight, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BrandLogo } from "@/components/layout/brand-logo";
+import { useT } from "@/i18n/context";
+import type { messages } from "@/i18n/messages";
 
-const linkColumns = [
+type FooterKey = Exclude<keyof (typeof messages)["layout"]["en"]["footer"], "copyright">;
+
+const linkColumns: Array<{ title: FooterKey; links: Array<{ label: FooterKey; to: string }> }> = [
   {
-    title: "Explore",
+    title: "explore",
     links: [
-      { label: "All auctions", to: "/auctions" },
-      { label: "Live auctions", to: "/auctions?status=live" },
-      { label: "Published results", to: "/auctions?status=awarded" },
-      { label: "How to participate", to: "/auctions#how-to-participate" },
+      { label: "allAuctions", to: "/auctions" },
+      { label: "liveAuctions", to: "/auctions?status=live" },
+      { label: "publishedResults", to: "/auctions?status=awarded" },
+      { label: "howToParticipate", to: "/auctions#how-to-participate" },
     ],
   },
   {
-    title: "Take part",
+    title: "takePart",
     links: [
-      { label: "Create bidder account", to: "/register" },
-      { label: "Sign in", to: "/login" },
-      { label: "Bidder workspace", to: "/app" },
+      { label: "createAccount", to: "/register" },
+      { label: "signIn", to: "/login" },
+      { label: "bidderWorkspace", to: "/app" },
     ],
   },
   {
-    title: "For institutions",
+    title: "institutions",
     links: [
-      { label: "Organization workspace", to: "/app/organizations" },
-      { label: "Manage auctions", to: "/app/auctions" },
+      { label: "orgWorkspace", to: "/app/organizations" },
+      { label: "manageAuctions", to: "/app/auctions" },
     ],
   },
 ];
@@ -42,6 +46,7 @@ const footerLink =
   "rounded-sm text-sm leading-6 text-inverse-foreground/70 transition-colors hover:text-inverse-foreground focus-visible:ring-highlight focus-visible:ring-offset-inverse";
 
 export function SiteFooter() {
+  const t = useT("layout");
   return (
     <footer className="bg-inverse text-inverse-foreground">
       <div className="page-container py-12 lg:py-16">
@@ -49,10 +54,9 @@ export function SiteFooter() {
           <div className="max-w-sm">
             <BrandLogo tone="inverse" className="focus-visible:ring-highlight focus-visible:ring-offset-inverse" />
             <p className="mt-5 text-sm leading-6 text-inverse-foreground/75">
-              A clear digital space for public auctions in Ethiopia—connecting institutions and bidders through a
-              process people can follow.
+              {t("footer.about")}
             </p>
-            <p className="eyebrow mt-6 text-highlight">Follow Cheretanet</p>
+            <p className="eyebrow mt-6 text-highlight">{t("footer.follow")}</p>
             <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
               {socialLinks.map(({ label, href }) => (
                 <li key={label}>
@@ -64,7 +68,7 @@ export function SiteFooter() {
                   >
                     {label}
                     <ArrowUpRight className="size-3.5 opacity-60" aria-hidden />
-                    <span className="sr-only"> (Cheretanet, opens in a new tab)</span>
+                    <span className="sr-only"> {t("footer.newTab")}</span>
                   </a>
                 </li>
               ))}
@@ -73,13 +77,13 @@ export function SiteFooter() {
 
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
             {linkColumns.map(({ title, links }) => (
-              <nav key={title} aria-label={title}>
-                <h2 className="eyebrow text-inverse-foreground">{title}</h2>
+              <nav key={title} aria-label={t(`footer.${title}`)}>
+                <h2 className="eyebrow text-inverse-foreground">{t(`footer.${title}`)}</h2>
                 <ul className="mt-4 flex flex-col gap-1.5">
                   {links.map((link) => (
                     <li key={link.label}>
                       <Link to={link.to} className={footerLink}>
-                        {link.label}
+                        {t(`footer.${link.label}`)}
                       </Link>
                     </li>
                   ))}
@@ -90,9 +94,9 @@ export function SiteFooter() {
         </div>
 
         <div className="flex flex-col gap-2 pt-6 text-xs text-inverse-foreground/55 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} Cheretanet. Public auctions, made clear.</p>
+          <p>{t("footer.copyright", { year: new Date().getFullYear() })}</p>
           <p className="inline-flex items-center gap-1.5">
-            <MapPin className="size-3.5" aria-hidden /> Ethiopia
+            <MapPin className="size-3.5" aria-hidden /> {t("footer.location")}
           </p>
         </div>
       </div>

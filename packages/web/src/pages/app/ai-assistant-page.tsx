@@ -2,22 +2,20 @@ import { Assistant } from "@/features/ai/assistant";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
+import { useT } from "@/i18n/context";
 
 export default function AiAssistantPage() {
+  const t = useT("tools");
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="AI assistant"
-        description="Ask for help understanding auctions, preparing listings, or navigating the platform."
+        title={t("assistant.pageTitle")}
+        description={t("assistant.pageDescription")}
       />
       <Alert>
         <Info aria-hidden />
-        <AlertTitle>Guidance for your review</AlertTitle>
-        <AlertDescription>
-          AI responses can be inaccurate and are for guidance only. They do not place bids, change auction
-          records, or make compliance decisions. Avoid entering passwords, payment details, or private
-          participant information.
-        </AlertDescription>
+        <AlertTitle>{t("assistant.guidanceTitle")}</AlertTitle>
+        <AlertDescription>{t("assistant.guidanceBody")}</AlertDescription>
       </Alert>
       <Assistant />
     </div>

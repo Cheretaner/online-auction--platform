@@ -4,23 +4,25 @@ import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { Button } from "@/components/ui/button";
 import { useCreateDispute } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
 
 /** Lets a participant formally contest how an auction was run. */
 export function OpenDisputeButton({ auctionId }: { auctionId: string }) {
   const [open, setOpen] = useState(false);
   const create = useCreateDispute();
+  const t = useT("auctions");
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
-        Raise a dispute
+        {t("dispute.raise")}
       </Button>
       <ReasonDialog
         open={open}
         onOpenChange={setOpen}
-        title="Raise a dispute"
-        description="Explain what went wrong. The organization's reviewers will respond, and every step is recorded in the audit trail."
-        label="What happened"
-        confirmLabel="Submit dispute"
+        title={t("dispute.raise")}
+        description={t("dispute.description")}
+        label={t("dispute.label")}
+        confirmLabel={t("dispute.submit")}
         minLength={12}
         pending={create.isPending}
         onConfirm={(reason) =>
@@ -28,7 +30,7 @@ export function OpenDisputeButton({ auctionId }: { auctionId: string }) {
             { auctionId, reason, evidence: {} },
             {
               onSuccess: () => {
-                toast.success("Dispute submitted. Track it under Disputes.");
+                toast.success(t("dispute.submitted"));
                 setOpen(false);
               },
               onError: (error) => toast.error(getErrorMessage(error)),

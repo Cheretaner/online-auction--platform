@@ -3,12 +3,13 @@ import { useSearchParams } from "react-router-dom";
 
 export const PAGE_SIZE = 10;
 
+/** `key` points into the `auctions.discovery.tabs` dictionary. */
 export const STATUS_TABS = [
-  { value: "", label: "All tenders" },
-  { value: "live", label: "Live" },
-  { value: "scheduled", label: "Upcoming" },
-  { value: "closed", label: "Closed" },
-  { value: "awarded", label: "Awarded" },
+  { value: "", key: "all" },
+  { value: "live", key: "live" },
+  { value: "scheduled", key: "scheduled" },
+  { value: "closed", key: "closed" },
+  { value: "awarded", key: "awarded" },
 ] as const;
 
 export const ETHIOPIAN_REGIONS = [

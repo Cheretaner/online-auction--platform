@@ -20,6 +20,7 @@ import { useAssignDispute, useResolveDispute } from "@/features/operations/queri
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DisputeRecord } from "@/lib/api/types";
 import { formatDateTime, hasRole } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 /** Disputes with the actions the viewer is allowed to take. Reviewers can
  * take an open dispute and resolve one assigned to them; the API refuses
@@ -41,6 +42,7 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
   const me = session?.user.id;
   const reviewer = hasRole(roles, "compliance_officer", "org_admin", "auction_officer", "super_admin");
   const mine = dispute.raisedBy === me;
+  const t = useT("account");
 
   return (
     <Card>
@@ -49,13 +51,17 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
           <div className="min-w-0 space-y-1">
             <p className="text-sm leading-6">{dispute.reason}</p>
             <p className="text-xs text-muted-foreground">
-              Raised {formatDateTime(dispute.createdAt)}
-              {mine ? " by you" : ""}
-              {dispute.assignedReviewer ? (dispute.assignedReviewer === me ? " · assigned to you" : " · assigned") : ""}
+              {t("disputes.raised", { date: formatDateTime(dispute.createdAt) })}
+              {mine ? t("disputes.byYou") : ""}
+              {dispute.assignedReviewer
+                ? dispute.assignedReviewer === me
+                  ? t("disputes.assignedToYou")
+                  : t("disputes.assigned")
+                : ""}
             </p>
             {showAuctionLink ? (
               <Link className="text-sm font-medium text-primary underline-offset-4 hover:underline" to={`/auctions/${dispute.auctionId}`}>
-                View auction
+                {t("disputes.viewAuction")}
               </Link>
             ) : null}
           </div>
@@ -64,7 +70,7 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
 
         {dispute.decision ? (
           <div className="rounded-md border-l-2 border-primary bg-muted p-3 text-sm">
-            <p className="eyebrow mb-1 text-muted-foreground">Decision</p>
+            <p className="eyebrow mb-1 text-muted-foreground">{t("disputes.decision")}</p>
             <p className="font-medium">{dispute.decision}</p>
             {dispute.decisionReason ? <p className="mt-1 text-muted-foreground">{dispute.decisionReason}</p> : null}
           </div>
@@ -80,18 +86,18 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
                   assign.mutate(
                     { id: dispute.id, body: { reviewerId: me } },
                     {
-                      onSuccess: () => toast.success("Assigned to you"),
+                      onSuccess: () => toast.success(t("disputes.assignedToast")),
                       onError: (error) => toast.error(getErrorMessage(error)),
                     },
                   )
                 }
               >
-                Take this dispute
+                {t("disputes.take")}
               </Button>
             ) : null}
             {dispute.status === "under_review" ? (
               <Button size="sm" variant="outline" onClick={() => setResolving(true)}>
-                Record decision
+                {t("disputes.record")}
               </Button>
             ) : null}
           </div>
@@ -116,13 +122,14 @@ function ResolveDialog({
   const [decision, setDecision] = useState("");
   const [reason, setReason] = useState("");
   const valid = decision.trim().length >= 3 && reason.trim().length >= 12;
+  const t = useT("account");
 
   const submit = (status: "resolved" | "rejected") =>
     resolve.mutate(
       { id: dispute.id, body: { status, decision: decision.trim(), decisionReason: reason.trim() } },
       {
         onSuccess: () => {
-          toast.success(status === "resolved" ? "Dispute resolved" : "Dispute rejected");
+          toast.success(status === "resolved" ? t("disputes.resolved") : t("disputes.rejected"));
           onOpenChange(false);
         },
         onError: (error) => toast.error(getErrorMessage(error)),
@@ -133,21 +140,21 @@ function ResolveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Record a decision</DialogTitle>
-          <DialogDescription>The bidder is notified, and the decision goes into the audit trail.</DialogDescription>
+          <DialogTitle>{t("disputes.dialogTitle")}</DialogTitle>
+          <DialogDescription>{t("disputes.dialogDescription")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor={`${id}-decision`}>Decision</Label>
+            <Label htmlFor={`${id}-decision`}>{t("disputes.decision")}</Label>
             <Input
               id={`${id}-decision`}
-              placeholder="e.g. Closing time extension upheld"
+              placeholder={t("disputes.decisionPlaceholder")}
               value={decision}
               onChange={(event) => setDecision(event.target.value)}
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor={`${id}-reason`}>Reasoning</Label>
+            <Label htmlFor={`${id}-reason`}>{t("disputes.reasoning")}</Label>
             <Textarea
               id={`${id}-reason`}
               rows={4}
@@ -156,16 +163,16 @@ function ResolveDialog({
               onChange={(event) => setReason(event.target.value)}
             />
             <FieldHint id={`${id}-reason-hint`}>
-              {reason.trim().length}/12 characters minimum. The bidder sees this.
+              {t("disputes.reasoningHint", { count: reason.trim().length })}
             </FieldHint>
           </div>
         </div>
         <DialogFooter>
           <Button variant="destructive-outline" disabled={!valid || resolve.isPending} onClick={() => submit("rejected")}>
-            Reject dispute
+            {t("disputes.reject")}
           </Button>
           <Button disabled={!valid || resolve.isPending} onClick={() => submit("resolved")}>
-            Uphold and resolve
+            {t("disputes.uphold")}
           </Button>
         </DialogFooter>
       </DialogContent>

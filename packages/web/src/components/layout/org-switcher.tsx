@@ -10,10 +10,12 @@ import {
 import { useAuth } from "@/features/auth/auth-provider";
 import { useSwitchOrgMutation } from "@/features/auth/queries";
 import { toast } from "sonner";
+import { useT } from "@/i18n/context";
 
 export function OrgSwitcher() {
   const { session } = useAuth();
   const mutation = useSwitchOrgMutation();
+  const t = useT("layout");
   const orgs = session?.organizations ?? [];
   if (orgs.length === 0) return null;
 
@@ -24,11 +26,11 @@ export function OrgSwitcher() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="max-w-56 justify-start">
           <Building2 className="size-4" />
-          <span className="truncate">{current?.organizationName ?? "Select organization"}</span>
+          <span className="truncate">{current?.organizationName ?? t("org.select")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuLabel>Organization context</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("org.context")}</DropdownMenuLabel>
         {orgs.map((org) => (
           <DropdownMenuItem
             key={org.organizationId}
@@ -36,9 +38,9 @@ export function OrgSwitcher() {
             onClick={async () => {
               try {
                 await mutation.mutateAsync(org.organizationId);
-                toast.success(`Switched to ${org.organizationName}`);
+                toast.success(t("org.switched", { name: org.organizationName }));
               } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Could not switch organization");
+                toast.error(error instanceof Error ? error.message : t("org.switchFailed"));
               }
             }}
           >

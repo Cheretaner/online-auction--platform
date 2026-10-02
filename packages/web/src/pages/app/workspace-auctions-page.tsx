@@ -10,6 +10,7 @@ import { useOrgAuctions } from "@/features/auctions/queries";
 import type { Auction } from "@/lib/api/types";
 import { canManageAuctions, formatDateTime, formatMoney } from "@/lib/format";
 import { Card } from "@/components/ui/card";
+import { useT } from "@/i18n/context";
 
 function displayPrice(auction: Auction) {
   return formatMoney(auction.currentHighestBid ?? auction.startPrice);
@@ -19,10 +20,11 @@ export default function WorkspaceAuctionsPage() {
   const { organizationId, roles } = useAuth();
   const auctions = useOrgAuctions(organizationId ?? undefined);
   const canCreate = canManageAuctions(roles);
+  const t = useT("workspace");
   const createButton = canCreate ? (
     <Button asChild>
       <Link to="/app/auctions/new">
-        <Plus aria-hidden /> Create auction
+        <Plus aria-hidden /> {t("list.create")}
       </Link>
     </Button>
   ) : null;
@@ -30,15 +32,15 @@ export default function WorkspaceAuctionsPage() {
   return (
     <div>
       <PageHeader
-        title="Workspace auctions"
-        description="Every auction your organization has drafted, published or closed."
+        title={t("list.title")}
+        description={t("list.description")}
         actions={organizationId ? createButton : null}
       />
       {!organizationId ? (
         <EmptyState
           icon={Building2}
-          title="Choose an organization first"
-          description="Auctions belong to an organization. Pick one with the organization switcher in the top bar."
+          title={t("list.chooseOrgTitle")}
+          description={t("list.chooseOrgBody")}
         />
       ) : (
         <QueryState
@@ -47,8 +49,8 @@ export default function WorkspaceAuctionsPage() {
           error={auctions.error}
           isEmpty={(auctions.data?.items.length ?? 0) === 0}
           emptyIcon={Gavel}
-          emptyTitle="No auctions for this organization yet"
-          emptyDescription={canCreate ? "Start with a draft. Nothing is public until a second person approves it." : undefined}
+          emptyTitle={t("list.emptyTitle")}
+          emptyDescription={canCreate ? t("list.emptyBody") : undefined}
           emptyAction={createButton}
           onRetry={() => auctions.refetch()}
         >
@@ -56,10 +58,10 @@ export default function WorkspaceAuctionsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead>Closes</TableHead>
+                  <TableHead>{t("list.colTitle")}</TableHead>
+                  <TableHead>{t("list.colStatus")}</TableHead>
+                  <TableHead className="text-right">{t("list.colPrice")}</TableHead>
+                  <TableHead>{t("list.colCloses")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -96,7 +98,7 @@ export default function WorkspaceAuctionsPage() {
                     </div>
                     <div className="flex justify-between gap-3 text-sm">
                       <span className="font-medium tabular-nums">{displayPrice(auction)}</span>
-                      <span className="text-muted-foreground">Closes {formatDateTime(auction.closesAt)}</span>
+                      <span className="text-muted-foreground">{t("list.closesOn", { date: formatDateTime(auction.closesAt) })}</span>
                     </div>
                   </Card>
                 </Link>

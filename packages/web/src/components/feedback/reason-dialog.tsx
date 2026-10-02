@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FieldHint, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useT } from "@/i18n/context";
 
 /**
  * Asks for a written reason before a consequential action (reject, cancel,
@@ -40,7 +41,7 @@ function ReasonDialogBody({
   onOpenChange,
   title,
   description,
-  label = "Reason",
+  label,
   confirmLabel,
   minLength = 4,
   pending,
@@ -48,6 +49,7 @@ function ReasonDialogBody({
   onConfirm,
 }: Parameters<typeof ReasonDialog>[0]) {
   const id = useId();
+  const t = useT("common");
   const [reason, setReason] = useState("");
   const tooShort = reason.trim().length < minLength;
 
@@ -65,15 +67,15 @@ function ReasonDialogBody({
         }}
       >
         <div className="space-y-2">
-          <Label htmlFor={id}>{label}</Label>
+          <Label htmlFor={id}>{label ?? t("reason")}</Label>
           <Textarea id={id} aria-describedby={`${id}-hint`} value={reason} onChange={(event) => setReason(event.target.value)} rows={4} autoFocus />
           <FieldHint id={`${id}-hint`}>
-            {reason.trim().length}/{minLength} characters minimum. This is recorded in the audit trail.
+            {t("charactersMinimum", { count: reason.trim().length, min: minLength })} {t("recordedInAudit")}
           </FieldHint>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button type="submit" variant={destructive ? "destructive" : "default"} disabled={tooShort} loading={pending}>
             {confirmLabel}
