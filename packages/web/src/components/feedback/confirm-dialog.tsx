@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { buttonVariants } from "@/components/ui/button";
+import { useT } from "@/i18n/context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,19 +16,23 @@ export function ConfirmDialog({
   open,
   title,
   description,
-  confirmLabel = "Confirm",
+  confirmLabel,
   onConfirm,
   onOpenChange,
   pending,
+  destructive,
 }: {
   open: boolean;
   title: string;
   description: string;
   confirmLabel?: string;
   pending?: boolean;
+  /** Use for irreversible or removing actions so the confirm button reads as dangerous. */
+  destructive?: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT("common");
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -35,9 +41,17 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} onClick={onConfirm}>
-            {pending ? "Working…" : confirmLabel}
+          <AlertDialogCancel disabled={pending}>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={pending}
+            className={destructive ? buttonVariants({ variant: "destructive" }) : undefined}
+            onClick={(event) => {
+              // Keep the dialog open while the action runs; callers close it on success.
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
+            {pending ? t("working") : (confirmLabel ?? t("confirm"))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

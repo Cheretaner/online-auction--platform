@@ -4,17 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { RegisterRequest } from "@auction/shared";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { OptionalHint } from "@/components/ui/label";
+import { AuthCard, authLinkClass } from "@/features/auth/auth-card";
 import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -30,6 +26,8 @@ import {
 import { useRegisterMutation } from "@/features/auth/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
+import { enumLabel } from "@/lib/format";
 
 type RegisterFormValues = {
   email: string;
@@ -80,6 +78,7 @@ const registerResolver: Resolver<RegisterFormValues> = async (values, context, o
 export default function RegisterPage() {
   const navigate = useNavigate();
   const register = useRegisterMutation();
+  const t = useT("auth");
   const form = useForm<RegisterFormValues>({
     resolver: registerResolver,
     defaultValues: {
@@ -97,16 +96,20 @@ export default function RegisterPage() {
   const accountType = useWatch({ control: form.control, name: "accountType" });
 
   return (
-    <div className="mx-auto max-w-lg">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create an account</CardTitle>
-          <CardDescription>
-            Registration creates a bidder by default unless the API bootstraps a
-            platform admin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthCard
+      wide
+      eyebrow={t("register.eyebrow")}
+      title={t("register.title")}
+      description={t("register.description")}
+      footer={
+        <>
+          {t("register.already")}{" "}
+          <Link to="/login" className={authLinkClass}>
+            {t("register.signIn")}
+          </Link>
+        </>
+      }
+    >
           <Form {...form}>
             <form
               className="grid gap-4 sm:grid-cols-2"
@@ -116,7 +119,7 @@ export default function RegisterPage() {
                   navigate("/app", { replace: true });
                 } catch (error) {
                   if (!applyApiFieldErrors(error, form.setError)) {
-                    toast.error(getErrorMessage(error, "Registration failed"));
+                    toast.error(getErrorMessage(error, t("register.failed")));
                   }
                 }
               })}
@@ -126,7 +129,7 @@ export default function RegisterPage() {
                 name="fullName"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel>Full name</FormLabel>
+                    <FormLabel>{t("register.fullName")}</FormLabel>
                     <FormControl>
                       <Input autoComplete="name" {...field} />
                     </FormControl>
@@ -139,7 +142,7 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("email")}</FormLabel>
                     <FormControl>
                       <Input type="email" autoComplete="email" {...field} />
                     </FormControl>
@@ -152,7 +155,7 @@ export default function RegisterPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("password")}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -160,6 +163,7 @@ export default function RegisterPage() {
                         {...field}
                       />
                     </FormControl>
+                    <FormDescription>{t("register.passwordHint")}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -169,7 +173,7 @@ export default function RegisterPage() {
                 name="accountType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Account type</FormLabel>
+                    <FormLabel>{t("register.accountType")}</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
@@ -177,8 +181,8 @@ export default function RegisterPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="individual">Individual</SelectItem>
-                        <SelectItem value="business">Business</SelectItem>
+                        <SelectItem value="individual">{enumLabel("individual")}</SelectItem>
+                        <SelectItem value="business">{enumLabel("business")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -190,9 +194,12 @@ export default function RegisterPage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>
+                      {t("register.phone")}
+                      <OptionalHint />
+                    </FormLabel>
                     <FormControl>
-                      <Input autoComplete="tel" {...field} />
+                      <Input type="tel" autoComplete="tel" placeholder={t("register.phonePlaceholder")} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -205,7 +212,7 @@ export default function RegisterPage() {
                     name="businessName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Business name</FormLabel>
+                        <FormLabel>{t("register.businessName")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -218,7 +225,7 @@ export default function RegisterPage() {
                     name="tinNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>TIN</FormLabel>
+                        <FormLabel>{t("register.tin")}</FormLabel>
                         <FormControl>
                           <Input {...field} />
                         </FormControl>
@@ -233,7 +240,10 @@ export default function RegisterPage() {
                   name="nationalId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>National ID</FormLabel>
+                      <FormLabel>
+                        {t("register.nationalId")}
+                        <OptionalHint />
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
@@ -247,7 +257,10 @@ export default function RegisterPage() {
                 name="region"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel>Region</FormLabel>
+                    <FormLabel>
+                      {t("register.region")}
+                      <OptionalHint />
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -257,21 +270,14 @@ export default function RegisterPage() {
               />
               <Button
                 type="submit"
-                className="sm:col-span-2"
-                disabled={register.isPending}
+                size="lg"
+                className="mt-2 sm:col-span-2"
+                loading={register.isPending}
               >
-                {register.isPending ? "Creating account…" : "Create account"}
+                {register.isPending ? t("register.submitting") : t("register.submit")}
               </Button>
             </form>
           </Form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Already registered?{" "}
-            <Link to="/login" className="text-primary underline">
-              Sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    </AuthCard>
   );
 }

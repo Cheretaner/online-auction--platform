@@ -1,5 +1,6 @@
 import * as LabelPrimitive from "@radix-ui/react-label";
 import { Slot } from "@radix-ui/react-slot";
+import { CircleAlert } from "lucide-react";
 import { createContext, useContext, useId, type ComponentProps, type HTMLAttributes } from "react";
 import {
   Controller,
@@ -10,6 +11,7 @@ import {
   type FieldValues,
 } from "react-hook-form";
 import { cn } from "@/lib/utils";
+import { localizeSchemaMessage } from "@/i18n/zod-error-map";
 
 export const Form = FormProvider;
 
@@ -54,7 +56,7 @@ export function FormItem({ className, ...props }: HTMLAttributes<HTMLDivElement>
   const id = useId();
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div className={cn("flex flex-col gap-2", className)} {...props} />
+      <div className={cn("flex flex-col gap-1.5", className)} {...props} />
     </FormItemContext.Provider>
   );
 }
@@ -63,7 +65,7 @@ export function FormLabel({ className, ...props }: ComponentProps<typeof LabelPr
   const { error, formItemId } = useFormField();
   return (
     <LabelPrimitive.Root
-      className={cn("text-sm font-medium", error && "text-destructive", className)}
+      className={cn("text-sm leading-5 font-medium", error && "text-destructive", className)}
       htmlFor={formItemId}
       {...props}
     />
@@ -84,15 +86,16 @@ export function FormControl({ ...props }: ComponentProps<typeof Slot>) {
 
 export function FormDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   const { formDescriptionId } = useFormField();
-  return <p id={formDescriptionId} className={cn("text-sm text-muted-foreground", className)} {...props} />;
+  return <p id={formDescriptionId} className={cn("text-xs leading-5 text-muted-foreground", className)} {...props} />;
 }
 
 export function FormMessage({ className, children, ...props }: HTMLAttributes<HTMLParagraphElement>) {
   const { error, formMessageId } = useFormField();
-  const body = error ? String(error.message) : children;
+  const body = error ? localizeSchemaMessage(String(error.message)) : children;
   if (!body) return null;
   return (
-    <p id={formMessageId} className={cn("text-sm font-medium text-destructive", className)} {...props}>
+    <p id={formMessageId} role={error ? "alert" : undefined} className={cn("flex items-center gap-1.5 text-xs leading-5 font-medium text-destructive", className)} {...props}>
+      {error ? <CircleAlert className="size-3.5 shrink-0" aria-hidden /> : null}
       {body}
     </p>
   );

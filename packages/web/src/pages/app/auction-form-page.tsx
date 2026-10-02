@@ -6,9 +6,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Building2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OptionalHint } from "@/components/ui/label";
+import { EmptyState } from "@/components/feedback/query-state";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -29,10 +34,11 @@ import {
   useUpdateAuction,
 } from "@/features/auctions/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { toDatetimeLocalValue } from "@/lib/format";
+import { enumLabel, toDatetimeLocalValue } from "@/lib/format";
 import { getErrorMessage, isApiError } from "@/lib/api/errors";
 import { useEffect } from "react";
 import type { z } from "zod";
+import { useT } from "@/i18n/context";
 
 export default function AuctionFormPage() {
   const { id } = useParams();
@@ -42,6 +48,8 @@ export default function AuctionFormPage() {
   const create = useCreateAuction();
   const update = useUpdateAuction(id ?? "");
   const navigate = useNavigate();
+  const t = useT("workspace");
+  const tc = useT("common");
 
   const form = useForm<z.input<typeof CreateAuctionRequest>, unknown, z.output<typeof CreateAuctionRequest>>({
     resolver: zodResolver(CreateAuctionRequest),
@@ -86,15 +94,25 @@ export default function AuctionFormPage() {
 
   return (
     <div>
-      <PageHeader title={isEdit ? "Amend auction" : "Create auction"} />
+      <PageHeader
+        back={isEdit && id ? { to: `/app/auctions/${id}`, label: t("form.backToAuction") } : { to: "/app/auctions", label: t("form.backToList") }}
+        title={isEdit ? t("form.amendTitle") : t("form.createTitle")}
+        description={
+          isEdit
+            ? t("form.amendDescription")
+            : t("form.createDescription")
+        }
+      />
       {!organizationId ? (
-        <p className="text-sm text-destructive">
-          Organization context is required.
-        </p>
+        <EmptyState
+          icon={Building2}
+          title={t("list.chooseOrgTitle")}
+          description={t("list.chooseOrgBody")}
+        />
       ) : (
         <Form {...form}>
           <form
-            className="grid max-w-3xl gap-4 sm:grid-cols-2"
+            className="max-w-3xl space-y-6"
             onSubmit={form.handleSubmit(async (values) => {
               const payload = {
                 ...values,
@@ -110,14 +128,14 @@ export default function AuctionFormPage() {
                     opensAt: values.opensAt.toISOString(),
                     closesAt: values.closesAt.toISOString(),
                   });
-                  toast.success("Auction updated");
+                  toast.success(t("form.updated"));
                   navigate(`/app/auctions/${id}`);
                 } else {
                   // Use the normalized payload above so blank optional fields
                   // (especially reservePrice) are omitted instead of failing
                   // the API's money validation.
                   const created = await create.mutateAsync(payload);
-                  toast.success("Auction created");
+                  toast.success(t("form.created"));
                   navigate(`/app/auctions/${created.id}`);
                 }
               } catch (error) {
@@ -136,149 +154,185 @@ export default function AuctionFormPage() {
               const firstError = Object.entries(errors).find(([, fieldError]) => fieldError?.message);
               toast.error(firstError
                 ? `${firstError[0]}: ${String(firstError[1]?.message)}`
-                : "Please check the form fields and try again.");
+                : t("form.checkFields"));
             })}
           >
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem className="sm:col-span-2">
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem className="sm:col-span-2">
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            {!isEdit ? (
-              <FormField
-                control={form.control}
-                name="auctionType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={isEdit}
-                    >
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("form.basics")}</CardTitle>
+                <CardDescription>{t("form.basicsDescription")}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 sm:grid-cols-2">
+    <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>{t("form.title")}</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
+                        <Input {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="open_ascending">
-                          Open ascending
-                        </SelectItem>
-                        <SelectItem value="sealed_bid">Sealed bid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            ) : null}
-            <FormField
-              control={form.control}
-              name="startPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Start price</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="minIncrement"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Min increment</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="depositAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Deposit</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="region"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Region</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="opensAt"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Opens</FormLabel>
-                  <FormControl>
-                    <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="closesAt"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Closes</FormLabel>
-                  <FormControl>
-                    <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button
-              type="submit"
-              className="sm:col-span-2"
-              disabled={create.isPending || update.isPending}
-            >
-              {isEdit ? "Save changes" : "Create auction"}
-            </Button>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+    <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>
+                        {t("form.description")}
+                        <OptionalHint />
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea rows={5} {...field} />
+                      </FormControl>
+                      <FormDescription>{t("form.descriptionHint")}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+    {!isEdit ? (
+                  <FormField
+                    control={form.control}
+                    name="auctionType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("form.format")}</FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          disabled={isEdit}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="open_ascending">
+                              {enumLabel("open_ascending")}
+                            </SelectItem>
+                            <SelectItem value="sealed_bid">{enumLabel("sealed_bid")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>{t("form.formatHint")}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : null}
+    <FormField
+                  control={form.control}
+                  name="region"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {t("form.region")}
+                        <OptionalHint />
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("form.pricing")}</CardTitle>
+                <CardDescription>{t("form.pricingDescription")}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 sm:grid-cols-2">
+    <FormField
+                  control={form.control}
+                  name="startPrice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form.startPrice", { currency: tc("currency") })}</FormLabel>
+                      <FormControl>
+                        <Input inputMode="decimal" className="tabular-nums" {...field} />
+                      </FormControl>
+                      <FormDescription>{t("form.startPriceHint")}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+    <FormField
+                  control={form.control}
+                  name="minIncrement"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form.increment", { currency: tc("currency") })}</FormLabel>
+                      <FormControl>
+                        <Input inputMode="decimal" className="tabular-nums" {...field} />
+                      </FormControl>
+                      <FormDescription>{t("form.incrementHint")}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+    <FormField
+                  control={form.control}
+                  name="depositAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form.deposit", { currency: tc("currency") })}</FormLabel>
+                      <FormControl>
+                        <Input inputMode="decimal" className="tabular-nums" {...field} />
+                      </FormControl>
+                      <FormDescription>{t("form.depositHint")}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("form.schedule")}</CardTitle>
+                <CardDescription>{t("form.scheduleDescription")}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 sm:grid-cols-2">
+    <FormField
+                  control={form.control}
+                  name="opensAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form.opens")}</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+    <FormField
+                  control={form.control}
+                  name="closesAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form.closes")}</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} value={typeof field.value === "string" ? field.value : ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => navigate(isEdit && id ? `/app/auctions/${id}` : "/app/auctions")}>
+                {tc("cancel")}
+              </Button>
+              <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
+                {isEdit ? t("form.save") : t("form.create")}
+              </Button>
+            </div>
           </form>
         </Form>
       )}

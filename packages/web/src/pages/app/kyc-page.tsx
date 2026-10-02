@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
+import { CircleCheck, Clock, ShieldAlert, XCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { VERIFICATION_DOCUMENT_TYPES, VerificationDocumentFields } from "@auction/shared";
@@ -8,7 +9,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,13 +19,8 @@ import { useAuth } from "@/features/auth/auth-provider";
 import { useMyVerification, useSubmitVerification, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { canReviewKyc, formatDateTime } from "@/lib/format";
-
-const DOCUMENT_LABELS: Record<(typeof VERIFICATION_DOCUMENT_TYPES)[number], string> = {
-  national_id: "Fayda national ID",
-  kebele_id: "Kebele ID",
-  passport: "Passport",
-};
+import { canReviewKyc, enumLabel, formatDateTime } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 export default function KycPage() {
   const { session, roles } = useAuth();
@@ -31,16 +28,17 @@ export default function KycPage() {
   const record = verification.data;
   const status = session?.user.verificationStatus === "verified" ? "verified" : (record?.status ?? "unverified");
   const canSubmit = status === "unverified" || status === "rejected";
+  const t = useT("account");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Identity verification"
-        description="Bids are accepted only from verified bidders. You verify once and can then bid on any auction."
+        title={t("kyc.title")}
+        description={t("kyc.description")}
         actions={
           canReviewKyc(roles) ? (
             <Button asChild variant="outline">
-              <Link to="/app/kyc/review">Review queue</Link>
+              <Link to="/app/kyc/review">{t("kyc.reviewQueue")}</Link>
             </Button>
           ) : null
         }
@@ -49,25 +47,40 @@ export default function KycPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-lg">Your status</CardTitle>
+            <CardTitle>{t("kyc.yourStatus")}</CardTitle>
             <StatusBadge status={status} />
           </div>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          {verification.isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
-          {status === "verified" ? <p>You are verified and can bid.</p> : null}
-          {status === "pending" && record ? (
-            <p>
-              Submitted {formatDateTime(record.createdAt)} ({record.documentType.replaceAll("_", " ")}). A compliance
-              officer will review it; you will get a notification when they decide.
-            </p>
+        <CardContent className="text-sm">
+          {verification.isLoading ? (
+            <Skeleton className="h-12 w-full" />
+          ) : status === "verified" ? (
+            <Alert variant="success">
+              <CircleCheck aria-hidden />
+              <AlertTitle>{t("kyc.verifiedTitle")}</AlertTitle>
+              <AlertDescription>{t("kyc.verifiedBody")}</AlertDescription>
+            </Alert>
+          ) : status === "pending" && record ? (
+            <Alert variant="warning">
+              <Clock aria-hidden />
+              <AlertTitle>{t("kyc.pendingTitle")}</AlertTitle>
+              <AlertDescription>
+                {t("kyc.pendingBody", { date: formatDateTime(record.createdAt), document: enumLabel(record.documentType) })}
+              </AlertDescription>
+            </Alert>
+          ) : status === "unverified" ? (
+            <Alert>
+              <ShieldAlert aria-hidden />
+              <AlertTitle>{t("kyc.unverifiedTitle")}</AlertTitle>
+              <AlertDescription>{t("kyc.unverifiedBody")}</AlertDescription>
+            </Alert>
           ) : null}
-          {status === "unverified" && !verification.isLoading ? <p>You have not submitted anything yet.</p> : null}
           {status === "rejected" && record ? (
             <Alert variant="destructive">
-              <AlertTitle>Not accepted</AlertTitle>
+              <XCircle aria-hidden />
+              <AlertTitle>{t("kyc.rejectedTitle")}</AlertTitle>
               <AlertDescription>
-                {record.decisionReason ?? "No reason was given."} Correct the details and submit again.
+                {record.decisionReason ?? t("kyc.noReason")} {t("kyc.correctAndResubmit")}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -85,6 +98,7 @@ function SubmitForm() {
   const [evidence, setEvidence] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const t = useT("account");
   const form = useForm({
     resolver: zodResolver(VerificationDocumentFields),
     defaultValues: { documentType: "national_id" as const, documentNumber: "" },
@@ -92,7 +106,8 @@ function SubmitForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Submit your document</CardTitle>
+        <CardTitle>{t("kyc.submitTitle")}</CardTitle>
+        <CardDescription>{t("kyc.submitDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -101,7 +116,7 @@ function SubmitForm() {
             onSubmit={form.handleSubmit(async (values) => {
               setFormError(null);
               if (!evidence) {
-                setFormError("Upload a photo or scan of your document.");
+                setFormError(t("kyc.evidenceRequired"));
                 return;
               }
               setSubmitting(true);
@@ -112,7 +127,7 @@ function SubmitForm() {
                 body.set("isPrivate", "true");
                 const document = await upload.mutateAsync(body);
                 await submit.mutateAsync({ ...values, documentId: document.id });
-                toast.success("Submitted for review");
+                toast.success(t("kyc.submitted"));
               } catch (error) {
                 if (!applyApiFieldErrors(error, form.setError)) setFormError(getErrorMessage(error));
               } finally {
@@ -125,7 +140,7 @@ function SubmitForm() {
               name="documentType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document</FormLabel>
+                  <FormLabel>{t("kyc.document")}</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -135,7 +150,7 @@ function SubmitForm() {
                     <SelectContent>
                       {VERIFICATION_DOCUMENT_TYPES.map((type) => (
                         <SelectItem key={type} value={type}>
-                          {DOCUMENT_LABELS[type]}
+                          {enumLabel(type)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -149,7 +164,7 @@ function SubmitForm() {
               name="documentNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document number(12 digit FIN no if fayda) </FormLabel>
+                  <FormLabel>Document number(12 digit FIN number if fayda) </FormLabel>
                   <FormControl>
                     <Input autoComplete="off" {...field} />
                   </FormControl>
@@ -166,12 +181,12 @@ function SubmitForm() {
                 onChange={(event) => setEvidence(event.target.files?.[0] ?? null)}
                 required
               />
-              <p className="text-xs text-muted-foreground">Only you and authorized compliance reviewers can access this file.</p>
+              <p className="text-xs text-muted-foreground">{t("kyc.evidenceHint")}</p>
             </div>
             {formError ? <p className="text-sm text-destructive sm:col-span-2" role="alert">{formError}</p> : null}
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={submitting || submit.isPending || upload.isPending}>
-                {submitting ? "Submitting…" : "Submit for verification"}
+              <Button type="submit" loading={submitting || submit.isPending || upload.isPending}>
+                {submitting ? t("kyc.submitting") : t("kyc.submit")}
               </Button>
             </div>
           </form>

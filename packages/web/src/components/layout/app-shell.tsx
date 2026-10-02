@@ -1,60 +1,114 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { Menu } from "lucide-react";
-import { useEffect, useState } from "react";
-import { APP_SHORT_NAME } from "@/config/env";
+import { ArrowUpRight, Bell, Menu } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { OfflineBanner } from "@/components/feedback/query-state";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { OrgSwitcher } from "@/components/layout/org-switcher";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { UserMenu } from "@/components/layout/user-menu";
-import { getAppNav } from "@/components/layout/nav-items";
+import { getAppNav, NAV_GROUPS } from "@/components/layout/nav-items";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useUnreadCount } from "@/features/operations/queries";
 import { cn } from "@/lib/utils";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { useT } from "@/i18n/context";
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { roles } = useAuth();
   const unread = useUnreadCount(true);
   const items = getAppNav(roles);
+  const t = useT("layout");
   return (
-    <nav className="flex flex-col gap-1 p-2">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const count =
-          item.to === "/app/notifications" ? unread.data?.count : undefined;
+    <nav aria-label={t("nav.workspaceNav")} className="flex flex-col gap-5 px-3 py-4">
+      {NAV_GROUPS.map((group) => {
+        const groupItems = items.filter((item) => item.group === group);
+        if (groupItems.length === 0) return null;
         return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.match === "exact"}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                "flex min-h-10 items-center gap-3 rounded-md px-3 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
-              )
-            }
-          >
-            <Icon className="size-4 shrink-0" />
-            <span className="flex-1">{item.label}</span>
-            {count ? (
-              <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
-                {count}
-              </span>
+          <div key={group}>
+            {group !== "Overview" ? (
+              <p className="eyebrow mb-1.5 px-3 text-sidebar-foreground/50">{t(`nav.groups.${group}`)}</p>
             ) : null}
-          </NavLink>
+            <ul className="flex flex-col gap-0.5">
+              {groupItems.map((item) => {
+                const Icon = item.icon;
+                const count = item.to === "/app/notifications" ? unread.data?.count : undefined;
+                return (
+                  <li key={item.to}>
+                    <NavLink
+                      to={item.to}
+                      end={item.match === "exact"}
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        cn(
+                          "relative flex min-h-10 items-center gap-3 rounded-md px-3 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-highlight focus-visible:ring-offset-sidebar",
+                          isActive &&
+                            "bg-sidebar-accent font-medium text-sidebar-accent-foreground before:absolute before:inset-y-2 before:-left-3 before:w-1 before:rounded-r-full before:bg-highlight",
+                        )
+                      }
+                    >
+                      <Icon className="size-4 shrink-0" aria-hidden />
+                      <span className="flex-1 truncate">{t(`nav.${item.label}`)}</span>
+                      {count ? (
+                        <span className="min-w-5 rounded-full bg-highlight px-1.5 text-center text-xs leading-5 font-semibold text-inverse">
+                          {count}
+                          <span className="sr-only"> {t("nav.unread")}</span>
+                        </span>
+                      ) : null}
+                    </NavLink>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         );
       })}
     </nav>
+  );
+}
+
+/**
+ * The sidebar's own scroll region. `overscroll-contain` keeps the wheel/touch
+ * scroll inside the sidebar instead of handing it to the page at either end.
+ */
+function SidebarScroll({ children }: { children: ReactNode }) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-color:var(--sidebar-accent)_transparent] [scrollbar-gutter:stable] [scrollbar-width:thin]">
+      {children}
+    </div>
+  );
+}
+
+function SidebarFooter() {
+  const t = useT("layout");
+  return (
+    <div className="shrink-0 border-t border-sidebar-border p-3">
+      <Link
+        to="/auctions"
+        className="flex min-h-10 items-center justify-between rounded-md px-3 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-highlight focus-visible:ring-offset-sidebar"
+      >
+        {t("nav.publicSite")}
+        <ArrowUpRight className="size-4" aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
+function NotificationsButton() {
+  const unread = useUnreadCount(true);
+  const count = unread.data?.count ?? 0;
+  const t = useT("layout");
+  return (
+    <Button asChild variant="ghost" size="icon" className="relative">
+      <Link to="/app/notifications" aria-label={count ? t("nav.notificationsUnread", { count }) : t("nav.notifications")}>
+        <Bell />
+        {count ? (
+          <span className="absolute top-2 right-2 size-2 rounded-full bg-destructive ring-2 ring-background" aria-hidden />
+        ) : null}
+      </Link>
+    </Button>
   );
 }
 
@@ -62,6 +116,9 @@ export function AppShell() {
   const [online, setOnline] = useState(navigator.onLine);
   const [open, setOpen] = useState(false);
   const { session } = useAuth();
+  const t = useT("layout");
+  const tc = useT("common");
+  const needsOrg = !session?.organizationId && (session?.organizations.length ?? 0) > 0;
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -76,58 +133,69 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-svh bg-background">
-      <aside className="hidden w-64 shrink-0 bg-sidebar text-sidebar-foreground lg:flex lg:flex-col">
-        <div className="flex h-16 items-center px-4">
-          <Link to="/" className="font-heading text-lg font-semibold">
-            {APP_SHORT_NAME}
-          </Link>
+      <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
+        <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
+          <BrandLogo tone="inverse" to="/" className="focus-visible:ring-highlight focus-visible:ring-offset-sidebar" />
         </div>
-        <Separator className="bg-sidebar-border" />
-        <ScrollArea className="flex-1">
-          <NavLinks />
-        </ScrollArea>
+        <SidebarScroll>
+          <SidebarNav />
+        </SidebarScroll>
+        <SidebarFooter />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
+        <a
+          href="#main-content"
+          className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground focus:not-sr-only focus:absolute focus:top-2 focus:left-2"
+        >
+          {tc("skipToContent")}
+        </a>
         <OfflineBanner online={online} />
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-6 lg:px-8">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                aria-label="Open navigation"
-              >
+              <Button variant="ghost" size="icon" className="-ml-2 lg:hidden" aria-label={t("nav.openNavigation")}>
                 <Menu />
               </Button>
             </SheetTrigger>
             <SheetContent
               side="left"
-              className="w-72 bg-sidebar p-0 text-sidebar-foreground"
+              className="w-72 gap-0 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
             >
-              <SheetHeader className="p-4">
-                <SheetTitle className="text-sidebar-foreground">
-                  {APP_SHORT_NAME}
-                </SheetTitle>
-              </SheetHeader>
-              <NavLinks onNavigate={() => setOpen(false)} />
+              <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
+                <SheetTitle className="sr-only">{t("nav.workspaceNav")}</SheetTitle>
+                <SheetDescription className="sr-only">{t("nav.workspaceNavDescription")}</SheetDescription>
+                <BrandLogo tone="inverse" to="/" />
+              </div>
+              <SidebarScroll>
+                <SidebarNav onNavigate={() => setOpen(false)} />
+              </SidebarScroll>
+              <SidebarFooter />
             </SheetContent>
           </Sheet>
+          <div className="lg:hidden">
+            <BrandLogo to="/" compact />
+          </div>
           <div className="hidden md:block">
             <OrgSwitcher />
           </div>
+          {needsOrg ? (
+            <Badge variant="warning" className="hidden md:inline-flex">
+              {t("nav.chooseOrg")}
+            </Badge>
+          ) : null}
           <div className="ml-auto flex items-center gap-1">
-            {session?.organizationId ? null : session?.organizations.length ? (
-              <span className="hidden text-xs text-destructive md:inline">
-                Org context required
-              </span>
-            ) : null}
+            <LanguageSwitcher />
             <ThemeToggle />
+            <NotificationsButton />
             <UserMenu />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 md:px-6">
-          <div className="mb-4 md:hidden">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-8"
+        >
+          <div className="mb-5 md:hidden">
             <OrgSwitcher />
           </div>
           <Outlet />

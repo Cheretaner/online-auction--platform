@@ -1,4 +1,5 @@
 import { getErrorMessage, isApiError } from "@/lib/api/errors";
+import { translate } from "@/i18n/context";
 
 export interface BidErrorExplanation {
   message: string;
@@ -12,21 +13,21 @@ export function explainBidError(error: unknown): BidErrorExplanation {
   switch (error.code) {
     case "NOT_VERIFIED":
       return {
-        message: "Your identity has not been verified yet. Bids are accepted only from verified bidders.",
-        action: { label: "Go to identity verification", to: "/app/kyc" },
+        message: translate("auctions", "bid.errors.notVerified"),
+        action: { label: translate("auctions", "bid.errors.goVerify"), to: "/app/kyc" },
       };
     case "DEPOSIT_REQUIRED":
-      return { message: "This auction needs a verified bid security deposit before you can bid. Submit it below." };
+      return { message: translate("auctions", "bid.errors.depositRequired") };
     case "BID_BELOW_MINIMUM":
-      return { message: "Someone bid first or your amount is below the minimum. Refresh the price and bid again." };
+      return { message: translate("auctions", "bid.errors.belowMinimum") };
     case "AUCTION_CLOSED":
-      return { message: "This auction has closed. Bids are no longer accepted." };
+      return { message: translate("auctions", "bid.errors.closed") };
     case "AUCTION_NOT_LIVE":
-      return { message: "This auction is not open for bidding right now." };
+      return { message: translate("auctions", "bid.errors.notLive") };
     case "SELF_BIDDING":
-      return { message: "Staff of the organization running this auction cannot bid on it." };
+      return { message: translate("auctions", "bid.errors.selfBidding") };
     case "IDEMPOTENT_REPLAY":
-      return { message: "This bid was already recorded. Your earlier submission went through." };
+      return { message: translate("auctions", "bid.errors.replay") };
     default:
       return { message: error.message };
   }

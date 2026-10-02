@@ -1,11 +1,14 @@
 import { useReports } from "@/features/operations/queries";
 import { ResourcePage } from "@/components/feedback/resource-page";
+import { useT } from "@/i18n/context";
 export default function ReportsPage() {
   const query = useReports();
+  const t = useT("account");
   return (
     <ResourcePage
-      title="Reports"
-      description="Reports available to your role and organization context."
+      title={t("lists.reportsTitle")}
+      description={t("lists.reportsDescription")}
+      emptyDescription={t("lists.reportsEmpty")}
       query={query}
     />
   );

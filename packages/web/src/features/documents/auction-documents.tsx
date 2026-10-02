@@ -1,16 +1,20 @@
 import { useRef, useState } from "react";
 import { DOCUMENT_TYPES, type DocumentType } from "@auction/shared";
-import { Download, Lock } from "lucide-react";
+import { Download, FolderOpen, Lock } from "lucide-react";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuctionDocuments, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
-import { formatDateTime } from "@/lib/format";
+import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
+import { enumLabel, formatDateTime } from "@/lib/format";
+import { useT } from "@/i18n/context";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -20,30 +24,36 @@ function formatSize(bytes: number) {
 
 export function DocumentRow({ doc }: { doc: DocumentRecord }) {
   const [busy, setBusy] = useState(false);
+  const t = useT("auctions");
+  const tc = useT("common");
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 border-b py-2 last:border-0">
+    <li className="flex flex-wrap items-center justify-between gap-3 border-b py-3 first:pt-0 last:border-0 last:pb-0">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
-          {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label="Private" /> : null}
+          {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("documents.private")} /> : null}
           {doc.fileName}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {doc.documentType.replaceAll("_", " ")} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
+        <p className="text-xs text-muted-foreground capitalize">
+          {enumLabel(doc.documentType)} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
         </p>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          downloadDocument(doc.id, doc.fileName)
-            .catch((error: unknown) => toast.error(getErrorMessage(error, "Download failed")))
-            .finally(() => setBusy(false));
-        }}
-      >
-        <Download className="size-4" aria-hidden /> {busy ? "Downloading…" : "Download"}
-      </Button>
+      <div className="flex gap-2">
+        <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} />
+        <Button
+          size="sm"
+          variant="outline"
+          loading={busy}
+          onClick={() => {
+            setBusy(true);
+            downloadDocument(doc.id, doc.fileName)
+              .catch((error: unknown) => toast.error(getErrorMessage(error, tc("downloadFailed"))))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {busy ? null : <Download aria-hidden />}
+          {busy ? tc("downloading") : tc("download")}
+        </Button>
+      </div>
     </li>
   );
 }
@@ -56,17 +66,19 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState<DocumentType>("specification");
   const [publicDoc, setPublicDoc] = useState(true);
+  const t = useT("auctions");
+  const tc = useT("common");
 
   const items = docs.data?.items ?? [];
 
   return (
     <div className="space-y-4">
       {docs.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading documents…</p>
+        <PageSkeleton rows={2} />
       ) : docs.isError ? (
-        <p className="text-sm text-destructive">{getErrorMessage(docs.error, "Documents could not be loaded")}</p>
+        <ErrorState error={docs.error} onRetry={() => void docs.refetch()} />
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No documents published yet.</p>
+        <EmptyState size="inline" icon={FolderOpen} title={t("documents.none")} />
       ) : (
         <ul>
           {items.map((doc) => (
@@ -77,12 +89,12 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
 
       {canUpload ? (
         <form
-          className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_180px_auto] sm:items-end"
+          className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-[1fr_200px_auto] sm:items-end"
           onSubmit={(event) => {
             event.preventDefault();
             const file = fileRef.current?.files?.[0];
             if (!file) {
-              toast.error("Choose a file to upload");
+              toast.error(t("documents.chooseFile"));
               return;
             }
             const form = new FormData();
@@ -92,44 +104,42 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
             form.set("isPrivate", publicDoc ? "false" : "true");
             upload.mutate(form, {
               onSuccess: () => {
-                toast.success("Document uploaded");
+                toast.success(t("documents.uploaded"));
                 if (fileRef.current) fileRef.current.value = "";
               },
-              onError: (error) => toast.error(getErrorMessage(error, "Upload failed")),
+              onError: (error) => toast.error(getErrorMessage(error, tc("uploadFailed"))),
             });
           }}
         >
           <div className="space-y-1.5">
-            <Label htmlFor={`doc-file-${auctionId}`}>File (max 20 MB)</Label>
-            <input
-              id={`doc-file-${auctionId}`}
-              ref={fileRef}
-              type="file"
-              className="block w-full text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5"
-            />
+            <Label htmlFor={`doc-file-${auctionId}`}>{t("documents.file")}</Label>
+            <Input id={`doc-file-${auctionId}`} ref={fileRef} type="file" />
           </div>
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label htmlFor={`doc-type-${auctionId}`}>{t("documents.type")}</Label>
             <Select value={docType} onValueChange={(value) => setDocType(value as DocumentType)}>
-              <SelectTrigger aria-label="Document type">
+              <SelectTrigger id={`doc-type-${auctionId}`} className="capitalize">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {DOCUMENT_TYPES.filter((type) => !["identity_document", "deposit_release_evidence"].includes(type)).map((type) => (
                   <SelectItem key={type} value={type}>
-                    {type.replaceAll("_", " ")}
+                    {enumLabel(type)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" disabled={upload.isPending}>
-            {upload.isPending ? "Uploading…" : "Upload"}
+          <Button type="submit" loading={upload.isPending}>
+            {upload.isPending ? t("documents.uploading") : t("documents.upload")}
           </Button>
-          <label className="flex items-center gap-2 text-sm sm:col-span-3">
-            <Switch checked={publicDoc} onCheckedChange={setPublicDoc} />
-            Publish to bidders (turn off for internal documents)
-          </label>
+          <div className="flex items-start gap-3 sm:col-span-3">
+            <Switch id={`doc-public-${auctionId}`} checked={publicDoc} onCheckedChange={setPublicDoc} />
+            <div>
+              <Label htmlFor={`doc-public-${auctionId}`}>{t("documents.publish")}</Label>
+              <FieldHint>{t("documents.publishHint")}</FieldHint>
+            </div>
+          </div>
         </form>
       ) : null}
     </div>

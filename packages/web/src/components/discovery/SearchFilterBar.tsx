@@ -1,42 +1,41 @@
-import chevronDownIcon from '../../assets/icons/chevron-down.svg'
-import cpoProtectedIcon from '../../assets/icons/cpo-protected.svg'
-import verifiedFilterIcon from '../../assets/icons/verified-filter.svg'
+import { ShieldCheck } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { NativeSelect } from '@/components/ui/native-select'
 import { useCategories, useOrganizations } from '@/features/operations/queries'
-import { Icon } from '../ui/Icon'
+import { cn } from '@/lib/utils'
+import { useT } from '@/i18n/context'
+import { regionLabel } from '@/lib/format'
 import { ETHIOPIAN_REGIONS, STATUS_TABS, useDiscoveryFilters } from './use-discovery-filters'
 
 function FilterSelect({
+  id,
   label,
   value,
   onChange,
+  allLabel,
   options,
 }: {
+  id: string
   label: string
   value: string
   onChange: (value: string) => void
+  allLabel: string
   options: Array<{ value: string; label: string }>
 }) {
   return (
-    <label className="relative min-w-0 flex-1">
-      <span className="sr-only">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="block w-full appearance-none truncate border border-line bg-panel py-[8px] pr-[32px] pl-[12px] text-left text-body-13 text-ink-strong"
-      >
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className="eyebrow text-muted-foreground">
+        {label}
+      </label>
+      <NativeSelect id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{allLabel}</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
-      </select>
-      <Icon
-        src={chevronDownIcon}
-        width={9}
-        height={5.45625}
-        className="pointer-events-none absolute top-1/2 right-[12px] -translate-y-1/2"
-      />
-    </label>
+      </NativeSelect>
+    </div>
   )
 }
 
@@ -44,72 +43,71 @@ export function SearchFilterBar({ total }: { total: number | undefined }) {
   const { filters, update } = useDiscoveryFilters()
   const categories = useCategories()
   const organizations = useOrganizations()
+  const t = useT('auctions')
 
   return (
-    <section className="flex flex-col gap-[12px] border border-line bg-card p-[12px] drop-shadow-panel">
-      <div className="flex flex-col gap-2 border-b border-line/60 pb-[8px] lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-[4px] overflow-x-auto" role="tablist" aria-label="Auction status">
-          {STATUS_TABS.map(({ value, label }) => {
+    <Card className="flex flex-col gap-4 p-4 sm:p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div
+          className="-mx-1 flex items-center gap-1 overflow-x-auto px-1 pb-1 lg:pb-0"
+          role="group"
+          aria-label={t('discovery.statusFilter')}
+        >
+          {STATUS_TABS.map(({ value, key }) => {
             const active = filters.status === value
             return (
               <button
-                key={label}
+                key={key}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 onClick={() => update({ status: value })}
-                className={`px-[12px] py-[6px] font-label text-label-11 font-medium whitespace-nowrap uppercase ${
-                  active ? 'border border-primary bg-primary text-primary-foreground' : 'text-ink-soft hover:text-ink'
-                }`}
+                className={cn(
+                  'inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors',
+                  active
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
               >
-                {label}
-                {active && total !== undefined ? ` (${total})` : ''}
+                {t(`discovery.tabs.${key}`)}
+                {active && total !== undefined ? (
+                  <span className="rounded-sm bg-primary-foreground/20 px-1.5 text-xs tabular-nums">{total}</span>
+                ) : null}
               </button>
             )
           })}
         </div>
-        <div className="flex items-center gap-[8px]">
-          <Icon src={verifiedFilterIcon} width={16.2} height={15.3} />
-          <span className="text-sm text-ink-soft">Only auctions approved under the two-person rule are listed</span>
-        </div>
+        <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
+          {t('discovery.twoPerson')}
+        </p>
       </div>
 
-      <div className="flex flex-col gap-[8px] md:flex-row md:items-start">
+      <div className="grid gap-3 border-t pt-4 sm:grid-cols-3">
         <FilterSelect
-          label="Category"
+          id="filter-category"
+          label={t('discovery.category')}
           value={filters.categoryId}
           onChange={(categoryId) => update({ categoryId })}
-          options={[
-            { value: '', label: 'Category: All Categories' },
-            ...(categories.data?.items ?? []).map((category) => ({ value: category.id, label: category.name })),
-          ]}
+          allLabel={t('discovery.allCategories')}
+          options={(categories.data?.items ?? []).map((category) => ({ value: category.id, label: category.name }))}
         />
         <FilterSelect
-          label="Issuer"
+          id="filter-issuer"
+          label={t('discovery.issuer')}
           value={filters.orgId}
           onChange={(orgId) => update({ orgId })}
-          options={[
-            { value: '', label: 'Issuer: All Organizations' },
-            ...(organizations.data?.items ?? []).map((org) => ({ value: org.id, label: org.name })),
-          ]}
+          allLabel={t('discovery.allIssuers')}
+          options={(organizations.data?.items ?? []).map((org) => ({ value: org.id, label: org.name }))}
         />
         <FilterSelect
-          label="Region"
+          id="filter-region"
+          label={t('discovery.region')}
           value={filters.region}
           onChange={(region) => update({ region })}
-          options={[
-            { value: '', label: 'Location: All Regions' },
-            ...ETHIOPIAN_REGIONS.map((region) => ({ value: region, label: region })),
-          ]}
+          allLabel={t('discovery.allRegions')}
+          options={ETHIOPIAN_REGIONS.map((region) => ({ value: region, label: regionLabel(region) }))}
         />
-        <div className="flex min-w-0 flex-1 items-center justify-between border border-line bg-panel px-[12px] py-[8px]">
-          <div className="flex items-center gap-[6px]">
-            <Icon src={cpoProtectedIcon} width={10.4} height={12.8} />
-            <span className="text-body-13 whitespace-nowrap text-ink-soft">CPO Bond Protected</span>
-          </div>
-          <span className="font-label text-label-11 font-semibold whitespace-nowrap text-forest uppercase">Active</span>
-        </div>
       </div>
-    </section>
+    </Card>
   )
 }

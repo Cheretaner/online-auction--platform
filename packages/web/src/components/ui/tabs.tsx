@@ -8,7 +8,7 @@ export function TabsList({ className, ...props }: ComponentProps<typeof TabsPrim
   return (
     <TabsPrimitive.List
       className={cn(
-        "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+        "inline-flex h-11 min-w-full items-stretch gap-1 border-b text-muted-foreground",
         className,
       )}
       {...props}
@@ -20,7 +20,7 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm disabled:pointer-events-none disabled:opacity-50",
+        "-mb-px inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 border-transparent px-3 text-sm font-medium transition-colors hover:text-foreground focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:border-primary data-[state=active]:text-foreground",
         className,
       )}
       {...props}
@@ -29,5 +29,5 @@ export function TabsTrigger({ className, ...props }: ComponentProps<typeof TabsP
 }
 
 export function TabsContent({ className, ...props }: ComponentProps<typeof TabsPrimitive.Content>) {
-  return <TabsPrimitive.Content className={cn("mt-4", className)} {...props} />;
+  return <TabsPrimitive.Content className={cn("mt-5 focus-visible:ring-offset-4", className)} {...props} />;
 }

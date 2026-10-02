@@ -1,3 +1,4 @@
+import { translate } from "@/i18n/context";
 import { API_PREFIX } from "@/config/constants";
 import { env } from "@/config/env";
 import { tokenStore } from "@/lib/auth/token-store";
@@ -124,10 +125,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof DOMException && error.name === "AbortError") {
-        throw new ApiError(0, { message: signal?.aborted ? "Request cancelled" : "Request timed out" });
+        throw new ApiError(0, { message: signal?.aborted ? translate("common", "requestCancelled") : translate("common", "requestTimeout") });
       }
       if (error instanceof TypeError) {
-        throw new ApiError(0, { message: "Network error. Check your connection and try again." });
+        throw new ApiError(0, { message: translate("common", "networkError") });
       }
       throw error;
     } finally {

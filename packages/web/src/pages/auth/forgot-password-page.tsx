@@ -1,29 +1,40 @@
 import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MailCheck } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AuthCard, authLinkClass } from "@/features/auth/auth-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRequestPasswordReset } from "@/features/auth/queries";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
 
 export default function ForgotPasswordPage() {
   const id = useId();
   const [email, setEmail] = useState("");
   const request = useRequestPasswordReset();
+  const t = useT("auth");
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card>
-        <CardHeader>
-          <CardTitle>Reset your password</CardTitle>
-          <CardDescription>We will email you a link to choose a new password. The link works for 30 minutes.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthCard
+      eyebrow={t("forgot.eyebrow")}
+      title={t("forgot.title")}
+      description={t("forgot.description")}
+      footer={
+        <Link to="/login" className={authLinkClass}>
+          {t("forgot.back")}
+        </Link>
+      }
+    >
           {request.isSuccess ? (
-            <p className="text-sm">
-              If <strong>{email}</strong> has an account, a reset link is on its way. Check your inbox and spam folder.
-            </p>
+            <Alert variant="success">
+              <MailCheck aria-hidden />
+              <AlertTitle>{t("forgot.checkEmail")}</AlertTitle>
+              <AlertDescription>
+                {t("forgot.sentBody", { email })}
+              </AlertDescription>
+            </Alert>
           ) : (
             <form
               className="space-y-4"
@@ -33,22 +44,15 @@ export default function ForgotPasswordPage() {
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor={id}>Email</Label>
+                <Label htmlFor={id}>{t("email")}</Label>
                 <Input id={id} type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
               </div>
-              {request.isError ? <p className="text-sm text-destructive">{getErrorMessage(request.error)}</p> : null}
-              <Button type="submit" className="w-full" disabled={request.isPending}>
-                {request.isPending ? "Sending…" : "Send reset link"}
+              {request.isError ? <p role="alert" className="text-sm text-destructive">{getErrorMessage(request.error)}</p> : null}
+              <Button type="submit" size="lg" className="w-full" loading={request.isPending}>
+                {request.isPending ? t("forgot.submitting") : t("forgot.submit")}
               </Button>
             </form>
           )}
-          <p className="mt-4 text-sm text-muted-foreground">
-            <Link to="/login" className="text-primary underline">
-              Back to sign in
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    </AuthCard>
   );
 }

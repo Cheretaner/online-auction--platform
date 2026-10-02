@@ -1,16 +1,17 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Copy, Download, Upload } from "lucide-react";
+import { CircleAlert, Copy, Download, ReceiptText, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label } from "@/components/ui/label";
 import { usePlaceBid } from "@/features/auctions/queries";
 import type { Auction } from "@/lib/api/types";
 import { explainBidError, type BidErrorExplanation } from "@/lib/bid-errors";
 import { formatMoney } from "@/lib/format";
 import { createSealedCommitment, normalizeAmount, verifySealedCommitment } from "@/lib/sealed-bid";
+import { useT } from "@/i18n/context";
 
 interface PendingAttempt {
   amount: string;
@@ -46,12 +47,14 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
   const attempt = useRef<PendingAttempt | null>(null);
   const sealed = auction.auctionType === "sealed_bid";
   const minimum = minimumBid(auction);
+  const t = useT("auctions");
+  const tc = useT("common");
 
   async function submit() {
     setProblem(null);
     const normalized = normalizeAmount(amount.trim());
     if (!/^\d+\.\d{2}$/.test(normalized)) {
-      setProblem({ message: "Enter an amount in birr, for example 250000 or 250000.50." });
+      setProblem({ message: t("bid.invalidAmount") });
       return;
     }
     if (attempt.current?.amount !== normalized) {
@@ -71,7 +74,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
       if (sealed && current.commitmentHash && current.nonce) {
         setReceipt({ amount: current.amount, commitmentHash: current.commitmentHash, nonce: current.nonce });
       }
-      toast.success(sealed ? "Sealed bid recorded" : "Bid placed");
+      toast.success(sealed ? t("bid.sealedRecorded") : t("bid.placed"));
       attempt.current = null;
       setAmount("");
     } catch (error) {
@@ -87,14 +90,14 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
   return (
     <div className="space-y-4">
       <form
-        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        className="flex flex-col gap-3 @md:flex-row @md:items-start"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
         }}
       >
         <div className="flex-1 space-y-1.5">
-          <Label htmlFor={`bid-amount-${auction.id}`}>Your bid (ETB)</Label>
+          <Label htmlFor={`bid-amount-${auction.id}`}>{t("bid.yourBid", { currency: tc("currency") })}</Label>
           <Input
             id={`bid-amount-${auction.id}`}
             inputMode="decimal"
@@ -102,25 +105,35 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
             disabled={disabled}
+            aria-invalid={problem ? true : undefined}
+            aria-describedby={`bid-hint-${auction.id}`}
+            className="h-11 text-base tabular-nums"
           />
-          <p className="text-xs text-muted-foreground">
+          <FieldHint id={`bid-hint-${auction.id}`}>
             {sealed
-              ? `Minimum ${formatMoney(minimum)}. Other bidders and staff cannot see your amount until bids are opened.`
-              : `Minimum ${formatMoney(minimum)} (current highest plus the ${formatMoney(auction.minIncrement)} increment).`}
-          </p>
+              ? t("bid.sealedHint", { minimum: formatMoney(minimum) })
+              : t("bid.openHint", { minimum: formatMoney(minimum), increment: formatMoney(auction.minIncrement) })}
+          </FieldHint>
         </div>
-        <Button type="submit" disabled={disabled || placeBid.isPending || !amount.trim()}>
-          {placeBid.isPending ? "Submitting…" : sealed ? "Submit sealed bid" : "Place bid"}
+        <Button
+          type="submit"
+          size="lg"
+          className="@md:mt-6"
+          disabled={disabled || !amount.trim()}
+          loading={placeBid.isPending}
+        >
+          {placeBid.isPending ? t("bid.submitting") : sealed ? t("bid.submitSealed") : t("bid.place")}
         </Button>
       </form>
 
       {problem ? (
         <Alert variant="destructive">
-          <AlertTitle>Bid not placed</AlertTitle>
+          <CircleAlert aria-hidden />
+          <AlertTitle>{t("bid.notPlaced")}</AlertTitle>
           <AlertDescription>
             {problem.message}{" "}
             {problem.action ? (
-              <Link className="underline" to={problem.action.to}>
+              <Link className="font-medium text-foreground underline underline-offset-4" to={problem.action.to}>
                 {problem.action.label}
               </Link>
             ) : null}
@@ -131,7 +144,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
       {sealed && !receipt ? (
         <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-primary underline">
           <Upload className="size-4" aria-hidden />
-          Restore saved receipt
+          {t("bid.restoreReceipt")}
           <input
             className="sr-only"
             type="file"
@@ -150,7 +163,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
                       typeof parsed.commitmentHash !== "string" ||
                       !(await verifySealedCommitment(auction.id, parsed.amount, parsed.nonce, parsed.commitmentHash))
                     ) {
-                      throw new Error("This receipt does not match this auction or its commitment.");
+                      throw new Error(t("bid.receiptMismatch"));
                     }
                     setReceipt({
                       amount: normalizeAmount(parsed.amount),
@@ -158,7 +171,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
                       commitmentHash: parsed.commitmentHash,
                     });
                   } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Could not read that receipt.");
+                    toast.error(error instanceof Error ? error.message : t("bid.receiptUnreadable"));
                   }
                 });
               }
@@ -172,21 +185,21 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
 }
 
 function SealedReceiptCard({ auctionId, receipt }: { auctionId: string; receipt: SealedReceipt }) {
+  const t = useT("auctions");
+  const tc = useT("common");
   const text = [
-    `Auction: ${auctionId}`,
-    `Amount: ${receipt.amount}`,
-    `Nonce: ${receipt.nonce}`,
-    `Commitment: ${receipt.commitmentHash}`,
+    `${t("bid.receiptAuction")}: ${auctionId}`,
+    `${t("bid.receiptAmount")}: ${receipt.amount}`,
+    `${t("bid.receiptNonce")}: ${receipt.nonce}`,
+    `${t("bid.receiptCommitment")}: ${receipt.commitmentHash}`,
   ].join("\n");
   return (
-    <Alert>
-      <AlertTitle>Keep this sealed-bid receipt</AlertTitle>
+    <Alert variant="success">
+      <ReceiptText aria-hidden />
+      <AlertTitle>{t("bid.receiptTitle")}</AlertTitle>
       <AlertDescription className="space-y-2">
-        <p>
-          The commitment below is stored in the audit trail. After bids are opened, the amount, nonce and auction id
-          recompute to this commitment, which proves your bid was not changed.
-        </p>
-        <pre className="overflow-x-auto rounded bg-muted p-2 text-xs">{text}</pre>
+        <p>{t("bid.receiptBody")}</p>
+        <pre className="overflow-x-auto rounded-md border bg-card p-3 font-mono text-xs leading-5 text-foreground">{text}</pre>
         <Button
           type="button"
           size="sm"
@@ -194,11 +207,11 @@ function SealedReceiptCard({ auctionId, receipt }: { auctionId: string; receipt:
           onClick={() => {
             navigator.clipboard
               .writeText(text)
-              .then(() => toast.success("Receipt copied"))
-              .catch(() => toast.error("Copy failed. Select the text and copy it manually."));
+              .then(() => toast.success(t("bid.receiptCopied")))
+              .catch(() => toast.error(tc("copyFailed")));
           }}
         >
-          <Copy className="size-4" aria-hidden /> Copy receipt
+          <Copy className="size-4" aria-hidden /> {t("bid.copyReceipt")}
         </Button>
         <Button
           type="button"
@@ -216,7 +229,7 @@ function SealedReceiptCard({ auctionId, receipt }: { auctionId: string; receipt:
             URL.revokeObjectURL(url);
           }}
         >
-          <Download className="size-4" aria-hidden /> Download receipt
+          <Download className="size-4" aria-hidden /> {t("bid.downloadReceipt")}
         </Button>
       </AlertDescription>
     </Alert>
