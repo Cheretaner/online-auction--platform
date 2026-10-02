@@ -106,10 +106,10 @@ export function formatAuctionChannelMessage(
   const replyMarkup = {
     inline_keyboard: [
       [
-        { text: "View auction", url: webUrl },
-        ...(["scheduled", "live"].includes(auction.status) ? [{ text: "Open Telegram bot", url: botBidUrl }] : []),
+        { text: "View on Portal", url: webUrl },
+        ...(["scheduled", "live"].includes(auction.status) ? [{ text: "Bid via Bot", url: botBidUrl }] : []),
       ],
-      [{ text: "View audit record", url: botVerifyUrl }],
+      [{ text: "Verify Audit Chain", url: botVerifyUrl }],
     ],
   };
   return { text, replyMarkup };

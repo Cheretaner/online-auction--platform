@@ -68,7 +68,7 @@ export function AutofetchPendingTab() {
   };
 
   const items = pending?.items || [];
-  const draftAuctions = (auctions?.items || []).filter((a: any) => a.status === "draft");
+  const draftAuctions = (auctions?.items || []).filter((auction) => auction.status === "draft");
 
   return (
     <div className="space-y-4">
@@ -85,12 +85,12 @@ export function AutofetchPendingTab() {
           <p className="text-sm text-muted-foreground">No pending items awaiting review.</p>
         )}
         
-        {items.map((item: any) => (
+        {items.map((item) => (
           <Card key={item.id} className="flex flex-col">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start gap-2">
                 <CardTitle className="text-base line-clamp-2">{item.title}</CardTitle>
-                {(item.highSeverityConflicts > 0 || item.conflictCount > 0) && (
+                {((item.highSeverityConflicts ?? 0) > 0 || (item.conflictCount ?? 0) > 0) && (
                   <Badge variant="destructive" className="shrink-0 flex items-center">
                     <AlertTriangle className="mr-1 h-3 w-3" />
                     Conflict
@@ -101,11 +101,6 @@ export function AutofetchPendingTab() {
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-between">
               <div className="space-y-2 mb-4">
-                {item.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2" title={item.description}>
-                    {item.description}
-                  </p>
-                )}
                 <div className="grid grid-cols-2 gap-2 text-sm pt-2">
                   <div>
                     <span className="font-semibold block text-xs uppercase text-muted-foreground">Category</span>
@@ -167,9 +162,9 @@ export function AutofetchPendingTab() {
                 {draftAuctions.length === 0 && (
                   <SelectItem value="none" disabled>No draft auctions available</SelectItem>
                 )}
-                {draftAuctions.map((a: any) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.title}
+                {draftAuctions.map((auction) => (
+                  <SelectItem key={auction.id} value={auction.id}>
+                    {auction.title}
                   </SelectItem>
                 ))}
               </SelectContent>
