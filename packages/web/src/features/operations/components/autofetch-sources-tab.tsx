@@ -198,9 +198,8 @@ export function AutofetchSourcesTab() {
     });
   };
 
-  const rawSources = sources as any;
-  const items: any[] = Array.isArray(rawSources) ? rawSources : (rawSources?.items ?? []);
-  const existingUrls = new Set(items.map((s: any) => s.sourceUrl).filter(Boolean));
+  const items = sources ?? [];
+  const existingUrls = new Set(items.map((source) => source.sourceUrl).filter((url): url is string => Boolean(url)));
 
   return (
     <div className="space-y-6">
@@ -399,7 +398,7 @@ export function AutofetchSourcesTab() {
         {!isLoading && items.length === 0 && (
           <p className="text-sm text-muted-foreground">No sources configured yet.</p>
         )}
-        {items.map((source: any) => (
+        {items.map((source) => (
           <Card key={source.id}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between gap-2">
