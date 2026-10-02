@@ -14,8 +14,6 @@ export interface PublicProfile {
   phone: string | null;
   accountType: AccountType;
   businessName: string | null;
-  nationalId: string | null;
-  tinNumber: string | null;
   region: string | null;
   verificationStatus: VerificationStatus;
   platformRole: Role | null;
@@ -176,8 +174,48 @@ export interface DepositRecord {
   verifiedAt: string | null;
   releasedAt: string | null;
   rejectionReason: string | null;
+  releaseReferenceNumber: string | null;
+  releaseDocumentId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ChapaDepositInitiation {
+  depositId: string;
+  txRef: string;
+  checkoutUrl: string | null;
+  status: string;
+}
+
+export interface SettlementRecord {
+  id: string;
+  auctionId: string;
+  winnerId: string;
+  amount: string;
+  currency: "ETB";
+  status: "due" | "payment_pending" | "paid" | "cancelled" | "reconciliation_required";
+  dueAt: string;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChapaSettlementInitiation {
+  settlementId: string;
+  txRef: string;
+  checkoutUrl: string | null;
+  status: string;
+}
+
+export interface FinancialReconciliationSnapshot {
+  auctionId: string;
+  generatedAt: string;
+  snapshotSha256: string;
+  deposits: Array<{ status: string; instrumentType: string; count: string; amount: string }>;
+  providerPayments: Array<{ status: string; count: string; amount: string }>;
+  providerRefunds: Array<{ status: string; count: string; amount: string }>;
+  settlements: Array<{ status: string; count: string; amount: string }>;
+  exceptions: Array<{ issue: string; entityId: string; txRef: string | null; amount: string }>;
 }
 
 export interface NotificationRecord {
@@ -237,6 +275,7 @@ export interface VerificationRecord {
   userId: string;
   documentType: string;
   documentNumber: string;
+  documentId: string | null;
   status: VerificationStatus;
   decision: string | null;
   decisionReason: string | null;

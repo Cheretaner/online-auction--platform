@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { AuctionScopedQuery, CreateDepositRequest, ReviewDepositRequest } from "@auction/shared";
+import { AuctionScopedQuery, CreateDepositRequest, InitiateChapaDepositRequest, ReleaseDepositRequest, ReviewDepositRequest } from "@auction/shared";
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
+import { submissionRateLimiter } from "../shared/middleware/rateLimit.middleware.js";
 import * as controller from "./deposit.controller.js";
 
 export const depositRouter = Router();
@@ -12,11 +13,21 @@ const REVIEWERS = ["auction_officer", "org_admin", "compliance_officer", "super_
 depositRouter.post(
   "/",
   requireAuth(["bidder"]),
+  submissionRateLimiter,
   validate(CreateDepositRequest),
   asyncHandler(controller.create),
 );
 
+depositRouter.post(
+  "/initiate",
+  requireAuth(["bidder"]),
+  submissionRateLimiter,
+  validate(InitiateChapaDepositRequest),
+  asyncHandler(controller.initiateChapa),
+);
+
 depositRouter.get("/me", requireAuth(), asyncHandler(controller.listMine));
+depositRouter.get("/providers", requireAuth(["bidder"]), asyncHandler(controller.paymentProviders));
 
 // auctionId was previously read straight off req.query with no check, so a
 // missing value reached SQL as undefined.
@@ -36,4 +47,9 @@ depositRouter.post(
   asyncHandler(controller.review),
 );
 
-depositRouter.post("/:id/release", requireAuth([...REVIEWERS]), asyncHandler(controller.release));
+depositRouter.post(
+  "/:id/release",
+  requireAuth([...REVIEWERS]),
+  validate(ReleaseDepositRequest),
+  asyncHandler(controller.release),
+);

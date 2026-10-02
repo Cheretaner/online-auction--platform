@@ -1,5 +1,6 @@
 import rateLimit, { type Options } from "express-rate-limit";
 import { env } from "../../config/env.js";
+import { getAuth } from "../types/request.js";
 
 export function createRateLimiter(overrides: Partial<Options> = {}) {
   return rateLimit({
@@ -25,4 +26,11 @@ export const authRateLimiter = createRateLimiter({
   limit: env.AUTH_RATE_LIMIT_MAX,
   skip: () => false,
   message: { error: { message: "Too many authentication attempts, please retry shortly" } },
+});
+
+export const submissionRateLimiter = createRateLimiter({
+  windowMs: env.SUBMISSION_RATE_WINDOW_MS,
+  limit: env.SUBMISSION_RATE_LIMIT_MAX,
+  keyGenerator: (req) => getAuth(req).userId,
+  message: { error: { message: "Too many submissions. Please wait before trying again." } },
 });

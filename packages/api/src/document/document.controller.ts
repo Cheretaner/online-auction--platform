@@ -27,8 +27,13 @@ export const upload: RequestHandler = async (req, res) => {
     throw AppError.badRequest(`docType must be one of: ${DOCUMENT_TYPES.join(", ")}`);
   }
 
+  if (docType === "identity_document" && (!auth.roles.includes("bidder") || auctionId)) {
+    throw AppError.badRequest("Identity evidence must be uploaded by a bidder without an auction association");
+  }
+
   // Default to private: a document is only public once someone says so.
   let keepPrivate = isPrivate !== "false";
+  if (docType === "identity_document") keepPrivate = true;
   if (auctionId) {
     const owner = await findAuctionOwner(auctionId);
     if (!owner) throw AppError.notFound("Auction not found");

@@ -3,6 +3,7 @@ import { logger } from "../../shared/utils/logger.js";
 import { pruneExpiredIdempotencyKeys } from "../../shared/utils/idempotency.js";
 import { pruneExpiredIdempotencyKeys as pruneIdempotencyRows } from "../idempotency/idempotency.repository.js";
 import { processNotificationQueue, processOutboxBatch } from "../outbox/outbox.dispatcher.js";
+import { reconcileChapaRefunds } from "../../payments/payment.service.js";
 import { closeDueAuctions, openDueAuctions } from "../../auction/auction.service.js";
 import { getPool } from "../database/pool.js";
 import { pruneExpiredRefreshTokens } from "../../identity/session.repository.js";
@@ -30,7 +31,7 @@ const jobState = new Map<string, JobState>();
 /** Jobs whose absence breaks the product, not just housekeeping. /health/ready
  * reports not-ready when one of them stops succeeding, so an uptime monitor
  * catches a stuck scheduler instead of it failing silently in the logs. */
-const CRITICAL_JOBS = ["auction-lifecycle", "outbox-dispatch"];
+const CRITICAL_JOBS = ["auction-lifecycle", "outbox-dispatch", "provider-refund-reconciliation"];
 
 export interface JobHealth {
   healthy: boolean;
@@ -157,6 +158,16 @@ export function startInfrastructureJobs(): void {
     run: async () => {
       if (!env.DATABASE_URL) return;
       await processNotificationQueue();
+    },
+  });
+
+  scheduleJob({
+    name: "provider-refund-reconciliation",
+    intervalMs: 60 * 1000,
+    runOnStart: true,
+    run: async () => {
+      if (!env.DATABASE_URL || !env.CHAPA_SECRET_KEY || !env.CHAPA_WEBHOOK_SECRET) return;
+      await reconcileChapaRefunds();
     },
   });
 }

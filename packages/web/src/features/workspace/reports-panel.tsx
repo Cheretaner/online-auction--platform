@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { REPORT_TYPE } from "@auction/shared";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useGenerateReport, usePublishReport, useReports } from "@/features/operations/queries";
+import { useFinancialReconciliation, useGenerateReport, usePublishReport, useReports } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 
 type ReportType = (typeof REPORT_TYPE)[number];
 
@@ -15,6 +16,7 @@ export function ReportsPanel({ auctionId, canPublish }: { auctionId: string; can
   const reports = useReports(auctionId);
   const generate = useGenerateReport();
   const publish = usePublishReport();
+  const reconciliation = useFinancialReconciliation(auctionId);
   const [type, setType] = useState<ReportType>("auction_summary");
   const items = reports.data?.items ?? [];
 
@@ -83,6 +85,88 @@ export function ReportsPanel({ auctionId, canPublish }: { auctionId: string; can
                 </Button>
               ) : null}
             </div>
+          </li>
+        ))}
+      </ul>
+      <section className="space-y-3 border-t pt-4" aria-labelledby={`reconciliation-${auctionId}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 id={`reconciliation-${auctionId}`} className="font-medium">Financial reconciliation</h3>
+            {reconciliation.data ? (
+              <p className="text-xs text-muted-foreground">
+                Snapshot {formatDateTime(reconciliation.data.generatedAt)} · SHA-256 {reconciliation.data.snapshotSha256.slice(0, 16)}…
+              </p>
+            ) : null}
+          </div>
+          {reconciliation.data ? (
+            <Button
+              size="sm"
+              variant="outline"
+              aria-label="Download financial reconciliation JSON"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(reconciliation.data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement("a");
+                anchor.href = url;
+                anchor.download = `financial-reconciliation-${auctionId}.json`;
+                anchor.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download className="size-4" aria-hidden /> Export
+            </Button>
+          ) : null}
+        </div>
+        {reconciliation.isLoading ? <p className="text-sm text-muted-foreground">Loading reconciliation…</p> : null}
+        {reconciliation.isError ? (
+          <p className="text-sm text-destructive">Could not load financial reconciliation. Refresh the auction workspace and try again.</p>
+        ) : null}
+        {reconciliation.data ? (
+          <div className="space-y-4 text-sm">
+            <ReconciliationGroup title="Deposits" rows={reconciliation.data.deposits.map((row) => ({
+              label: `${row.status} · ${row.instrumentType.replaceAll("_", " ")}`,
+              count: row.count,
+              amount: row.amount,
+            }))} />
+            <ReconciliationGroup title="Provider payments" rows={reconciliation.data.providerPayments.map((row) => ({
+              label: row.status.replaceAll("_", " "), count: row.count, amount: row.amount,
+            }))} />
+            <ReconciliationGroup title="Refunds" rows={reconciliation.data.providerRefunds.map((row) => ({
+              label: row.status.replaceAll("_", " "), count: row.count, amount: row.amount,
+            }))} />
+            <ReconciliationGroup title="Winner settlements" rows={reconciliation.data.settlements.map((row) => ({
+              label: row.status.replaceAll("_", " "), count: row.count, amount: row.amount,
+            }))} />
+            {reconciliation.data.exceptions.length > 0 ? (
+              <div>
+                <h4 className="mb-2 font-medium text-destructive">Exceptions</h4>
+                <ul className="space-y-1">
+                  {reconciliation.data.exceptions.map((issue) => (
+                    <li key={`${issue.issue}-${issue.entityId}`} className="flex flex-wrap justify-between gap-2">
+                      <span>{issue.issue.replaceAll("_", " ")} · {issue.txRef ?? issue.entityId}</span>
+                      <span>{formatMoney(issue.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : <p className="text-sm text-emerald-700 dark:text-emerald-400">No reconciliation exceptions.</p>}
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function ReconciliationGroup({ title, rows }: { title: string; rows: Array<{ label: string; count: string; amount: string }> }) {
+  return (
+    <div>
+      <h4 className="mb-1 font-medium">{title}</h4>
+      {rows.length === 0 ? <p className="text-muted-foreground">No records</p> : null}
+      <ul className="space-y-1">
+        {rows.map((row) => (
+          <li key={`${title}-${row.label}`} className="flex flex-wrap justify-between gap-2">
+            <span>{row.label} · {row.count}</span>
+            <span>{formatMoney(row.amount)}</span>
           </li>
         ))}
       </ul>

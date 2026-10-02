@@ -1,0 +1,9 @@
+# Identity Verification
+
+KYC submissions require a private evidence document uploaded by the submitting account. Uploads are checked against file signatures, restricted to PDF/JPEG/PNG/WebP, capped at 10 MB for identity documents, and scanned by the configured ClamAV daemon before storage. Production startup requires scanning enabled. Uploaded bytes are checksum-recorded in the audit trail; the verification submission event records the evidence document ID and checksum. Reviewers must compare the evidence to the applicant and account details before approving. A number that passes format validation is not proof of identity.
+
+Fayda numbers are validated as 12 digits, as stated by Ethiopia's National ID Program at https://id.gov.et/. No checksum or direct Fayda API credential was found for this project. The current adapter boundary is the verification service; integrate an authorized NIDP/Faydaverse or licensed-provider API there only after receiving the applicable credentials, consent terms, and data-processing approval. Manual review remains the only verification method and fails closed until that access exists.
+
+TIN format checks are deliberately limited to a bounded alphanumeric/reference character set. The Ministry of Revenue material reviewed did not publish a validation checksum suitable for client/server enforcement; do not treat a well-formed value as verified.
+
+Identity identifiers and bank references are encrypted with AES-256-GCM and stored alongside keyed HMAC-SHA-256 lookup digests. Production requires independent `PII_ENCRYPTION_KEY` and `PII_HASH_SECRET` values. Before deploying migrations `011_identity_privacy` and `015_deposit_reference_privacy`, configure and securely back up both keys. After applying those migrations, run `pnpm --filter @auction/api pii:encrypt-existing` once per deployment environment; it can be safely rerun. Do not rotate either key without a planned re-encryption and digest-rebuild procedure.

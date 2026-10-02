@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { VerificationDecision } from "@auction/shared";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Download } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
@@ -17,6 +17,7 @@ import { authApi } from "@/lib/api/auth";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { VerificationRecord } from "@/lib/api/types";
 import { formatDateTime } from "@/lib/format";
+import { downloadDocument } from "@/lib/download";
 
 export default function VerificationReviewPage() {
   const pending = usePendingVerifications();
@@ -83,10 +84,20 @@ function ReviewCard({ record }: { record: VerificationRecord }) {
           <Field label="Document" value={record.documentType.replaceAll("_", " ")} />
           <Field label="Document number" value={record.documentNumber} />
           <Field label="Account type" value={user?.accountType ?? "—"} />
-          <Field label="National ID on profile" value={user?.nationalId ?? "—"} />
-          <Field label="TIN on profile" value={user?.tinNumber ?? "—"} />
           <Field label="Business" value={user?.businessName ?? "—"} />
         </dl>
+
+        {record.documentId ? (
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label="Download submitted identity document"
+            onClick={() => void downloadDocument(record.documentId!, `verification-${record.id}`).catch((error: unknown) => toast.error(getErrorMessage(error)))}
+          >
+            <Download className="size-4" aria-hidden />
+            View evidence
+          </Button>
+        ) : null}
 
         {duplicates.data?.hasDuplicates ? (
           <p className="flex items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">

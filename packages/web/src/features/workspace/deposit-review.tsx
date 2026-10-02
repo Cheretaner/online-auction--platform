@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useAuctionDeposits, useReleaseDeposit, useReviewDeposit } from "@/features/operations/queries";
+import { useAuctionDeposits, useReleaseDeposit, useReviewDeposit, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction, DepositRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
@@ -18,7 +21,13 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const deposits = useAuctionDeposits(auction.id);
   const review = useReviewDeposit();
   const release = useReleaseDeposit();
+  const upload = useUploadDocument();
   const [rejecting, setRejecting] = useState<DepositRecord | null>(null);
+  const [releasing, setReleasing] = useState<DepositRecord | null>(null);
+  const [releaseReferenceNumber, setReleaseReferenceNumber] = useState("");
+  const [releaseEvidence, setReleaseEvidence] = useState<File | null>(null);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [submittingRelease, setSubmittingRelease] = useState(false);
   const items = deposits.data?.items ?? [];
 
   if (deposits.isLoading) return <p className="text-sm text-muted-foreground">Loading deposits…</p>;
@@ -78,6 +87,17 @@ export function DepositReview({ auction }: { auction: Auction }) {
                         View proof
                       </Button>
                     ) : null}
+                    {deposit.releaseDocumentId ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => downloadDocument(deposit.releaseDocumentId!, `release-${deposit.id}`).catch((error: unknown) =>
+                          toast.error(getErrorMessage(error, "Download failed")),
+                        )}
+                      >
+                        View release evidence
+                      </Button>
+                    ) : null}
                     {deposit.status === "pending" ? (
                       <>
                         <Button size="sm" disabled={review.isPending} onClick={() => verify(deposit)}>
@@ -88,17 +108,14 @@ export function DepositReview({ auction }: { auction: Auction }) {
                         </Button>
                       </>
                     ) : null}
-                    {deposit.status === "verified" && RELEASABLE.has(auction.status) && deposit.bidderId !== auction.winnerId ? (
+                    {deposit.status === "verified" && RELEASABLE.has(auction.status) && (
+                      deposit.bidderId !== auction.winnerId || auction.status === "awarded"
+                    ) ? (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={release.isPending}
-                        onClick={() =>
-                          release.mutate(deposit.id, {
-                            onSuccess: () => toast.success("Deposit released"),
-                            onError: (error) => toast.error(getErrorMessage(error)),
-                          })
-                        }
+                        onClick={() => setReleasing(deposit)}
                       >
                         Release
                       </Button>
@@ -132,6 +149,80 @@ export function DepositReview({ auction }: { auction: Auction }) {
           )
         }
       />
+      <Dialog
+        open={releasing !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReleasing(null);
+            setReleaseReferenceNumber("");
+            setReleaseEvidence(null);
+            setReleaseError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record manual instrument release</DialogTitle>
+            <DialogDescription>
+              Record the bank or instrument-return reference and attach its private confirmation before changing status.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="release-reference">Release confirmation reference</Label>
+              <Input
+                id="release-reference"
+                autoComplete="off"
+                value={releaseReferenceNumber}
+                onChange={(event) => setReleaseReferenceNumber(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="release-evidence">Bank release / returned instrument evidence</Label>
+              <Input
+                id="release-evidence"
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp"
+                onChange={(event) => setReleaseEvidence(event.target.files?.[0] ?? null)}
+              />
+            </div>
+            {releaseError ? <p className="text-sm text-destructive" role="alert">{releaseError}</p> : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReleasing(null)}>Keep held</Button>
+            <Button
+              disabled={submittingRelease || !releaseReferenceNumber.trim() || !releaseEvidence}
+              onClick={async () => {
+                if (!releasing || !releaseEvidence) return;
+                setSubmittingRelease(true);
+                setReleaseError(null);
+                try {
+                  const form = new FormData();
+                  form.set("file", releaseEvidence);
+                  form.set("docType", "deposit_release_evidence");
+                  form.set("auctionId", auction.id);
+                  form.set("isPrivate", "true");
+                  const document = await upload.mutateAsync(form);
+                  await release.mutateAsync({
+                    id: releasing.id,
+                    body: { releaseReferenceNumber, releaseDocumentId: document.id },
+                  });
+                  toast.success("Release evidence recorded and deposit released");
+                  setReleasing(null);
+                  setReleaseReferenceNumber("");
+                  setReleaseEvidence(null);
+                } catch (error) {
+                  setReleaseError(getErrorMessage(error));
+                } finally {
+                  setSubmittingRelease(false);
+                }
+              }}
+            >
+              {submittingRelease ? "Recording…" : "Confirm release"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

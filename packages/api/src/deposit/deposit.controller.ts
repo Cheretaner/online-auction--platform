@@ -1,9 +1,11 @@
 import type { RequestHandler } from "express";
-import type { AuctionScopedQuery, CreateDepositRequest, ReviewDepositRequest } from "@auction/shared";
+import type { AuctionScopedQuery, CreateDepositRequest, ReleaseDepositRequest, ReviewDepositRequest } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import { assertAuctionAccess } from "../shared/authz/auction-access.js";
+import * as audit from "../audit/audit.service.js";
 import * as service from "./deposit.service.js";
+import * as paymentService from "../payments/payment.service.js";
 
 export const create: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
@@ -12,6 +14,19 @@ export const create: RequestHandler = async (req, res) => {
     req.body as CreateDepositRequest,
   );
   res.status(HttpStatus.CREATED).json(deposit);
+};
+
+export const initiateChapa: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const result = await paymentService.initiateChapaDeposit(
+    { userId: auth.userId, roles: auth.roles },
+    req.body,
+  );
+  res.status(result.checkoutUrl ? HttpStatus.CREATED : HttpStatus.OK).json(result);
+};
+
+export const paymentProviders: RequestHandler = (_req, res) => {
+  res.json(paymentService.chapaPaymentOptions());
 };
 
 /** Reviewing or releasing a deposit is an act on behalf of the auction's
@@ -43,7 +58,7 @@ export const release: RequestHandler = async (req, res) => {
   const deposit = await service.releaseDeposit(routeParam(req.params.id), {
     userId: auth.userId,
     roles: auth.roles,
-  });
+  }, req.body as ReleaseDepositRequest);
   res.json(deposit);
 };
 
@@ -66,6 +81,16 @@ export const getById: RequestHandler = async (req, res) => {
     });
   }
 
+  await audit.appendAuditEvent({
+    auctionId: deposit.auctionId,
+    actorId: auth.userId,
+    actorRole: audit.actorRoleOf(auth.roles),
+    entityType: "deposit",
+    entityId: deposit.id,
+    action: "deposit.details_viewed",
+    payload: { viewerIsOwner: deposit.bidderId === auth.userId },
+  });
+
   res.json(deposit);
 };
 
@@ -82,10 +107,30 @@ export const listByAuction: RequestHandler = async (req, res) => {
     organizationId: auth.organizationId,
   });
 
-  res.json({ items: await service.listByAuction(auctionId) });
+  const items = await service.listByAuction(auctionId);
+  await audit.appendAuditEvent({
+    auctionId,
+    actorId: auth.userId,
+    actorRole: audit.actorRoleOf(auth.roles),
+    entityType: "auction",
+    entityId: auctionId,
+    action: "deposit.details_listed",
+    payload: { depositCount: items.length },
+  });
+  res.json({ items });
 };
 
 export const listMine: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
-  res.json({ items: await service.listByBidder(auth.userId) });
+  const items = await service.listByBidder(auth.userId);
+  await audit.appendAuditEvent({
+    auctionId: null,
+    actorId: auth.userId,
+    actorRole: audit.actorRoleOf(auth.roles),
+    entityType: "profile",
+    entityId: auth.userId,
+    action: "deposit.details_listed",
+    payload: { depositCount: items.length },
+  });
+  res.json({ items });
 };

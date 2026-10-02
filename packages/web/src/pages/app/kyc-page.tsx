@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SubmitVerificationRequest } from "@auction/shared";
+import { VERIFICATION_DOCUMENT_TYPES, VerificationDocumentFields } from "@auction/shared";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/feedback/status-badge";
@@ -12,18 +13,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useMyVerification, useSubmitVerification } from "@/features/operations/queries";
+import { useMyVerification, useSubmitVerification, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { canReviewKyc, formatDateTime } from "@/lib/format";
 
-const DOCUMENT_OPTIONS = [
-  { value: "national_id", label: "Fayda national ID" },
-  { value: "kebele_id", label: "Kebele ID" },
-  { value: "passport", label: "Passport" },
-  { value: "driving_license", label: "Driving licence" },
-  { value: "business_license", label: "Business licence (companies)" },
-];
+const DOCUMENT_LABELS: Record<(typeof VERIFICATION_DOCUMENT_TYPES)[number], string> = {
+  national_id: "Fayda national ID",
+  kebele_id: "Kebele ID",
+  passport: "Passport",
+};
 
 export default function KycPage() {
   const { session, roles } = useAuth();
@@ -81,9 +80,13 @@ export default function KycPage() {
 
 function SubmitForm() {
   const submit = useSubmitVerification();
+  const upload = useUploadDocument();
+  const [evidence, setEvidence] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const form = useForm({
-    resolver: zodResolver(SubmitVerificationRequest),
-    defaultValues: { documentType: "national_id", documentNumber: "" },
+    resolver: zodResolver(VerificationDocumentFields),
+    defaultValues: { documentType: "national_id" as const, documentNumber: "" },
   });
   return (
     <Card>
@@ -94,14 +97,27 @@ function SubmitForm() {
         <Form {...form}>
           <form
             className="grid gap-4 sm:grid-cols-2"
-            onSubmit={form.handleSubmit((values) =>
-              submit.mutate(values, {
-                onSuccess: () => toast.success("Submitted for review"),
-                onError: (error) => {
-                  if (!applyApiFieldErrors(error, form.setError)) toast.error(getErrorMessage(error));
-                },
-              }),
-            )}
+            onSubmit={form.handleSubmit(async (values) => {
+              setFormError(null);
+              if (!evidence) {
+                setFormError("Upload a photo or scan of your document.");
+                return;
+              }
+              setSubmitting(true);
+              try {
+                const body = new FormData();
+                body.set("file", evidence);
+                body.set("docType", "identity_document");
+                body.set("isPrivate", "true");
+                const document = await upload.mutateAsync(body);
+                await submit.mutateAsync({ ...values, documentId: document.id });
+                toast.success("Submitted for review");
+              } catch (error) {
+                if (!applyApiFieldErrors(error, form.setError)) setFormError(getErrorMessage(error));
+              } finally {
+                setSubmitting(false);
+              }
+            })}
           >
             <FormField
               control={form.control}
@@ -116,9 +132,9 @@ function SubmitForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {DOCUMENT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      {VERIFICATION_DOCUMENT_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {DOCUMENT_LABELS[type]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -140,9 +156,21 @@ function SubmitForm() {
                 </FormItem>
               )}
             />
+            <div className="space-y-1.5 sm:col-span-2">
+              <FormLabel htmlFor="kyc-evidence">Document image or scan</FormLabel>
+              <Input
+                id="kyc-evidence"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                onChange={(event) => setEvidence(event.target.files?.[0] ?? null)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">Only you and authorized compliance reviewers can access this file.</p>
+            </div>
+            {formError ? <p className="text-sm text-destructive sm:col-span-2" role="alert">{formError}</p> : null}
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={submit.isPending}>
-                {submit.isPending ? "Submitting…" : "Submit for verification"}
+              <Button type="submit" disabled={submitting || submit.isPending || upload.isPending}>
+                {submitting ? "Submitting…" : "Submit for verification"}
               </Button>
             </div>
           </form>

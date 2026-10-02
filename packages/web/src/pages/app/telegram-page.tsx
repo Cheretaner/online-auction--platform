@@ -314,7 +314,7 @@ function ChannelPosting({ canPost }: { canPost: boolean }) {
   const orgId = session?.organizationId ?? undefined;
   const auctions = useOrgAuctions(orgId);
   const options = (auctions.data?.items ?? []).filter((auction) =>
-    ["scheduled", "live", "closed", "awarded"].includes(auction.status),
+    ["scheduled", "live", "closed", "under_review", "awarded", "cancelled"].includes(auction.status),
   );
   const broadcast = useTelegramBroadcast();
   const [auctionId, setAuctionId] = useState<string>(NO_AUCTION);
@@ -369,7 +369,7 @@ function ChannelPosting({ canPost }: { canPost: boolean }) {
                 {broadcast.isPending ? "Publishing…" : "Publish to channel"}
               </Button>
               {options.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No scheduled, live, or concluded auctions are available to publish.</p>
+                <p className="text-xs text-muted-foreground">No approved auctions are available to publish.</p>
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">

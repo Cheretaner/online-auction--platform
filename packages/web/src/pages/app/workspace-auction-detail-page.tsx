@@ -24,7 +24,7 @@ import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
 import { canApproveAuctions, canManageAuctions, formatDateTime, formatMoney, hasRole } from "@/lib/format";
 
-const CANCELLABLE = new Set(["draft", "pending_review", "scheduled", "live"]);
+const CANCELLABLE = new Set(["draft", "pending_review", "scheduled", "live", "closed", "under_review"]);
 const AWARDABLE = new Set(["closed", "under_review"]);
 
 export default function WorkspaceAuctionDetailPage() {

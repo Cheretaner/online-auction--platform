@@ -1,4 +1,4 @@
-import type { CreateDepositRequest, ReviewDepositRequest, Role } from "@auction/shared";
+import type { CreateDepositRequest, ReleaseDepositRequest, ReviewDepositRequest, Role } from "@auction/shared";
 import { compareMoney } from "../kernel/money.js";
 import { isUniqueViolation } from "../kernel/pg.js";
 import { AppError } from "../shared/errors/index.js";
@@ -8,6 +8,9 @@ import * as biddingRepo from "../bidding/bidding.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import * as repo from "./deposit.repository.js";
 import type { Deposit } from "./deposit.types.js";
+import { hashSensitive } from "../shared/security/sensitive-data.js";
+import * as documentService from "../document/document.service.js";
+import * as settlementRepo from "../settlement/settlement.repository.js";
 
 interface Actor {
   userId: string;
@@ -39,6 +42,9 @@ export async function createDeposit(actor: Actor, input: CreateDepositRequest): 
       const existing = await repo.findByAuctionAndBidder(input.auctionId, actor.userId);
       if (existing) {
         throw AppError.conflict("A deposit already exists for this auction");
+      }
+      if (await repo.hasActiveReference(input.issuingBank, hashSensitive(input.referenceNumber)!)) {
+        throw AppError.conflict("This bank reference is already associated with an active deposit");
       }
 
       let deposit: Deposit;
@@ -151,13 +157,33 @@ export async function reviewDeposit(
   );
 }
 
-export async function releaseDeposit(depositId: string, actor: Actor): Promise<Deposit> {
+export async function releaseDeposit(
+  depositId: string,
+  actor: Actor,
+  input: ReleaseDepositRequest,
+): Promise<Deposit> {
   return withTransaction(
     async () => {
       const deposit = await repo.findById(depositId);
       if (!deposit) throw AppError.notFound("Deposit not found");
       if (deposit.status !== "verified") {
         throw AppError.unprocessable(`Cannot release a deposit with status '${deposit.status}'`);
+      }
+      if (deposit.instrumentType === "chapa") {
+        throw AppError.unprocessable(
+          "A Chapa deposit cannot be marked released without a confirmed provider refund",
+          "DEPOSIT_REFUND_REQUIRED",
+        );
+      }
+
+      const releaseDocument = await documentService.getDocument(input.releaseDocumentId);
+      if (
+        !releaseDocument ||
+        releaseDocument.uploadedBy !== actor.userId ||
+        !releaseDocument.isPrivate ||
+        releaseDocument.documentType !== "deposit_release_evidence"
+      ) {
+        throw AppError.badRequest("A private deposit-release evidence document uploaded by you is required");
       }
 
       const auction = await biddingRepo.findAuction(deposit.auctionId);
@@ -169,8 +195,18 @@ export async function releaseDeposit(depositId: string, actor: Actor): Promise<D
           "The leading bidder's deposit cannot be released until the auction is awarded",
         );
       }
+      if (auction?.winnerId === deposit.bidderId) {
+        const settlement = await settlementRepo.findByAuctionAndWinner(auction.id, deposit.bidderId);
+        if (settlement?.status !== "paid") {
+          throw AppError.unprocessable("The winner's bid security cannot be released before final payment is reconciled");
+        }
+      }
 
-      const updated = await repo.updateStatus(depositId, "released", { releasedAt: new Date() });
+      const updated = await repo.updateStatus(depositId, "released", {
+        releasedAt: new Date(),
+        releaseReferenceNumber: input.releaseReferenceNumber,
+        releaseDocumentId: input.releaseDocumentId,
+      });
 
       await audit.appendAuditEvent({
         auctionId: deposit.auctionId,
@@ -179,7 +215,11 @@ export async function releaseDeposit(depositId: string, actor: Actor): Promise<D
         entityType: "deposit",
         entityId: deposit.id,
         action: "deposit.released",
-        payload: { amount: deposit.amount },
+        payload: {
+          amount: deposit.amount,
+          releaseDocumentId: releaseDocument.id,
+          releaseReferenceHash: hashSensitive(input.releaseReferenceNumber),
+        },
       });
 
       await notifications.enqueueNotification({
