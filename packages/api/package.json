@@ -25,10 +25,13 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.4.0",
     "nodemailer": "^7.0.13",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.16.3",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "telegraf": "^4.16.3",
+    "tesseract.js": "^7.0.0",
+    "twilio": "^5.13.1",
     "zod": "^3.23.0"
   },
   "devDependencies": {

@@ -105,6 +105,11 @@ const envSchema = z
       .default("false")
       .transform((val) => val === "true"),
     WEB_BASE_URL: z.string().default("http://localhost:5173"),
+    
+    // Twilio voice/SMS configuration
+    TWILIO_ACCOUNT_SID: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TWILIO_AUTH_TOKEN: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
+    TWILIO_PHONE_NUMBER: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
   })
   .superRefine((value, ctx) => {
     if (Boolean(value.SMTP_USER) !== Boolean(value.SMTP_PASS)) {

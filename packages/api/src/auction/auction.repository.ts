@@ -195,6 +195,8 @@ export interface PublicAuctionFilters {
   region?: string;
   limit: number;
   offset: number;
+  /** Also search OCR-extracted document text when q is present */
+  includeDocumentSearch?: boolean;
 }
 
 /** One page of the public catalogue plus the total match count, so clients
@@ -214,8 +216,44 @@ export async function listPublicAuctions(
   if (filters.orgId) where.push(`a.org_id = ${param(filters.orgId)}`);
   if (filters.region) where.push(`a.region ILIKE ${param(filters.region)}`);
   if (filters.q) {
-    const pattern = param(`%${filters.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    where.push(`(a.title ILIKE ${pattern} OR a.description ILIKE ${pattern})`);
+    const q = filters.q;
+    // Escape LIKE special chars for the ILIKE path
+    const likePattern = param(`%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+
+    if (filters.includeDocumentSearch) {
+      // Build a ts_query for full-text matching on OCR text.
+      // Compose each whitespace-separated word as a prefix term, joined with &.
+      const tsQuery = q
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w.replace(/[^a-zA-Z0-9\u1200-\u137F]/g, ''))
+        .filter(Boolean)
+        .join(' & ');
+
+      if (tsQuery) {
+        const tsQueryParam = param(tsQuery);
+        // Match title/description OR any attached document whose OCR text
+        // matches.  We use BOTH English and simple (covers Amharic tokens).
+        where.push(`(
+          a.title ILIKE ${likePattern}
+          OR a.description ILIKE ${likePattern}
+          OR EXISTS (
+            SELECT 1 FROM documents d
+            WHERE d.auction_id = a.id
+              AND d.ocr_status = 'completed'
+              AND (
+                to_tsvector('english', COALESCE(d.extracted_text, '')) @@ to_tsquery('english', ${tsQueryParam})
+                OR to_tsvector('simple', COALESCE(d.extracted_text, '')) @@ to_tsquery('simple', ${tsQueryParam})
+              )
+          )
+        )`);
+      } else {
+        // tsQuery was empty after sanitisation — fall back to ILIKE only
+        where.push(`(a.title ILIKE ${likePattern} OR a.description ILIKE ${likePattern})`);
+      }
+    } else {
+      where.push(`(a.title ILIKE ${likePattern} OR a.description ILIKE ${likePattern})`);
+    }
   }
   if (filters.categoryId) {
     where.push(
