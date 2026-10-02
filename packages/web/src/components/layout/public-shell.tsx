@@ -8,7 +8,7 @@ export function PublicShell() {
   return (
     <div className="flex min-h-svh w-full flex-col overflow-x-clip bg-background">
       <header className="sticky top-0 z-30 w-full border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex min-h-14 w-full max-w-6xl items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-4">
+        <div className="mx-auto flex min-h-14 w-full max-w-7xl items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-4">
           <Link to="/" className="flex h-14 w-[104px] shrink-0 items-center sm:h-16 sm:w-[136px]">
             <img src={logo} alt="Cheretanet home" className="block h-auto max-h-11 w-full object-contain sm:max-h-12" />
           </Link>
@@ -29,7 +29,7 @@ export function PublicShell() {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-3 py-5 sm:px-4 sm:py-8">
+      <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-3 py-5 sm:px-4 sm:py-8">
         <Outlet />
       </main>
       <Footer />
