@@ -18,7 +18,7 @@ export function AvatarImage({ className, ...props }: ComponentProps<typeof Avata
 export function AvatarFallback({ className, ...props }: ComponentProps<typeof AvatarPrimitive.Fallback>) {
   return (
     <AvatarPrimitive.Fallback
-      className={cn("flex size-full items-center justify-center bg-muted text-xs font-medium", className)}
+      className={cn("flex size-full items-center justify-center bg-primary/10 text-xs font-semibold text-primary", className)}
       {...props}
     />
   );

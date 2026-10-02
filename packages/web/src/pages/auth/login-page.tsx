@@ -4,30 +4,38 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginRequest } from "@auction/shared";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthCard, authLinkClass } from "@/features/auth/auth-card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useLoginMutation } from "@/features/auth/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
+import { useT } from "@/i18n/context";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const login = useLoginMutation();
+  const t = useT("auth");
   const form = useForm({
     resolver: zodResolver(LoginRequest),
     defaultValues: { email: "", password: "" },
   });
 
   return (
-    <div className="mx-auto max-w-md">
-      <Card>
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardDescription>Sign in to bid, track deposits and manage auctions.</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AuthCard
+      eyebrow={t("login.eyebrow")}
+      title={t("login.title")}
+      description={t("login.description")}
+      footer={
+        <>
+          {t("login.newHere")}{" "}
+          <Link to="/register" className={authLinkClass}>
+            {t("login.createAccount")}
+          </Link>
+        </>
+      }
+    >
           <Form {...form}>
             <form
               className="space-y-4"
@@ -38,7 +46,7 @@ export default function LoginPage() {
                   navigate(to, { replace: true });
                 } catch (error) {
                   if (!applyApiFieldErrors(error, form.setError)) {
-                    toast.error(getErrorMessage(error, "Sign in failed"));
+                    toast.error(getErrorMessage(error, t("login.failed")));
                   }
                 }
               })}
@@ -48,7 +56,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("email")}</FormLabel>
                     <FormControl>
                       <Input type="email" autoComplete="email" {...field} />
                     </FormControl>
@@ -62,9 +70,9 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center justify-between">
-                      <FormLabel>Password</FormLabel>
-                      <Link to="/forgot-password" className="text-xs text-primary underline">
-                        Forgot password?
+                      <FormLabel>{t("password")}</FormLabel>
+                      <Link to="/forgot-password" className={`text-xs ${authLinkClass}`}>
+                        {t("login.forgot")}
                       </Link>
                     </div>
                     <FormControl>
@@ -74,19 +82,11 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={login.isPending}>
-                {login.isPending ? "Signing in…" : "Sign in"}
+              <Button type="submit" size="lg" className="w-full" loading={login.isPending}>
+                {login.isPending ? t("login.submitting") : t("login.submit")}
               </Button>
             </form>
           </Form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            No account?{" "}
-            <Link to="/register" className="text-primary underline">
-              Register
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    </AuthCard>
   );
 }

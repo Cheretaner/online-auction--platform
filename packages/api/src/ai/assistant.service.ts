@@ -2,12 +2,40 @@ import { aiProviderAdapter } from "../infrastructure/ai/provider.adapter.js";
 import { PLATFORM_GUIDE } from "./assistant.knowledge.js";
 import * as auctionRepo from "../auction/auction.repository.js";
 import * as auctionItemRepo from "../auction/auction-item.repository.js";
+import { env } from "../config/env.js";
 
 export async function askAssistant(
   prompt: string,
   auctionId?: string,
 ): Promise<{ answer: string; provider: string; fallback: boolean }> {
-  const contextParts = [`Verified CheretaNet website guide:\n${PLATFORM_GUIDE}`, `User question:\n${prompt}`];
+  const webBaseUrl = env.WEB_BASE_URL.replace(/\/$/, "");
+  const websiteLinks = [
+    `Public auction listings: ${webBaseUrl}/auctions`,
+    `Auction notice template: ${webBaseUrl}/auctions/{auctionId}`,
+    `Public reports: ${webBaseUrl}/reports/{reportId}`,
+    `Sign in: ${webBaseUrl}/login`,
+    `Create account: ${webBaseUrl}/register`,
+    `Bidder identity verification (signed in): ${webBaseUrl}/app/kyc`,
+    `Bid security and deposits (signed in): ${webBaseUrl}/app/deposits`,
+    `My documents (signed in): ${webBaseUrl}/app/documents`,
+    `Bidder dashboard (signed in): ${webBaseUrl}/app`,
+    `Organization auction workspace (authorized staff): ${webBaseUrl}/app/auctions`,
+    `Organization auction creation (authorized staff): ${webBaseUrl}/app/auctions/new`,
+    `AI assistant (signed in): ${webBaseUrl}/app/ai-assistant`,
+    `Telegram settings (signed in): ${webBaseUrl}/app/telegram`,
+    `Profile and account settings (signed in): ${webBaseUrl}/app/profile`,
+    `Disputes (signed in): ${webBaseUrl}/app/disputes`,
+    `Notifications (signed in): ${webBaseUrl}/app/notifications`,
+    `KYC review (authorized reviewers): ${webBaseUrl}/app/kyc/review`,
+    `Reports workspace (authorized staff): ${webBaseUrl}/app/reports`,
+    `Audit workspace (authorized staff): ${webBaseUrl}/app/audit`,
+  ].join("\n");
+  const contextParts = [
+    `Verified Cheretanet website guide:\n${PLATFORM_GUIDE}`,
+    `Website base URL: ${webBaseUrl}`,
+    `Verified website links (use Markdown links with these exact URLs; signed-in and staff pages require the stated access):\n${websiteLinks}`,
+    `User question:\n${prompt}`,
+  ];
   if (auctionId) {
     const auction = await auctionRepo.findById(auctionId);
     if (auction) {
@@ -15,6 +43,7 @@ export async function askAssistant(
       contextParts.splice(1, 0, [
         "Live auction context (authoritative for this auction):",
         `Title: ${auction.title}`,
+        `Auction page: ${webBaseUrl}/auctions/${auction.id}`,
         `Status: ${auction.status}`,
         `Format: ${auction.auctionType}`,
         `Description: ${auction.description ?? "not supplied"}`,

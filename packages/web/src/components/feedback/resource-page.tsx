@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/feedback/status-badge";
 import { getErrorMessage } from "@/lib/api/errors";
+import { translate, useT } from "@/i18n/context";
+import { intlLocale } from "@/i18n/core";
 
 type ResourceQuery<T> = {
   data?: T;
@@ -17,13 +19,16 @@ export function ResourcePage<T>({
   title,
   description,
   query,
+  emptyDescription,
   children,
 }: {
   title: string;
   description: string;
+  emptyDescription?: string;
   query: ResourceQuery<{ items: T[] } | T | null>;
   children?: ReactNode;
 }) {
+  const t = useT("layout");
   const data = query.data;
   const rows =
     data &&
@@ -43,8 +48,8 @@ export function ResourcePage<T>({
         isError={query.isError}
         error={query.error}
         isEmpty={rows.length === 0}
-        emptyTitle={`No ${title.toLowerCase()} yet`}
-        emptyDescription="When the API has records for this account, they will appear here."
+        emptyTitle={t("feedback.noRecordsYet", { title: title.toLowerCase() })}
+        emptyDescription={emptyDescription ?? t("feedback.recordsHint")}
         onRetry={() => void query.refetch()}
       >
         <div className="space-y-3">
@@ -89,10 +94,10 @@ function ResourceRecord({ value }: { value: unknown }) {
     <Card>
       <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
         <div className="min-w-0">
-          <p className="font-medium leading-snug">
-            {titleEntry ? String(titleEntry[1] ?? "Untitled") : "Record"}
+          <p className="leading-snug font-medium first-letter:uppercase">
+            {titleEntry ? String(titleEntry[1] ?? translate("layout", "feedback.untitled")) : translate("layout", "feedback.record")}
           </p>
-          <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs text-muted-foreground sm:grid-cols-2">
+          <dl className="mt-3 grid gap-x-6 gap-y-3 text-xs text-muted-foreground sm:grid-cols-2">
             {entries
               .filter(
                 ([key]) => key !== titleEntry?.[0] && key !== statusEntry?.[0],
@@ -100,7 +105,7 @@ function ResourceRecord({ value }: { value: unknown }) {
               .slice(0, 4)
               .map(([key, item]) => (
                 <div className="min-w-0" key={key}>
-                  <dt className="capitalize">{humanize(key)}</dt>
+                  <dt className="eyebrow">{humanize(key)}</dt>
                   <dd className="mt-0.5 truncate font-medium text-foreground">
                     {formatRecordValue(key, item)}
                   </dd>
@@ -108,11 +113,7 @@ function ResourceRecord({ value }: { value: unknown }) {
               ))}
           </dl>
         </div>
-        {statusEntry ? (
-          <Badge variant="secondary" className="self-start capitalize">
-            {String(statusEntry[1])}
-          </Badge>
-        ) : null}
+        {statusEntry ? <StatusBadge status={String(statusEntry[1])} className="self-start" /> : null}
       </CardContent>
     </Card>
   );
@@ -125,14 +126,14 @@ function humanize(value: string) {
 }
 
 function formatRecordValue(key: string, value: unknown) {
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? translate("common", "yes") : translate("common", "no");
   if (typeof value === "number") return new Intl.NumberFormat().format(value);
   if (
     typeof value === "string" &&
     key.endsWith("At") &&
     !Number.isNaN(Date.parse(value))
   ) {
-    return new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat(intlLocale(), {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(new Date(value));

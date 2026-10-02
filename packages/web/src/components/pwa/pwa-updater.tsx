@@ -1,6 +1,7 @@
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { translate } from "@/i18n/context";
 
 export function PwaUpdater() {
   const {
@@ -17,9 +18,9 @@ export function PwaUpdater() {
 
   useEffect(() => {
     if (!needRefresh) return;
-    toast("A new version is available", {
+    toast(translate("common", "newVersion"), {
       action: {
-        label: "Reload",
+        label: translate("common", "reload"),
         onClick: () => {
           void updateServiceWorker(true);
         },

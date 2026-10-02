@@ -3,64 +3,96 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Cheretanet design tokens.
+ *
+ * Palette: forest green brand on warm "paper" neutrals, with a gold highlight
+ * for dark (inverse) bands. Semantic colours (success, warning, info,
+ * destructive) are used only for state, never for decoration.
+ */
 :root {
-  --background: oklch(0.97 0.01 90);
+  --background: oklch(0.975 0.008 90);
   --foreground: oklch(0.22 0.03 155);
-  --card: oklch(0.99 0.005 90);
+  --card: oklch(0.995 0.003 90);
   --card-foreground: oklch(0.22 0.03 155);
-  --popover: oklch(0.99 0.005 90);
+  --popover: oklch(0.995 0.003 90);
   --popover-foreground: oklch(0.22 0.03 155);
   --primary: oklch(0.4 0.09 155);
   --primary-foreground: oklch(0.98 0.01 90);
-  --secondary: oklch(0.93 0.02 90);
+  --secondary: oklch(0.935 0.018 90);
   --secondary-foreground: oklch(0.28 0.04 155);
-  --muted: oklch(0.94 0.015 90);
-  --muted-foreground: oklch(0.48 0.03 155);
-  --accent: oklch(0.9 0.04 80);
-  --accent-foreground: oklch(0.28 0.05 70);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.98 0.01 90);
-  --border: oklch(0.88 0.02 90);
-  --input: oklch(0.88 0.02 90);
+  --muted: oklch(0.945 0.013 90);
+  --muted-foreground: oklch(0.47 0.03 155);
+  --accent: oklch(0.92 0.035 85);
+  --accent-foreground: oklch(0.3 0.05 70);
+  --border: oklch(0.885 0.018 90);
+  --input: oklch(0.8 0.02 90);
   --ring: oklch(0.45 0.09 155);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.28 0.04 155);
-  --sidebar-foreground: oklch(0.96 0.01 90);
-  --sidebar-accent: oklch(0.35 0.05 155);
+
+  --destructive: oklch(0.53 0.19 27);
+  --destructive-foreground: oklch(0.98 0.01 90);
+  --success: oklch(0.5 0.12 150);
+  --success-foreground: oklch(0.98 0.01 90);
+  --warning: oklch(0.55 0.12 65);
+  --warning-foreground: oklch(0.98 0.01 90);
+  --info: oklch(0.5 0.11 245);
+  --info-foreground: oklch(0.98 0.01 90);
+
+  /* Dark brand band (hero, process band, footer, workspace sidebar). Dark in both themes. */
+  --inverse: oklch(0.27 0.045 160);
+  --inverse-foreground: oklch(0.97 0.01 90);
+  --highlight: oklch(0.82 0.1 88);
+  --highlight-strong: oklch(0.89 0.08 92);
+
+  --sidebar: var(--inverse);
+  --sidebar-foreground: var(--inverse-foreground);
+  --sidebar-accent: oklch(0.34 0.05 158);
   --sidebar-accent-foreground: oklch(0.98 0.01 90);
-  --sidebar-border: oklch(0.35 0.03 155);
+  --sidebar-border: oklch(0.35 0.03 158);
+
+  --radius: 0.5rem;
 }
 
 .dark {
-  --background: oklch(0.2 0.02 155);
-  --foreground: oklch(0.96 0.01 90);
-  --card: oklch(0.24 0.02 155);
-  --card-foreground: oklch(0.96 0.01 90);
-  --popover: oklch(0.24 0.02 155);
-  --popover-foreground: oklch(0.96 0.01 90);
-  --primary: oklch(0.78 0.08 155);
+  --background: oklch(0.27 0.03 246.6);
+  --foreground: oklch(0.95 0.01 90);
+  --card: oklch(0.21 0.00 0.0);
+  --card-foreground: oklch(0.95 0.01 90);
+  --popover: oklch(0.24 0.02 158);
+  --popover-foreground: oklch(0.95 0.01 90);
+  --primary: oklch(0.78 0.09 155);
   --primary-foreground: oklch(0.18 0.03 155);
-  --secondary: oklch(0.3 0.02 155);
-  --secondary-foreground: oklch(0.96 0.01 90);
-  --muted: oklch(0.3 0.02 155);
-  --muted-foreground: oklch(0.75 0.02 90);
-  --accent: oklch(0.34 0.04 80);
-  --accent-foreground: oklch(0.96 0.02 90);
-  --destructive: oklch(0.65 0.18 25);
-  --destructive-foreground: oklch(0.98 0.01 90);
-  --border: oklch(0.34 0.02 155);
-  --input: oklch(0.34 0.02 155);
-  --ring: oklch(0.78 0.08 155);
-  --sidebar: oklch(0.16 0.02 155);
-  --sidebar-foreground: oklch(0.96 0.01 90);
-  --sidebar-accent: oklch(0.26 0.03 155);
-  --sidebar-accent-foreground: oklch(0.98 0.01 90);
-  --sidebar-border: oklch(0.28 0.02 155);
+  --secondary: oklch(0.29 0.02 158);
+  --secondary-foreground: oklch(0.95 0.01 90);
+  --muted: oklch(0.27 0.018 158);
+  --muted-foreground: oklch(0.74 0.02 90);
+  --accent: oklch(0.32 0.04 80);
+  --accent-foreground: oklch(0.95 0.02 90);
+  --border: oklch(0.32 0.02 158);
+  --input: oklch(0.4 0.02 158);
+  --ring: oklch(0.78 0.09 155);
+
+  --destructive: oklch(0.7 0.16 25);
+  --destructive-foreground: oklch(0.18 0.03 25);
+  --success: oklch(0.76 0.13 150);
+  --success-foreground: oklch(0.18 0.03 155);
+  --warning: oklch(0.8 0.12 75);
+  --warning-foreground: oklch(0.2 0.04 70);
+  --info: oklch(0.75 0.1 245);
+  --info-foreground: oklch(0.18 0.03 245);
+
+  --inverse: oklch(0.23 0.03 247.3);
+  --inverse-foreground: oklch(0.95 0.01 90);
+  --sidebar-accent: oklch(0.25 0.03 158);
+  --sidebar-border: oklch(0.27 0.02 158);
 }
 
 @theme inline {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "IBM Plex Serif", ui-serif, Georgia, serif;
+  /* Ethiopic fallbacks: the Latin faces have no Ge'ez glyphs, so Amharic text uses Noto. */
+  --font-sans: "Hanken Grotesk", "Noto Sans Ethiopic", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Newsreader", "Noto Serif Ethiopic", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -75,34 +107,28 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-inverse: var(--inverse);
+  --color-inverse-foreground: var(--inverse-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-strong: var(--highlight-strong);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
 
-  /* Figma prototype color names, mapped onto the app's green palette so the
-     public discovery pages match the rest of the app (and follow dark mode). */
-  --color-ink: var(--foreground);
-  --color-ink-soft: var(--muted-foreground);
-  --color-ink-strong: var(--foreground);
-  --color-line: var(--border);
-  --color-line-strong: var(--muted-foreground);
-  --color-canvas: var(--background);
-  --color-panel: var(--muted);
-  --color-panel-2: var(--secondary);
-  --color-panel-3: var(--secondary);
-  --color-panel-4: var(--accent);
-  --color-forest: var(--primary);
-  --color-danger: var(--destructive);
-  --color-danger-tint: color-mix(in oklch, var(--destructive) 15%, transparent);
-  --color-navy: var(--sidebar);
-  --color-navy-ink: var(--sidebar-foreground);
+  /* sm: badges, chips · md: buttons, inputs, menu items · lg: cards, dialogs · xl: large feature bands */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -116,10 +142,23 @@
 
   html {
     @apply scroll-smooth;
+    width: 100%;
+    /* Keeps anchored sections clear of the sticky header. */
+    scroll-padding-top: 7rem;
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
+    width: 100%;
+    min-width: 320px;
+    margin: 0;
+    overflow-x: clip;
+  }
+
+  #root {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100svh;
   }
 
   h1,
@@ -127,43 +166,48 @@
   h3,
   h4 {
     font-family: var(--font-heading);
-    @apply tracking-tight text-foreground;
+    @apply tracking-tight text-balance text-foreground;
   }
 
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
-}
 
-/* Design tokens taken from the Cheretanet Figma prototype. */
-@theme {
-  --font-display: "Newsreader", ui-serif, Georgia, serif;
-  --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-label: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-  --font-amharic: "FreeSerif", "Noto Serif Ethiopic", serif;
-
-  --text-label-11: 11px;
-  --text-label-11--line-height: 14px;
-  --text-label-11--letter-spacing: 0.55px;
-  --text-label-12: 12px;
-  --text-label-12--line-height: 16px;
-  --text-label-12--letter-spacing: 0.6px;
-  --text-body-13: 13px;
-  --text-body-13--line-height: 18px;
-  --text-body-13--letter-spacing: 0.065px;
-
-  --drop-shadow-panel: 0 1px 1px rgb(0 0 0 / 0.05);
-}
-
-@layer base {
-  /* Unrounded glyph advances so text widths match the Figma metrics (hinted rounding widens mono text ~6%).
-     Form controls are listed because the browser stylesheet resets text-rendering on them. */
-  html,
-  body,
-  button,
-  input,
-  select,
-  textarea {
-    text-rendering: geometricPrecision;
+  ::selection {
+    @apply bg-primary/20;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Page-width container shared by the public header, pages and footer, so their edges line up. */
+@utility page-container {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+/* Small uppercase label for metadata, eyebrows and table headings. */
+@utility eyebrow {
+  @apply font-mono text-[11px] leading-4 font-medium tracking-[0.08em] uppercase;
+}
+
+/* Ge'ez script has no letter case and suffers under wide tracking and a
+   monospace face, so Amharic labels use the sans face at a readable size. */
+:lang(am) .eyebrow {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+/* Ethiopic glyphs need a little more line height than Latin text. */
+:lang(am) body {
+  line-height: 1.6;
 }

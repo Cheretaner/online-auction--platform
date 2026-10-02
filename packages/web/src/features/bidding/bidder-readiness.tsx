@@ -7,7 +7,7 @@ import { CheckCircle2, Circle, Clock, CreditCard, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldHint, Label, OptionalHint } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -22,30 +22,25 @@ import type { BidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { useAuth } from "@/features/auth/auth-provider";
-
-const INSTRUMENT_LABELS: Record<(typeof INSTRUMENT_TYPES)[number], string> = {
-  cpo: "CPO (certified payment order)",
-  bank_guarantee: "Bank guarantee",
-  transfer: "Bank transfer",
-};
+import { useT } from "@/i18n/context";
 
 function Step({ state, title, children }: { state: "done" | "waiting" | "todo" | "failed"; title: string; children?: React.ReactNode }) {
   const Icon = state === "done" ? CheckCircle2 : state === "waiting" ? Clock : state === "failed" ? XCircle : Circle;
   const tone =
     state === "done"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-success"
       : state === "failed"
         ? "text-destructive"
         : state === "waiting"
-          ? "text-amber-600 dark:text-amber-400"
+          ? "text-warning"
           : "text-muted-foreground";
   return (
     <li className="flex gap-3">
       <Icon className={`mt-0.5 size-5 shrink-0 ${tone}`} aria-hidden />
       <div className="min-w-0 flex-1 space-y-2">
-        <p className="font-medium">{title}</p>
+        <p className="leading-5 font-medium">{title}</p>
         {children}
       </div>
     </li>
@@ -53,6 +48,7 @@ function Step({ state, title, children }: { state: "done" | "waiting" | "todo" |
 }
 
 export function BidderReadinessPanel({ auction, readiness }: { auction: Auction; readiness: BidderReadiness }) {
+  const t = useT("auctions");
   const { kycStatus, depositRequired, deposit } = readiness;
   const { session } = useAuth();
   const isWinner = auction.status === "awarded" && auction.winnerId === session?.user.id;
@@ -71,29 +67,30 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
 
   return (
     <ol className="space-y-4">
-      <Step state={kycState} title="Identity verified">
+      <Step state={kycState} title={t("readiness.identity")}>
         {kycStatus === "verified" ? null : (
           <p className="text-sm text-muted-foreground">
             {kycStatus === "pending"
-              ? "Your documents are with the compliance team. You can bid once they approve them."
+              ? t("readiness.kycPending")
               : kycStatus === "rejected"
-                ? "Your verification was not accepted. Check the reason and submit again."
-                : "Verify your identity once to bid on any auction."}{" "}
-            <Link to="/app/kyc" className="text-primary underline">
-              {kycStatus === "pending" ? "View status" : "Verify identity"}
+                ? t("readiness.kycRejected")
+                : t("readiness.kycTodo")}{" "}
+            <Link to="/app/kyc" className="font-medium text-primary underline-offset-4 hover:underline">
+              {kycStatus === "pending" ? t("readiness.viewStatus") : t("readiness.verify")}
             </Link>
           </p>
         )}
       </Step>
       {depositRequired ? (
-        <Step state={depositState} title={`Bid security of ${formatMoney(auction.depositAmount)}`}>
+        <Step state={depositState} title={t("readiness.bidSecurity", { amount: formatMoney(auction.depositAmount) })}>
           {deposit ? (
             <p className="text-sm text-muted-foreground">
-              {deposit.status === "pending" && deposit.instrumentType === "chapa" && "Chapa payment is pending confirmation."}
-              {deposit.status === "pending" && deposit.instrumentType !== "chapa" && `Submitted (${deposit.referenceNumber}). The organization is checking it.`}
-              {deposit.status === "verified" && `Verified (${deposit.referenceNumber}).`}
-              {deposit.status === "released" && "Released back to you."}
-              {deposit.status === "rejected" && `Rejected: ${deposit.rejectionReason ?? "no reason given"}.`}
+              {deposit.status === "pending" && deposit.instrumentType === "chapa" && t("readiness.chapaPending")}
+              {deposit.status === "pending" && deposit.instrumentType !== "chapa" && t("readiness.depositPending", { reference: deposit.referenceNumber })}
+              {deposit.status === "verified" && t("readiness.depositVerified", { reference: deposit.referenceNumber })}
+              {deposit.status === "released" && t("readiness.depositReleased")}
+              {deposit.status === "rejected" &&
+                t("readiness.depositRejected", { reason: deposit.rejectionReason ?? t("readiness.noReason") })}
             </p>
           ) : null}
           {deposit?.instrumentType === "chapa" && ["pending", "rejected"].includes(deposit.status) && acceptsDeposits ? (
@@ -101,14 +98,14 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
           ) : (!deposit || deposit.status === "rejected") && acceptsDeposits ? (
             deposit?.status === "rejected" ? (
               <p className="text-sm text-muted-foreground">
-                Contact the organization to register a corrected instrument; only one deposit per auction is accepted.
+                {t("readiness.depositRejectedHelp")}
               </p>
             ) : (
               <DepositForm auction={auction} />
             )
           ) : null}
           {!deposit && !acceptsDeposits ? (
-            <p className="text-sm text-muted-foreground">This auction no longer accepts deposits.</p>
+            <p className="text-sm text-muted-foreground">{t("readiness.noLongerAccepting")}</p>
           ) : null}
         </Step>
       ) : null}
@@ -120,16 +117,21 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
 function SettlementStep({ auction, settlement }: { auction: Auction; settlement: import("@/lib/api/types").SettlementRecord | undefined }) {
   const providers = useDepositPaymentProviders();
   const initiate = useInitiateChapaSettlement();
+  const t = useT("auctions");
   const state = settlement?.status === "paid" ? "done" : settlement?.status === "reconciliation_required" ? "failed" : "waiting";
   return (
-    <Step state={state} title="Final payment">
-      {!settlement ? <p className="text-sm text-muted-foreground">Loading your payment obligation…</p> : null}
-      {settlement?.status === "paid" ? <p className="text-sm text-muted-foreground">Payment of {formatMoney(settlement.amount)} ETB received.</p> : null}
-      {settlement?.status === "reconciliation_required" ? <p className="text-sm text-destructive">Payment needs reconciliation. Contact the auction organization.</p> : null}
+    <Step state={state} title={t("readiness.finalPayment")}>
+      {!settlement ? <p className="text-sm text-muted-foreground">{t("readiness.loadingSettlement")}</p> : null}
+      {settlement?.status === "paid" ? (
+        <p className="text-sm text-muted-foreground">{t("readiness.paymentReceived", { amount: formatMoney(settlement.amount) })}</p>
+      ) : null}
+      {settlement?.status === "reconciliation_required" ? (
+        <p className="text-sm text-destructive">{t("readiness.reconciliation")}</p>
+      ) : null}
       {settlement && ["due", "payment_pending"].includes(settlement.status) ? (
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            {formatMoney(settlement.amount)} ETB due by {formatDateTime(settlement.dueAt)}. Bid security is handled separately.
+            {t("readiness.due", { amount: formatMoney(settlement.amount), date: formatDateTime(settlement.dueAt) })}
           </p>
           {providers.data?.chapa ? (
             <Button
@@ -138,14 +140,14 @@ function SettlementStep({ auction, settlement }: { auction: Auction; settlement:
               onClick={() => initiate.mutate(auction.id, {
                 onSuccess: (result) => result.checkoutUrl
                   ? window.location.assign(result.checkoutUrl)
-                  : toast.success("Final payment is already complete."),
+                  : toast.success(t("readiness.finalComplete")),
                 onError: (error) => toast.error(getErrorMessage(error)),
               })}
             >
               <CreditCard className="size-4" aria-hidden />
-              {initiate.isPending ? "Opening checkout…" : "Pay final amount with Chapa"}
+              {initiate.isPending ? t("readiness.openingCheckout") : t("readiness.payFinalChapa")}
             </Button>
-          ) : <p className="text-sm text-muted-foreground">Contact the auction organization to arrange final payment.</p>}
+          ) : <p className="text-sm text-muted-foreground">{t("readiness.contactForFinal")}</p>}
         </div>
       ) : null}
     </Step>
@@ -157,6 +159,8 @@ function DepositForm({ auction }: { auction: Auction }) {
   const upload = useUploadDocument();
   const [proof, setProof] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const t = useT("auctions");
+  const tc = useT("common");
   const form = useForm({
     resolver: zodResolver(CreateDepositRequest),
     defaultValues: {
@@ -173,7 +177,7 @@ function DepositForm({ auction }: { auction: Auction }) {
       <ChapaCheckoutButton auction={auction} disabled={submitting} />
       <Form {...form}>
       <form
-        className="grid gap-3 rounded-md border p-3 sm:grid-cols-2"
+        className="grid gap-4 rounded-md border bg-background/60 p-4 @md:grid-cols-2"
         onSubmit={form.handleSubmit(async (values) => {
           setSubmitting(true);
           try {
@@ -188,7 +192,7 @@ function DepositForm({ auction }: { auction: Auction }) {
               documentId = (await upload.mutateAsync(data)).id;
             }
             await create.mutateAsync({ ...values, documentId });
-            toast.success("Deposit submitted for verification");
+            toast.success(t("readiness.submitted"));
           } catch (error) {
             if (!applyApiFieldErrors(error, form.setError)) toast.error(getErrorMessage(error));
           } finally {
@@ -201,7 +205,7 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Amount (ETB)</FormLabel>
+              <FormLabel>{t("readiness.amount", { currency: tc("currency") })}</FormLabel>
               <FormControl>
                 <Input inputMode="decimal" {...field} />
               </FormControl>
@@ -214,7 +218,7 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="instrumentType"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Instrument</FormLabel>
+              <FormLabel>{t("readiness.instrument")}</FormLabel>
               <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger>
@@ -224,7 +228,7 @@ function DepositForm({ auction }: { auction: Auction }) {
                 <SelectContent>
                   {INSTRUMENT_TYPES.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {INSTRUMENT_LABELS[type]}
+                      {enumLabel(type)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -238,11 +242,11 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="issuingBank"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Issuing bank</FormLabel>
+              <FormLabel>{t("readiness.bank")}</FormLabel>
               <Select value={field.value} onValueChange={field.onChange}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a bank" />
+                    <SelectValue placeholder={t("readiness.bankPlaceholder")} />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
@@ -262,28 +266,30 @@ function DepositForm({ auction }: { auction: Auction }) {
           name="referenceNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Reference number</FormLabel>
+              <FormLabel>{t("readiness.reference")}</FormLabel>
               <FormControl>
-                <Input autoComplete="off" placeholder="Letters, numbers, /, . or -" {...field} />
+                <Input autoComplete="off" placeholder={t("readiness.referencePlaceholder")} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor={`deposit-proof-${auction.id}`}>Scan or photo of the instrument</Label>
-          <input
+        <div className="space-y-1.5 @md:col-span-2">
+          <Label htmlFor={`deposit-proof-${auction.id}`}>
+            {t("readiness.proof")}
+            <OptionalHint />
+          </Label>
+          <Input
             id={`deposit-proof-${auction.id}`}
             type="file"
             accept="image/*,application/pdf"
             onChange={(event) => setProof(event.target.files?.[0] ?? null)}
-            className="block w-full text-sm file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5"
           />
-          <p className="text-xs text-muted-foreground">Only you and the organization's officers can see this file.</p>
+          <FieldHint>{t("readiness.proofHint")}</FieldHint>
         </div>
-        <div className="sm:col-span-2">
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Submitting…" : "Submit deposit"}
+        <div className="@md:col-span-2">
+          <Button type="submit" loading={submitting}>
+            {submitting ? t("readiness.submitting") : t("readiness.submit")}
           </Button>
         </div>
       </form>
@@ -295,6 +301,7 @@ function DepositForm({ auction }: { auction: Auction }) {
 function ChapaCheckoutButton({ auction, disabled = false }: { auction: Auction; disabled?: boolean }) {
   const chapa = useInitiateChapaDeposit();
   const providers = useDepositPaymentProviders();
+  const t = useT("auctions");
   if (!providers.data?.chapa) return null;
   return (
     <Button
@@ -304,13 +311,13 @@ function ChapaCheckoutButton({ auction, disabled = false }: { auction: Auction; 
       onClick={() => chapa.mutate({ auctionId: auction.id }, {
         onSuccess: (result) => {
           if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
-          else toast.success("Your deposit is already verified.");
+          else toast.success(t("readiness.alreadyVerified"));
         },
         onError: (error) => toast.error(getErrorMessage(error)),
       })}
     >
       <CreditCard className="size-4" aria-hidden />
-      {chapa.isPending ? "Opening checkout…" : "Pay bid security with Chapa"}
+      {chapa.isPending ? t("readiness.openingCheckout") : t("readiness.payDepositChapa")}
     </Button>
   );
 }

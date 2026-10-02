@@ -102,23 +102,6 @@ export async function processOutboxBatch(): Promise<number> {
         await refundNonWinnerChapaDeposits(auctionId, null);
       }
 
-      if (
-        auctionId &&
-        (message.eventType === "auction.approved" ||
-          message.eventType === "auction.published" ||
-          message.eventType === "auction.opened" ||
-          message.eventType === "auction.extended" ||
-          message.eventType === "bid.placed" ||
-          message.eventType === "auction.closed" ||
-          message.eventType === "auction.under_review" ||
-          message.eventType === "auction.awarded" ||
-          message.eventType === "auction.cancelled")
-      ) {
-        // Await delivery before acknowledging the outbox event. Telegram
-        // failures then retry through the existing durable backoff.
-        await telegramService.broadcastAuction(auctionId);
-      }
-
       if (message.eventType === "notification.queued" && typeof message.payload.notificationId === "string") {
         await dispatchNotification(message.payload.notificationId);
       }

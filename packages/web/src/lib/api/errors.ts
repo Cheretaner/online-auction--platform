@@ -1,3 +1,4 @@
+import { translate } from "@/i18n/context";
 import type { ErrorCode } from "@auction/shared";
 
 export interface ApiErrorBody {
@@ -80,7 +81,7 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
-export function getErrorMessage(error: unknown, fallback = "Something went wrong"): string {
+export function getErrorMessage(error: unknown, fallback = translate("common", "unexpectedError")): string {
   if (isApiError(error)) return error.message;
   if (error instanceof Error) return error.message;
   return fallback;
