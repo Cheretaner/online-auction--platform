@@ -8,6 +8,7 @@ import * as biddingService from "../bidding/bidding.service.js";
 import * as auditService from "../audit/audit.service.js";
 import * as aiAssistant from "../ai/assistant.service.js";
 import * as telegramRepo from "./telegram.repository.js";
+import { formatAiAnswerForTelegram } from "./telegram-markdown.js";
 import { downloadTelegramAudio, processVoiceNote } from "./telegram-voice.service.js";
 import type { TelegramNotificationPayload } from "./telegram.types.js";
 
@@ -29,6 +30,8 @@ function escapeHtml(text: string): string {
 export class TelegramBotService {
   private bot: Telegraf | null = null;
   private isPolling = false;
+  private inboundTransport: "disabled" | "starting" | "webhook" | "polling" | "error" = "disabled";
+  private inboundError: string | null = null;
 
   constructor() {
     if (env.TELEGRAM_BOT_TOKEN) {
@@ -45,19 +48,30 @@ export class TelegramBotService {
     return this.bot;
   }
 
+  getInboundStatus() {
+    return {
+      transport: this.inboundTransport,
+      error: this.inboundError,
+    };
+  }
+
   private setupMiddlewareAndCommands(): void {
     if (!this.bot) return;
 
     // Error handling
     this.bot.catch((err, ctx) => {
       logger.error({ err, updateType: ctx.updateType }, "Telegram bot error");
-      void ctx.reply("⚠️ An unexpected error occurred. Please try again.").catch(() => undefined);
+      // Never turn an internal bot error into a public channel/group post.
+      if (ctx.chat?.type === "private") {
+        void ctx.reply("Something went wrong while processing that request. Please try again or use /help.").catch(() => undefined);
+      }
     });
 
     // Logging & rate-limit stub
     this.bot.use(async (ctx, next) => {
       const from = ctx.from;
-      logger.debug({ fromId: from?.id, username: from?.username, text: "text" in ctx.message! ? ctx.message.text : undefined }, "Telegram update received");
+      const incomingText = ctx.message && "text" in ctx.message ? ctx.message.text : undefined;
+      logger.debug({ fromId: from?.id, username: from?.username, hasText: typeof incomingText === "string" }, "Telegram update received");
       await next();
     });
 
@@ -241,18 +255,20 @@ export class TelegramBotService {
 
     // Voice & Audio Handler
     this.bot.on([message("voice"), message("audio")], async (ctx) => {
+      if (ctx.chat.type !== "private") return;
       await this.handleVoiceMessage(ctx);
     });
 
     // General text messages that are not commands: pass to AI assistant
     this.bot.on(message("text"), async (ctx) => {
+      if (ctx.chat.type !== "private") return;
       const text = ctx.message.text.trim();
       if (text.startsWith("/")) return; // Unhandled command
 
       await ctx.sendChatAction("typing");
       try {
         const response = await aiAssistant.askAssistant(text);
-        await ctx.reply(`🤖 <b>AI Advisory Assistant:</b>\n\n${escapeHtml(response.answer)}`, {
+        await ctx.reply(`<b>AI Advisory Assistant</b>\n\n${formatAiAnswerForTelegram(response.answer)}`, {
           parse_mode: "HTML",
         });
       } catch {
@@ -611,7 +627,7 @@ export class TelegramBotService {
 
       // Default or question: run through assistant
       const answer = await aiAssistant.askAssistant(result.transcription);
-      await ctx.reply(`🤖 <b>AI Advisory Assistant:</b>\n\n${escapeHtml(answer.answer)}`, { parse_mode: "HTML" });
+      await ctx.reply(`<b>AI Advisory Assistant</b>\n\n${formatAiAnswerForTelegram(answer.answer)}`, { parse_mode: "HTML" });
     } catch (error) {
       logger.error({ err: error }, "Failed to process Telegram voice message");
       await ctx.reply("⚠️ Could not process the voice note. Please try speaking clearly or use text commands like /auctions or /bid.");
@@ -663,26 +679,50 @@ export class TelegramBotService {
   // --- LIFECYCLE ---
 
   async start(): Promise<void> {
-    if (!this.bot) return;
+    if (!this.bot) {
+      this.inboundTransport = "disabled";
+      return;
+    }
 
     if (env.TELEGRAM_WEBHOOK_URL) {
       const webhookUrl = `${env.TELEGRAM_WEBHOOK_URL.replace(/\/$/, "")}/api/v1/telegram/webhook`;
-      await this.bot.telegram.setWebhook(webhookUrl, {
-        secret_token: env.TELEGRAM_WEBHOOK_SECRET,
-      });
-      logger.info({ webhookUrl }, "Telegram webhook registered");
+      this.inboundTransport = "starting";
+      try {
+        await this.bot.telegram.setWebhook(webhookUrl, {
+          secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+        });
+        this.inboundTransport = "webhook";
+        this.inboundError = null;
+        logger.info({ webhookUrl }, "Telegram webhook registered");
+      } catch (error) {
+        this.inboundTransport = "error";
+        this.inboundError = error instanceof Error ? error.message : "Webhook registration failed";
+        logger.error({ err: error, webhookUrl }, "Telegram webhook registration failed");
+      }
     } else if (env.TELEGRAM_POLLING || env.NODE_ENV === "development") {
-      // Long-polling for local dev or when polling flag enabled
-      // Remove any leftover webhook first
-      await this.bot.telegram.deleteWebhook().catch(() => undefined);
+      this.inboundTransport = "starting";
+      this.inboundError = null;
+      // Long-polling needs any previously registered webhook removed first.
+      try {
+        await this.bot.telegram.deleteWebhook();
+      } catch (error) {
+        this.inboundTransport = "error";
+        this.inboundError = error instanceof Error ? error.message : "Could not clear the Telegram webhook";
+        logger.error({ err: error }, "Could not clear Telegram webhook before polling");
+        return;
+      }
       void this.bot.launch(() => {
         this.isPolling = true;
+        this.inboundTransport = "polling";
         logger.info("Telegram bot polling started");
       }).catch((error) => {
         this.isPolling = false;
+        this.inboundTransport = "error";
+        this.inboundError = error instanceof Error ? error.message : "Telegram polling failed to start";
         logger.error({ err: error }, "Telegram bot polling failed to start");
       });
     } else {
+      this.inboundTransport = "disabled";
       logger.warn(
         "Telegram bot is configured but no inbound transport is enabled; set TELEGRAM_WEBHOOK_URL or TELEGRAM_POLLING=true",
       );
@@ -693,6 +733,7 @@ export class TelegramBotService {
     if (this.bot && this.isPolling) {
       this.bot.stop("SIGTERM");
       this.isPolling = false;
+      this.inboundTransport = "disabled";
       logger.info("Telegram bot polling stopped");
     }
   }

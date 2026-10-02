@@ -1,4 +1,5 @@
 import type { ReportType } from "@auction/shared";
+import { createHash } from "node:crypto";
 import { DOMAIN_EVENTS } from "../kernel/events.js";
 import { primaryActorRole } from "../kernel/roles.js";
 import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
@@ -111,6 +112,26 @@ export async function listReportsForOrg(
 
 export async function listReports(auctionId?: string): Promise<ReportRecord[]> {
   return repo.listReports(auctionId);
+}
+
+export async function financialReconciliation(input: {
+  auctionId: string;
+  actorId: string;
+  roles: import("@auction/shared").Role[];
+}): Promise<repo.FinancialReconciliationSnapshot & { generatedAt: string; snapshotSha256: string }> {
+  const snapshot = await repo.financialReconciliation(input.auctionId);
+  const snapshotSha256 = createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+  const generatedAt = new Date().toISOString();
+  await audit.appendAuditEvent({
+    auctionId: input.auctionId,
+    actorId: input.actorId,
+    actorRole: primaryActorRole(input.roles),
+    entityType: "financial_reconciliation",
+    entityId: input.auctionId,
+    action: "financial.reconciliation_exported",
+    payload: { snapshotSha256, generatedAt },
+  });
+  return { ...snapshot, generatedAt, snapshotSha256 };
 }
 
 export async function publishReport(input: {

@@ -29,6 +29,12 @@ export async function getLinkStatus(req: Request, res: Response): Promise<void> 
   res.status(HttpStatus.OK).json({ data: status });
 }
 
+export async function getIntegrationStatus(req: Request, res: Response): Promise<void> {
+  getAuth(req);
+  const status = await telegramService.getIntegrationStatus();
+  res.status(HttpStatus.OK).json({ data: status });
+}
+
 export async function unlinkTelegram(req: Request, res: Response): Promise<void> {
   const auth = getAuth(req);
   await telegramService.unlinkTelegram(auth.userId);

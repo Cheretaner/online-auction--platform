@@ -152,6 +152,39 @@ export async function findChannelPost(auctionId: string, client?: Queryable): Pr
   };
 }
 
+export async function getChannelAuctionDetails(auctionId: string): Promise<{
+  organizationName: string | null;
+  winnerName: string | null;
+  approvedByName: string | null;
+  awardedByName: string | null;
+} | null> {
+  return queryOne(
+    `SELECT o.name AS organization_name,
+            winner.full_name AS winner_name,
+            approver.full_name AS approved_by_name,
+            awarder.full_name AS awarded_by_name
+       FROM auctions a
+       LEFT JOIN organizations o ON o.id = a.org_id
+       LEFT JOIN profiles winner ON winner.id = a.winner_id
+       LEFT JOIN profiles approver ON approver.id = a.approved_by
+       LEFT JOIN LATERAL (
+         SELECT actor_id
+           FROM audit_events
+          WHERE auction_id = a.id AND action = 'auction.awarded'
+          ORDER BY sequence_no DESC
+          LIMIT 1
+       ) award_event ON TRUE
+       LEFT JOIN profiles awarder ON awarder.id = award_event.actor_id
+      WHERE a.id = $1`,
+    [auctionId],
+  ).then((row) => row ? {
+    organizationName: row.organization_name,
+    winnerName: row.winner_name,
+    approvedByName: row.approved_by_name,
+    awardedByName: row.awarded_by_name,
+  } : null);
+}
+
 export async function saveChannelPost(
   auctionId: string,
   channelId: string,

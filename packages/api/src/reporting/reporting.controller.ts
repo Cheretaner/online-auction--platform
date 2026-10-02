@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { GenerateReportRequest, OptionalAuctionScopedQuery } from "@auction/shared";
+import type { AuctionScopedQuery, GenerateReportRequest, OptionalAuctionScopedQuery } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { assertAuctionAccess } from "../shared/authz/auction-access.js";
 import { routeParam } from "../shared/types/request.js";
@@ -47,6 +47,21 @@ export const list: RequestHandler = async (req, res) => {
   res.json({
     items: await service.listReportsForOrg(auth.organizationId, auth.roles.includes("super_admin")),
   });
+};
+
+export const financialReconciliation: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const { auctionId } = req.query as unknown as AuctionScopedQuery;
+  await assertAuctionAccess(auctionId, {
+    userId: auth.userId,
+    roles: auth.roles,
+    organizationId: auth.organizationId,
+  });
+  res.json(await service.financialReconciliation({
+    auctionId,
+    actorId: auth.userId,
+    roles: auth.roles,
+  }));
 };
 
 export const getById: RequestHandler = async (req, res) => {

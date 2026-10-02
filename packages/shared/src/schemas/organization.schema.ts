@@ -4,7 +4,7 @@ import { ORG_TYPES, OFFICER_ROLES } from "../enums.js";
 export const CreateOrganizationRequest = z.object({
   name: z.string().min(2).max(200),
   orgType: z.enum(ORG_TYPES),
-  tinNumber: z.string().min(4).max(20),
+  tinNumber: z.string().regex(/^[A-Za-z0-9/-]{4,20}$/),
   region: z.string().min(1).max(80),
   contactEmail: z.string().email(),
   contactPhone: z.string().min(5).max(20),

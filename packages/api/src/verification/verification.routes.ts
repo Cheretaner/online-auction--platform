@@ -3,6 +3,7 @@ import { ReviewVerificationRequest, SubmitVerificationRequest } from "@auction/s
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
+import { submissionRateLimiter } from "../shared/middleware/rateLimit.middleware.js";
 import * as controller from "./verification.controller.js";
 
 const router = Router();
@@ -15,6 +16,7 @@ const REVIEWERS = ["compliance_officer", "org_admin", "super_admin"] as const;
 router.post(
   "/submit",
   requireAuth(),
+  submissionRateLimiter,
   validate(SubmitVerificationRequest),
   asyncHandler(controller.submitVerification),
 );

@@ -5,6 +5,7 @@ export interface Verification {
   userId: string;
   documentType: string;
   documentNumber: string;
+  documentId: string | null;
   status: VerificationStatus;
   decision: string | null;
   decisionReason: string | null;

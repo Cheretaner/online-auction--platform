@@ -5,7 +5,7 @@ export const ALLOWED_TRANSITIONS: Record<AuctionStatus, AuctionStatus[]> = {
   pending_review: ["scheduled", "draft", "cancelled"],
   scheduled: ["live", "cancelled"],
   live: ["closed", "cancelled", "under_review"],
-  closed: ["under_review", "awarded"],
+  closed: ["under_review", "awarded", "cancelled"],
   under_review: ["awarded", "cancelled"],
   awarded: [],
   cancelled: [],

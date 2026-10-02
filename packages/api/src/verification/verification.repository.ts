@@ -1,5 +1,8 @@
 import { queryOne, queryAll } from "../infrastructure/database/query.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
+import { queryOne as queryOneDb } from "../infrastructure/database/query.js";
+import { decryptSensitive, encryptSensitive, hashSensitive } from "../shared/security/sensitive-data.js";
+import { AppError } from "../shared/errors/index.js";
 import type { Verification } from "./verification.types.js";
 
 interface DbVerification {
@@ -7,6 +10,7 @@ interface DbVerification {
   user_id: string;
   document_type: string;
   document_number: string;
+  document_id: string | null;
   status: Verification["status"];
   decision: string | null;
   decision_reason: string | null;
@@ -21,7 +25,8 @@ function mapVerification(row: DbVerification): Verification {
     id: row.id,
     userId: row.user_id,
     documentType: row.document_type,
-    documentNumber: row.document_number,
+    documentNumber: decryptSensitive(row.document_number) ?? "",
+    documentId: row.document_id,
     status: row.status,
     decision: row.decision,
     decisionReason: row.decision_reason,
@@ -35,9 +40,16 @@ function mapVerification(row: DbVerification): Verification {
 export class VerificationRepository {
   async createVerification(
     userId: string,
-    data: { documentType: string; documentNumber: string },
+    data: { documentType: string; documentNumber: string; documentId: string },
   ): Promise<Verification> {
     return withTransaction(async (client) => {
+      const evidence = await queryOneDb<{ id: string }>(
+        `SELECT id FROM documents WHERE id = $1 AND uploaded_by = $2 AND is_private = TRUE FOR SHARE`,
+        [data.documentId, userId],
+        client,
+      );
+      if (!evidence) throw AppError.badRequest("KYC evidence must be a private document uploaded by you");
+
       await queryOne(
         `UPDATE profiles SET verification_status = 'pending', updated_at = NOW() WHERE id = $1`,
         [userId],
@@ -45,10 +57,10 @@ export class VerificationRepository {
       );
 
       const row = await queryOne<DbVerification>(
-        `INSERT INTO verifications (user_id, document_type, document_number, status)
-         VALUES ($1, $2, $3, 'pending')
+        `INSERT INTO verifications (user_id, document_type, document_number, document_id, status)
+         VALUES ($1, $2, $3, $4, 'pending')
          RETURNING *`,
-        [userId, data.documentType, data.documentNumber],
+        [userId, data.documentType, encryptSensitive(data.documentNumber), data.documentId],
         client,
       );
 
@@ -133,22 +145,22 @@ export class VerificationRepository {
   async checkDuplicateNationalIdOrTin(
     nationalId: string | null,
     tinNumber: string | null,
-  ): Promise<Array<{ id: string; national_id: string | null; tin_number: string | null }>> {
+  ): Promise<Array<{ id: string }>> {
     const params: string[] = [];
     const conditions: string[] = [];
 
     if (nationalId) {
-      params.push(nationalId);
-      conditions.push(`national_id = $${params.length}`);
+      params.push(hashSensitive(nationalId)!);
+      conditions.push(`national_id_hash = $${params.length}`);
     }
     if (tinNumber) {
-      params.push(tinNumber);
-      conditions.push(`tin_number = $${params.length}`);
+      params.push(hashSensitive(tinNumber)!);
+      conditions.push(`tin_number_hash = $${params.length}`);
     }
     if (conditions.length === 0) return [];
 
-    return queryAll<{ id: string; national_id: string | null; tin_number: string | null }>(
-      `SELECT id, national_id, tin_number FROM profiles WHERE ${conditions.join(" OR ")}`,
+    return queryAll<{ id: string }>(
+      `SELECT id FROM profiles WHERE ${conditions.join(" OR ")}`,
       params,
     );
   }

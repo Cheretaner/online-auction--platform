@@ -20,7 +20,11 @@ ENV_FILE=/etc/auction/api.env
 
 echo "==> Packages"
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg git openssl postgresql nginx
+apt-get install -y ca-certificates curl gnupg git openssl postgresql nginx clamav clamav-daemon
+sed -ri 's/^[#[:space:]]*TCPSocket .*/TCPSocket 3310/' /etc/clamav/clamd.conf
+sed -ri 's/^[#[:space:]]*TCPAddr .*/TCPAddr 127.0.0.1/' /etc/clamav/clamd.conf
+systemctl enable --now clamav-daemon
+systemctl restart clamav-daemon
 if ! command -v node >/dev/null || [[ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
@@ -65,9 +69,24 @@ WEB_BASE_URL=https://auction.example.et
 
 # nginx is the only proxy in front of the API.
 TRUST_PROXY_HOPS=1
+SUBMISSION_RATE_WINDOW_MS=900000
+SUBMISSION_RATE_LIMIT_MAX=5
 
 STORAGE_DRIVER=filesystem
 STORAGE_DIR=/var/lib/auction/storage
+FILE_SCAN_ENABLED=true
+CLAMAV_HOST=127.0.0.1
+CLAMAV_PORT=3310
+FILE_SCAN_TIMEOUT_MS=15000
+
+PII_ENCRYPTION_KEY=$(openssl rand -hex 32)
+PII_HASH_SECRET=$(openssl rand -hex 32)
+SETTLEMENT_DUE_HOURS=72
+
+# Fill these from the Chapa dashboard to enable digital deposits/refunds.
+CHAPA_SECRET_KEY=
+CHAPA_PUBLIC_KEY=
+CHAPA_WEBHOOK_SECRET=
 
 # Password-reset links and notifications are emailed. Without SMTP they are
 # only logged, so users cannot recover their accounts.
@@ -79,8 +98,13 @@ SMTP_PASS=
 MAIL_FROM=no-reply@auction.example.et
 
 AI_PROVIDER=auto
+AI_TIMEOUT_MS=15000
 GEMINI_API_KEY=
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+GEMINI_MODEL=gemini-flash-latest
 OPENROUTER_API_KEY=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_MODEL=openrouter/free
 
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_WEBHOOK_URL=
@@ -105,7 +129,8 @@ echo "30 2 * * * root /usr/local/sbin/auction-backup >> /var/log/auction-backup.
 cat <<NEXT
 
 Provisioning done. Next:
-  1. Edit $ENV_FILE: set BOOTSTRAP_SUPER_ADMIN_EMAIL, CORS_ORIGIN, WEB_BASE_URL, SMTP_*.
+  1. Edit $ENV_FILE: set BOOTSTRAP_SUPER_ADMIN_EMAIL, CORS_ORIGIN, WEB_BASE_URL, SMTP_*,
+     and Gemini/OpenRouter API keys if AI assistance should be enabled.
      Back the file up somewhere safe.
   2. sudo bash deploy/deploy.sh
   3. Configure nginx + TLS (packages/api/README.md, "TLS").

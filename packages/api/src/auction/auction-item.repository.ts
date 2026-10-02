@@ -84,10 +84,11 @@ export async function createAuctionItem(
   }, { userId });
 }
 
-export async function getAuctionItems(auctionId: string): Promise<AuctionItemRecord[]> {
+export async function getAuctionItems(auctionId: string, limit?: number): Promise<AuctionItemRecord[]> {
+  const limitClause = limit ? " LIMIT $2" : "";
   const rows = await queryAll<DbAuctionItem>(
-    `SELECT * FROM auction_items WHERE auction_id = $1 ORDER BY created_at ASC`,
-    [auctionId],
+    `SELECT * FROM auction_items WHERE auction_id = $1 ORDER BY created_at ASC${limitClause}`,
+    limit ? [auctionId, limit] : [auctionId],
   );
   return rows.map(mapRow);
 }

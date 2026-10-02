@@ -5,6 +5,7 @@ import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { logger } from "../shared/utils/logger.js";
+import * as settlementRepo from "../settlement/settlement.repository.js";
 import * as audit from "../audit/audit.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
 import * as notifications from "../notification/notification.service.js";
@@ -187,6 +188,9 @@ export async function transitionAuction(
       // Awarding is the terminal, publishable outcome, so it must not be
       // reachable while the audit ledger for this auction is broken.
       if (status === "awarded") {
+        if (!auction.winnerId || !auction.winningAmount) {
+          throw AppError.unprocessable("An auction without a confirmed winner and winning amount cannot be awarded");
+        }
         // FR15: an unresolved high-severity anomaly keeps the outcome
         // provisional until compliance has reviewed it.
         const openHigh = await anomalyRepo.countOpenHigh(auction.id);
@@ -211,6 +215,14 @@ export async function transitionAuction(
 
       if (!updated) throw new AppError("Auction not found", HttpStatus.NOT_FOUND, "AUCTION_NOT_FOUND");
 
+      if (status === "awarded" && updated.winnerId && updated.winningAmount) {
+        await settlementRepo.createForAward({
+          auctionId: updated.id,
+          winnerId: updated.winnerId,
+          amount: updated.winningAmount,
+        }, client);
+      }
+
       await audit.appendAuditEvent({
         auctionId: auction.id,
         actorId: actor.userId,
@@ -220,6 +232,21 @@ export async function transitionAuction(
         action: `auction.${status}`,
         payload: { from: auction.status, to: status },
       });
+
+      if (status === "awarded" || status === "under_review") {
+        await enqueueOutbox({
+          aggregateType: "auction",
+          aggregateId: auction.id,
+          eventType: `auction.${status}`,
+          payload: {
+            auctionId: auction.id,
+            from: auction.status,
+            to: status,
+            winnerId: updated.winnerId,
+            winningAmount: updated.winningAmount,
+          },
+        });
+      }
 
       return updated;
     },
@@ -449,11 +476,15 @@ export async function closeDueAuctions(now = new Date()): Promise<number> {
           }
         }
 
-        const updated = await AuctionRepo.closeWithOutcome(
-          auction.id,
-          { winnerId, winningAmount },
-          client,
-        );
+        const noSale = auction.auctionType === "open_ascending" && !winnerId;
+        const cancellationReason = noSale
+          ? auction.reservePrice
+            ? "Reserve price not met"
+            : "No bids received"
+          : null;
+        const updated = noSale
+          ? await AuctionRepo.markCancelled(auction.id, cancellationReason, client)
+          : await AuctionRepo.closeWithOutcome(auction.id, { winnerId, winningAmount }, client);
         if (!updated) return null;
 
         await audit.appendAuditEvent({
@@ -462,21 +493,22 @@ export async function closeDueAuctions(now = new Date()): Promise<number> {
           actorRole: "system",
           entityType: "auction",
           entityId: auction.id,
-          action: "auction.closed",
+          action: noSale ? "auction.cancelled" : "auction.closed",
           payload: {
             closesAt: auction.closesAt.toISOString(),
             auctionType: auction.auctionType,
             winnerId,
             winningAmount,
             reservePrice: auction.reservePrice,
+            cancellationReason,
           },
         });
 
         await enqueueOutbox({
           aggregateType: "auction",
           aggregateId: auction.id,
-          eventType: "auction.closed",
-          payload: { auctionId: auction.id, winnerId, winningAmount },
+          eventType: noSale ? "auction.cancelled" : "auction.closed",
+          payload: { auctionId: auction.id, winnerId, winningAmount, cancellationReason },
         });
 
         return { auction: updated, winnerId };
@@ -502,9 +534,11 @@ export async function closeDueAuctions(now = new Date()): Promise<number> {
         officers.map((userId) => ({
           userId,
           channel: "in_app" as const,
-          type: "auction.closed",
-          title: "Auction closed",
-          message: `"${result.auction.title}" has closed and is ready for review.`,
+          type: result.auction.status === "cancelled" ? "auction.cancelled" : "auction.closed",
+          title: result.auction.status === "cancelled" ? "Auction cancelled" : "Auction closed",
+          message: result.auction.status === "cancelled"
+            ? `"${result.auction.title}" did not meet its reserve or receive a qualifying bid.`
+            : `"${result.auction.title}" has closed and is ready for review.`,
           relatedEntityType: "auction",
           relatedEntityId: result.auction.id,
         })),

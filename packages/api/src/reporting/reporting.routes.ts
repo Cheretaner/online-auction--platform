@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { GenerateReportRequest, OptionalAuctionScopedQuery } from "@auction/shared";
+import { AuctionScopedQuery, GenerateReportRequest, OptionalAuctionScopedQuery } from "@auction/shared";
 import { optionalAuth, requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
@@ -22,6 +22,13 @@ reportingRouter.get(
   requireAuth([...AUTHORS]),
   validate(OptionalAuctionScopedQuery, "query"),
   asyncHandler(controller.list),
+);
+
+reportingRouter.get(
+  "/financial-reconciliation",
+  requireAuth([...AUTHORS]),
+  validate(AuctionScopedQuery, "query"),
+  asyncHandler(controller.financialReconciliation),
 );
 
 // A published report is the public transparency artefact (FR16), so it is

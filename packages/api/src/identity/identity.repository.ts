@@ -3,6 +3,7 @@ import { queryOne, queryAll } from "../infrastructure/database/query.js";
 import type { Queryable } from "../infrastructure/database/query.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { mapDbRole } from "../kernel/roles.js";
+import { decryptSensitive, encryptSensitive, hashSensitive } from "../shared/security/sensitive-data.js";
 import type { OrganizationMembership, Profile } from "./identity.types.js";
 
 interface DbProfile {
@@ -15,6 +16,8 @@ interface DbProfile {
   business_name: string | null;
   national_id: string | null;
   tin_number: string | null;
+  national_id_hash: string | null;
+  tin_number_hash: string | null;
   region: string | null;
   verification_status: Profile["verificationStatus"];
   platform_role: string | null;
@@ -32,8 +35,8 @@ function mapProfile(row: DbProfile): Profile {
     phone: row.phone,
     accountType: row.account_type,
     businessName: row.business_name,
-    nationalId: row.national_id,
-    tinNumber: row.tin_number,
+    nationalId: decryptSensitive(row.national_id),
+    tinNumber: decryptSensitive(row.tin_number),
     region: row.region,
     verificationStatus: row.verification_status,
     platformRole: row.platform_role ? mapDbRole(row.platform_role) : null,
@@ -77,8 +80,8 @@ export class IdentityRepository {
       const row = await queryOne<DbProfile>(
         `INSERT INTO profiles (
            email, full_name, password_hash, phone, account_type,
-           business_name, national_id, tin_number, region, platform_role
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           business_name, national_id, tin_number, national_id_hash, tin_number_hash, region, platform_role
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING *`,
         [
           data.email,
@@ -87,8 +90,10 @@ export class IdentityRepository {
           data.phone ?? null,
           data.accountType,
           data.businessName ?? null,
-          data.nationalId ?? null,
-          data.tinNumber ?? null,
+          encryptSensitive(data.nationalId),
+          encryptSensitive(data.tinNumber),
+          hashSensitive(data.nationalId),
+          hashSensitive(data.tinNumber),
           data.region ?? null,
           data.platformRole ?? null,
         ],
