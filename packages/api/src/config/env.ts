@@ -45,6 +45,8 @@ const envSchema = z
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+    SUBMISSION_RATE_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60_000),
+    SUBMISSION_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
     // Number of reverse proxies in front of the API. Needed so
     // express-rate-limit and audit IP hashing see the real client address.
     // Leave at 0 when the process is exposed directly.
@@ -72,6 +74,11 @@ const envSchema = z
       .transform((value) => value === "true"),
     STORAGE_DRIVER: z.enum(["memory", "filesystem"]).default("filesystem"),
     STORAGE_DIR: z.string().default("./data/storage"),
+    FILE_SCAN_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+    CLAMAV_HOST: z.string().default("127.0.0.1"),
+    CLAMAV_PORT: z.coerce.number().int().positive().max(65535).default(3310),
+    FILE_SCAN_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+    SETTLEMENT_DUE_HOURS: z.coerce.number().int().positive().default(72),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().default(587),
     SMTP_USER: z.string().optional(),
@@ -83,13 +90,13 @@ const envSchema = z
     MAIL_FROM: z.string().default("noreply@localhost"),
     
     AI_PROVIDER: z.enum(["auto", "stub", "gemini", "openrouter"]).default("auto"),
-    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(8000),
+    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
     GEMINI_API_KEY: z.string().optional(),
     GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
     GEMINI_MODEL: z.string().default("gemini-flash-latest"),
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
-    OPENROUTER_MODEL: z.string().default("liquid/lfm-2.5-2.6b:free"),
+    OPENROUTER_MODEL: z.string().default("openrouter/free"),
     OPENROUTER_SITE_URL: z.string().default("http://localhost:3000"),
     OPENROUTER_SITE_NAME: z.string().default("AI-Powered Transparent Online Auction System"),
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
@@ -104,9 +111,57 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((val) => val === "true"),
+    CHAPA_SECRET_KEY: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() ? value.trim() : undefined),
+      z.string().optional(),
+    ),
+    CHAPA_PUBLIC_KEY: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() ? value.trim() : undefined),
+      z.string().optional(),
+    ),
+    CHAPA_WEBHOOK_SECRET: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() ? value.trim() : undefined),
+      z.string().optional(),
+    ),
+    PII_ENCRYPTION_KEY: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() ? value.trim() : undefined),
+      z.string().min(32).optional(),
+    ),
+    PII_HASH_SECRET: z.preprocess(
+      (value) => (typeof value === "string" && value.trim() ? value.trim() : undefined),
+      z.string().min(32).optional(),
+    ),
     WEB_BASE_URL: z.string().default("http://localhost:5173"),
   })
   .superRefine((value, ctx) => {
+    if (value.NODE_ENV === "production" && !value.FILE_SCAN_ENABLED) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["FILE_SCAN_ENABLED"],
+        message: "must be true in production so uploads are scanned before storage",
+      });
+    }
+    if (Boolean(value.CHAPA_SECRET_KEY) !== Boolean(value.CHAPA_WEBHOOK_SECRET)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [value.CHAPA_SECRET_KEY ? "CHAPA_WEBHOOK_SECRET" : "CHAPA_SECRET_KEY"],
+        message: "must be set together with the other Chapa credential",
+      });
+    }
+    if (value.NODE_ENV === "production" && !value.PII_ENCRYPTION_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["PII_ENCRYPTION_KEY"],
+        message: "is required in production to encrypt identity data at rest",
+      });
+    }
+    if (value.NODE_ENV === "production" && !value.PII_HASH_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["PII_HASH_SECRET"],
+        message: "is required in production to create keyed identity lookup digests",
+      });
+    }
     if (Boolean(value.SMTP_USER) !== Boolean(value.SMTP_PASS)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

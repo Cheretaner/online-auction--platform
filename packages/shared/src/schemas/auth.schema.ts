@@ -22,6 +22,12 @@ export const RegisterRequest = z.object({
   tinNumber: optionalText(4, 20),
   region: optionalText(1, 80),
 }).superRefine((data, ctx) => {
+  if (data.nationalId && !/^\d{12}$/.test(data.nationalId.replace(/[\s-]/g, ""))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Fayda numbers contain 12 digits", path: ["nationalId"] });
+  }
+  if (data.tinNumber && !/^[A-Za-z0-9/-]{4,20}$/.test(data.tinNumber)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "TIN must use 4-20 letters, numbers, / or -", path: ["tinNumber"] });
+  }
   if (data.accountType === "business") {
     if (!data.businessName) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Business name is required for business accounts", path: ["businessName"] });

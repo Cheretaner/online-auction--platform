@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { CircleAlert, Copy, ReceiptText } from "lucide-react";
+import { CircleAlert, Copy, Download, ReceiptText, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import { usePlaceBid } from "@/features/auctions/queries";
 import type { Auction } from "@/lib/api/types";
 import { explainBidError, type BidErrorExplanation } from "@/lib/bid-errors";
 import { formatMoney } from "@/lib/format";
+import { createSealedCommitment, normalizeAmount, verifySealedCommitment } from "@/lib/sealed-bid";
 import { useT } from "@/i18n/context";
-import { createSealedCommitment, normalizeAmount } from "@/lib/sealed-bid";
 
 interface PendingAttempt {
   amount: string;
@@ -141,6 +141,44 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
         </Alert>
       ) : null}
 
+      {sealed && !receipt ? (
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-primary underline">
+          <Upload className="size-4" aria-hidden />
+          {t("bid.restoreReceipt")}
+          <input
+            className="sr-only"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) {
+                void file.text().then(async (contents) => {
+                  try {
+                    const parsed = JSON.parse(contents) as Record<string, unknown>;
+                    if (
+                      parsed.auctionId !== auction.id ||
+                      typeof parsed.amount !== "string" ||
+                      typeof parsed.nonce !== "string" ||
+                      typeof parsed.commitmentHash !== "string" ||
+                      !(await verifySealedCommitment(auction.id, parsed.amount, parsed.nonce, parsed.commitmentHash))
+                    ) {
+                      throw new Error(t("bid.receiptMismatch"));
+                    }
+                    setReceipt({
+                      amount: normalizeAmount(parsed.amount),
+                      nonce: parsed.nonce,
+                      commitmentHash: parsed.commitmentHash,
+                    });
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : t("bid.receiptUnreadable"));
+                  }
+                });
+              }
+            }}
+          />
+        </label>
+      ) : null}
       {receipt ? <SealedReceiptCard auctionId={auction.id} receipt={receipt} /> : null}
     </div>
   );
@@ -174,6 +212,24 @@ function SealedReceiptCard({ auctionId, receipt }: { auctionId: string; receipt:
           }}
         >
           <Copy className="size-4" aria-hidden /> {t("bid.copyReceipt")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            const blob = new Blob([JSON.stringify({ auctionId, ...receipt }, null, 2)], {
+              type: "application/json",
+            });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = `sealed-bid-${auctionId}.json`;
+            anchor.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          <Download className="size-4" aria-hidden /> {t("bid.downloadReceipt")}
         </Button>
       </AlertDescription>
     </Alert>

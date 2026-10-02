@@ -28,3 +28,15 @@ export async function createSealedCommitment(auctionId: string, amount: string):
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(preimage));
   return { commitmentHash: toHex(digest), nonce };
 }
+
+export async function verifySealedCommitment(
+  auctionId: string,
+  amount: string,
+  nonce: string,
+  commitmentHash: string,
+): Promise<boolean> {
+  if (!/^[0-9a-f]{32}$/i.test(nonce) || !/^[0-9a-f]{64}$/i.test(commitmentHash)) return false;
+  const preimage = sealedBidCommitmentPreimage(auctionId, normalizeAmount(amount), nonce);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(preimage));
+  return toHex(digest) === commitmentHash.toLowerCase();
+}

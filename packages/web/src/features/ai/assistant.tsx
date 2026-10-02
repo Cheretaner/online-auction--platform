@@ -1,16 +1,22 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { usePublicAuctions } from "@/features/auctions/queries";
 import { LoaderCircle, Send, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAiAssist } from "@/features/ai/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
+import { statusLabel } from "@/lib/format";
 import { useT } from "@/i18n/context";
 
 const SUGGESTIONS = ["suggestion1", "suggestion2", "suggestion3"] as const;
+const NO_AUCTION = "none";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -26,16 +32,20 @@ interface ChatTurn {
  */
 export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auctionTitle?: string }) {
   const assist = useAiAssist();
+  const auctions = usePublicAuctions({ limit: 50 });
   const [prompt, setPrompt] = useState("");
+  const [selectedAuctionId, setSelectedAuctionId] = useState(auctionId ?? NO_AUCTION);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const t = useT("tools");
+  const selectedAuction = auctions.data?.items.find((auction) => auction.id === selectedAuctionId);
+  const activeAuctionId = selectedAuctionId === NO_AUCTION ? undefined : selectedAuctionId;
 
   function ask(value?: string) {
     const question = (value ?? prompt).trim();
     if (!question || assist.isPending) return;
     setPrompt("");
     setTurns((previous) => [...previous, { role: "user", text: question }]);
-    assist.mutate(auctionId ? { prompt: question, auctionId } : { prompt: question }, {
+    assist.mutate(activeAuctionId ? { prompt: question, auctionId: activeAuctionId } : { prompt: question }, {
       onSuccess: (result) =>
         setTurns((previous) => [
           ...previous,
@@ -54,10 +64,26 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
         </CardTitle>
         <CardDescription>
           {t("assistant.description")}{" "}
-          {auctionTitle ? t("assistant.about", { title: auctionTitle }) : t("assistant.generic")}
+          {selectedAuction?.title || auctionTitle
+            ? t("assistant.context", { title: selectedAuction?.title ?? auctionTitle ?? "" })
+            : t("assistant.chooseContext")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="max-w-xl space-y-1.5">
+          <Label htmlFor="ai-auction-context">{t("assistant.contextLabel")}</Label>
+          <Select value={selectedAuctionId} onValueChange={setSelectedAuctionId}>
+            <SelectTrigger id="ai-auction-context">
+              <SelectValue placeholder={t("assistant.general")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_AUCTION}>{t("assistant.general")}</SelectItem>
+              {(auctions.data?.items ?? []).map((auction) => (
+                <SelectItem key={auction.id} value={auction.id}>{auction.title} ({statusLabel(auction.status)})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {turns.length === 0 ? (
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map((key) => t(`assistant.${key}`)).map((suggestion) => (
@@ -91,7 +117,13 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
                     </Badge>
                   ) : null}
                 </p>
-                <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
+                {turn.role === "assistant" ? (
+                  <div className="text-sm leading-6 [&_a]:text-primary [&_a]:underline [&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_h1]:mb-2 [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:my-2 [&_ol]:list-decimal [&_p]:mb-3 [&_p:last-child]:mb-0 [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1 [&_ul]:my-2 [&_ul]:list-disc">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.text}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
+                )}
               </li>
             ))}
             {assist.isPending ? (

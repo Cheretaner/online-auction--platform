@@ -5,6 +5,7 @@ import { logger } from "../../shared/utils/logger.js";
 import { withTransaction } from "../database/tx.js";
 import * as notificationRepo from "../../notification/notification.repository.js";
 import * as outboxRepo from "./outbox.repository.js";
+import { refundNonWinnerChapaDeposits } from "../../payments/payment.service.js";
 
 type ClaimedNotification = Awaited<ReturnType<typeof notificationRepo.claimNotificationById>>;
 
@@ -58,61 +59,77 @@ async function dispatchNotification(id: string): Promise<void> {
  * `enqueueOutbox` (bids, extensions, disputes, anomalies, reports, ...)
  * is ever actually delivered. */
 export async function processOutboxBatch(): Promise<number> {
-  return withTransaction(async () => {
-    const messages = await outboxRepo.claimOutboxBatch(40);
-    for (const message of messages) {
-      try {
+  // Claim under a short transaction, then deliver outside it. Telegram and
+  // realtime calls can take seconds; they must not hold database locks open.
+  const messages = await withTransaction(() => outboxRepo.claimOutboxBatch(40));
+  for (const message of messages) {
+    try {
+      await realtimeAdapter.publish({
+        channel: `${message.aggregateType}:${message.aggregateId}`,
+        event: message.eventType,
+        payload: message.payload,
+      });
+
+      const auctionId =
+        typeof message.payload.auctionId === "string"
+          ? message.payload.auctionId
+          : message.aggregateType === "auction"
+            ? message.aggregateId
+            : undefined;
+
+      if (auctionId && message.aggregateType !== "auction") {
+        // T02: Strip bidder identity from public auction channels.
+        // The user: channel carries the full payload; the auction:
+        // channel is public and must not leak who placed the bid.
+        const publicPayload = { ...message.payload };
+        delete (publicPayload as Record<string, unknown>).bidderId;
         await realtimeAdapter.publish({
-          channel: `${message.aggregateType}:${message.aggregateId}`,
+          channel: `auction:${auctionId}`,
           event: message.eventType,
-          payload: message.payload,
+          payload: publicPayload,
         });
-
-        const auctionId =
-          typeof message.payload.auctionId === "string"
-            ? message.payload.auctionId
-            : message.aggregateType === "auction"
-              ? message.aggregateId
-              : undefined;
-
-        if (auctionId && message.aggregateType !== "auction") {
-          // T02: Strip bidder identity from public auction channels.
-          // The user: channel carries the full payload; the auction:
-          // channel is public and must not leak who placed the bid.
-          const publicPayload = { ...message.payload };
-          delete (publicPayload as Record<string, unknown>).bidderId;
-          await realtimeAdapter.publish({
-            channel: `auction:${auctionId}`,
-            event: message.eventType,
-            payload: publicPayload,
-          });
-        }
-
-        if (
-          auctionId &&
-          (message.eventType === "auction.published" ||
-            message.eventType === "auction.opened" ||
-            message.eventType === "auction.extended" ||
-            message.eventType === "bid.placed" ||
-            message.eventType === "auction.closed")
-        ) {
-          void telegramService.broadcastAuction(auctionId).catch((err) => {
-            logger.warn({ err, auctionId }, "Automatic Telegram channel broadcast skipped or failed");
-          });
-        }
-
-        if (message.eventType === "notification.queued" && typeof message.payload.notificationId === "string") {
-          await dispatchNotification(message.payload.notificationId);
-        }
-
-        await outboxRepo.markOutboxProcessed(message.id);
-      } catch (error) {
-        logger.error({ err: error, outboxId: message.id }, "Outbox dispatch failed");
-        await outboxRepo.markOutboxFailed(message.id, error instanceof Error ? error.message : String(error));
       }
+
+      if (auctionId && (message.eventType === "auction.awarded" || message.eventType === "auction.cancelled")) {
+        const winnerId =
+          message.eventType === "auction.awarded" && typeof message.payload.winnerId === "string"
+            ? message.payload.winnerId
+            : null;
+        await refundNonWinnerChapaDeposits(auctionId, winnerId);
+      }
+
+      if (auctionId && message.eventType === "settlement.paid") {
+        await refundNonWinnerChapaDeposits(auctionId, null);
+      }
+
+      if (
+        auctionId &&
+        (message.eventType === "auction.approved" ||
+          message.eventType === "auction.published" ||
+          message.eventType === "auction.opened" ||
+          message.eventType === "auction.extended" ||
+          message.eventType === "bid.placed" ||
+          message.eventType === "auction.closed" ||
+          message.eventType === "auction.under_review" ||
+          message.eventType === "auction.awarded" ||
+          message.eventType === "auction.cancelled")
+      ) {
+        // Await delivery before acknowledging the outbox event. Telegram
+        // failures then retry through the existing durable backoff.
+        await telegramService.broadcastAuction(auctionId);
+      }
+
+      if (message.eventType === "notification.queued" && typeof message.payload.notificationId === "string") {
+        await dispatchNotification(message.payload.notificationId);
+      }
+
+      await outboxRepo.markOutboxProcessed(message.id);
+    } catch (error) {
+      logger.error({ err: error, outboxId: message.id }, "Outbox dispatch failed");
+      await outboxRepo.markOutboxFailed(message.id, error instanceof Error ? error.message : String(error));
     }
-    return messages.length;
-  });
+  }
+  return messages.length;
 }
 
 /** Safety-net retry sweep for notifications whose first attempt failed

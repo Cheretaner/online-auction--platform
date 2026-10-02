@@ -260,10 +260,19 @@ export async function withdrawBid(bidId: string, reason: string): Promise<BidRec
   return mapBid(result.rows[0]);
 }
 
-export async function markSealedOpened(auctionId: string, openedBy: string): Promise<AuctionLockSnapshot> {
+export async function markSealedOpened(
+  auctionId: string,
+  openedBy: string,
+  outcome: { winnerId: string | null; winningAmount: string | null; cancellationReason?: string },
+): Promise<AuctionLockSnapshot> {
   const result = await query<DbAuctionLock>(
-    `UPDATE auctions SET sealed_opened_at = NOW(), sealed_opened_by = $2 WHERE id = $1 RETURNING *`,
-    [auctionId, openedBy],
+    `UPDATE auctions
+        SET sealed_opened_at = NOW(), sealed_opened_by = $2,
+            winner_id = $3, winning_amount = $4,
+            status = CASE WHEN $5::text IS NULL THEN status ELSE 'cancelled' END,
+            cancellation_reason = COALESCE($5, cancellation_reason), updated_at = NOW()
+      WHERE id = $1 RETURNING *`,
+    [auctionId, openedBy, outcome.winnerId, outcome.winningAmount, outcome.cancellationReason ?? null],
   );
   return mapAuction(result.rows[0]);
 }

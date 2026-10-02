@@ -27,7 +27,7 @@ import type { Auction } from "@/lib/api/types";
 import { canApproveAuctions, canManageAuctions, enumLabel, formatDateTime, formatMoney, hasRole, regionLabel } from "@/lib/format";
 import { useT } from "@/i18n/context";
 
-const CANCELLABLE = new Set(["draft", "pending_review", "scheduled", "live"]);
+const CANCELLABLE = new Set(["draft", "pending_review", "scheduled", "live", "closed", "under_review"]);
 const AWARDABLE = new Set(["closed", "under_review"]);
 
 export default function WorkspaceAuctionDetailPage() {

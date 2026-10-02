@@ -25,6 +25,9 @@ export const account = defineMessages(
       businessLicence: "Business licence (companies)",
       submitting: "Submitting…",
       submit: "Submit for verification",
+      evidence: "Document image or scan",
+      evidenceHint: "Only you and authorized compliance reviewers can access this file.",
+      evidenceRequired: "Upload a photo or scan of your document.",
     },
     review: {
       title: "Identity review queue",
@@ -51,6 +54,8 @@ export const account = defineMessages(
       resubmitTitle: "Ask for resubmission",
       applicantSees: "The applicant sees this reason.",
       sendBack: "Send back",
+      viewEvidence: "View evidence",
+      downloadEvidence: "Download submitted identity document",
     },
     deposits: {
       title: "Bid security deposits",
@@ -149,6 +154,9 @@ export const account = defineMessages(
       businessLicence: "የንግድ ፈቃድ (ለድርጅቶች)",
       submitting: "በማስገባት ላይ…",
       submit: "ለማረጋገጫ አስገባ",
+      evidence: "የሰነዱ ምስል ወይም ቅኝት",
+      evidenceHint: "ይህን ፋይል ማየት የሚችሉት እርስዎ እና ፈቃድ ያላቸው የደንብ ተገዢነት ገምጋሚዎች ብቻ ናቸው።",
+      evidenceRequired: "የሰነድዎን ፎቶ ወይም ቅኝት ይጫኑ።",
     },
     review: {
       title: "የማንነት ማረጋገጫ ግምገማ ወረፋ",
@@ -174,6 +182,8 @@ export const account = defineMessages(
       resubmitTitle: "እንደገና እንዲቀርብ ጠይቅ",
       applicantSees: "አመልካቹ ይህን ምክንያት ያያል።",
       sendBack: "መልስ",
+      viewEvidence: "ማስረጃውን ይመልከቱ",
+      downloadEvidence: "የቀረበውን የማንነት ሰነድ አውርድ",
     },
     deposits: {
       title: "የጨረታ ማስከበሪያዎች",

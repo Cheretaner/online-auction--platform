@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { VerificationDecision } from "@auction/shared";
-import { AlertTriangle, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Download, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { QueryState } from "@/components/feedback/query-state";
@@ -18,6 +18,7 @@ import { authApi } from "@/lib/api/auth";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { VerificationRecord } from "@/lib/api/types";
 import { enumLabel, formatDateTime } from "@/lib/format";
+import { downloadDocument } from "@/lib/download";
 import { useT } from "@/i18n/context";
 
 export default function VerificationReviewPage() {
@@ -88,10 +89,20 @@ function ReviewCard({ record }: { record: VerificationRecord }) {
           <Field label={t("review.document")} value={enumLabel(record.documentType)} />
           <Field label={t("review.documentNumber")} value={record.documentNumber} />
           <Field label={t("review.accountType")} value={user?.accountType ? enumLabel(user.accountType) : "—"} />
-          <Field label={t("review.nationalId")} value={user?.nationalId ?? "—"} />
-          <Field label={t("review.tin")} value={user?.tinNumber ?? "—"} />
           <Field label={t("review.business")} value={user?.businessName ?? "—"} />
         </dl>
+
+        {record.documentId ? (
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={t("review.downloadEvidence")}
+            onClick={() => void downloadDocument(record.documentId!, `verification-${record.id}`).catch((error: unknown) => toast.error(getErrorMessage(error)))}
+          >
+            <Download className="size-4" aria-hidden />
+            {t("review.viewEvidence")}
+          </Button>
+        ) : null}
 
         {duplicates.data?.hasDuplicates ? (
           <Alert variant="warning">

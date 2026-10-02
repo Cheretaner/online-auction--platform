@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Megaphone, Unlink } from "lucide-react";
+import { Bot, CircleAlert, CircleCheck, Megaphone, RefreshCw, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,24 +13,26 @@ import { useAuth } from "@/features/auth/auth-provider";
 import {
   useTelegramBroadcast,
   useTelegramLinkToken,
+  useTelegramIntegrationStatus,
   useTelegramStatus,
   useTelegramUnlink,
 } from "@/features/telegram/queries";
 import { getErrorMessage } from "@/lib/api/errors";
-import type { TelegramLinkToken, TelegramStatus } from "@/lib/api/types";
+import type { TelegramIntegrationStatus, TelegramLinkToken, TelegramStatus } from "@/lib/api/types";
 import { canManageAuctions, formatDateTime } from "@/lib/format";
-import { useT } from "@/i18n/context";
+import { translate, useT } from "@/i18n/context";
 
 /** While a link code is on screen, poll so the page flips to “linked” on its own. */
-const POLL_INTERVAL_MS = 5000;
 const NO_AUCTION = "none";
 
 export default function TelegramPage() {
   const { roles } = useAuth();
   const [link, setLink] = useState<TelegramLinkToken | null>(null);
-  const status = useTelegramStatus(true, link ? POLL_INTERVAL_MS : false);
+  const status = useTelegramStatus(true, link?.expiresAt);
   const createToken = useTelegramLinkToken();
   const unlink = useTelegramUnlink();
+  const canPost = canManageAuctions(roles);
+  const integration = useTelegramIntegrationStatus(canPost);
   const linked = Boolean(status.data?.telegramLinkedAt);
   const t = useT("tools");
 
@@ -68,9 +70,149 @@ export default function TelegramPage() {
           unlinking={unlink.isPending}
         />
       )}
-      <ChannelPosting canPost={canManageAuctions(roles)} />
+      <IntegrationStatus status={integration.data} loading={integration.isLoading} error={integration.error} onRefresh={() => void integration.refetch()} canView={canPost} />
+      <ChannelPosting canPost={canPost} />
     </div>
   );
+}
+
+function IntegrationStatus({
+  status,
+  loading,
+  error,
+  onRefresh,
+  canView,
+}: {
+  status: TelegramIntegrationStatus | undefined;
+  loading: boolean;
+  error: Error | null;
+  onRefresh: () => void;
+  canView: boolean;
+}) {
+  const t = useT("tools");
+  if (!canView) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("health.title")}</CardTitle>
+          <CardDescription>{t("health.restricted")}</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const botOkay = status?.bot.status === "connected" && ["webhook", "polling"].includes(status.bot.inboundTransport);
+  const channelOkay = status?.channel.status === "connected";
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="space-y-1.5">
+          <CardTitle>{t("health.title")}</CardTitle>
+          <CardDescription>{t("health.description")}</CardDescription>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
+          {t("health.refresh")}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p role="alert" className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {getErrorMessage(error, t("health.loadError"))}
+          </p>
+        ) : null}
+        <div className="grid gap-3 md:grid-cols-2">
+          <IntegrationCard
+            icon={<Bot className="size-5" aria-hidden />}
+            title={t("health.bot")}
+            okay={Boolean(botOkay)}
+            loading={loading}
+            status={botLabel(status?.bot.status, status?.bot.inboundTransport)}
+          >
+            {status?.bot.username ? <p>{t("health.botName")} <span className="font-medium">{status.bot.username}</span></p> : null}
+            <p>{t("health.updates")} <span className="font-medium">{transportLabel(status?.bot.inboundTransport)}</span></p>
+            {!status?.bot.configured ? <p>{t("health.setEnvBefore")}<code>TELEGRAM_BOT_TOKEN</code>{t("health.setEnvAfter")}</p> : null}
+            {status?.bot.inboundTransport === "disabled" ? <p>{t("health.enableBefore")}<code>TELEGRAM_POLLING=true</code>{t("health.enableAfter")}</p> : null}
+            {status?.bot.inboundTransport === "error" || status?.bot.status === "error" ? (
+              <p className="break-words text-destructive">{status.bot.inboundError || t("health.botTransportError")}</p>
+            ) : null}
+          </IntegrationCard>
+
+          <IntegrationCard
+            icon={<Megaphone className="size-5" aria-hidden />}
+            title={t("health.channel")}
+            okay={Boolean(channelOkay)}
+            loading={loading}
+            status={channelLabel(status?.channel.status)}
+          >
+            {status?.channel.title ? <p>{t("health.channelName")} <span className="font-medium">{status.channel.username ? `@${status.channel.username}` : status.channel.title}</span></p> : null}
+            {!status?.channel.configured ? <p>{t("health.setEnvBefore")}<code>TELEGRAM_CHANNEL_ID</code>{t("health.setEnvAfter")}</p> : null}
+            {status?.channel.status === "permission_required" ? <p>{t("health.needsAdmin")}</p> : null}
+            {status?.channel.status === "bot_not_configured" ? <p>{t("health.configureBotFirst")}</p> : null}
+            {status?.channel.status === "error" ? <p className="break-words text-destructive">{status.channel.error || t("health.channelError")}</p> : null}
+            {status?.channel.status === "connected" ? <p>{t("health.channelReady")}</p> : null}
+          </IntegrationCard>
+        </div>
+        {status?.bot.inboundTransport === "starting" ? <p className="mt-3 text-xs text-muted-foreground">{t("health.starting")}</p> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function IntegrationCard({
+  icon,
+  title,
+  status,
+  okay,
+  loading,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  status: string;
+  okay: boolean;
+  loading: boolean;
+  children: React.ReactNode;
+}) {
+  const t = useT("tools");
+  return (
+    <div className="rounded-lg border bg-muted/30 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 font-semibold">{icon}{title}</div>
+        <Badge variant={loading ? "muted" : okay ? "success" : "outline"} className="gap-1">
+          {loading ? null : okay ? <CircleCheck className="size-3" aria-hidden /> : <CircleAlert className="size-3" aria-hidden />}
+          {loading ? t("health.checking") : status}
+        </Badge>
+      </div>
+      <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">{children}</div>
+    </div>
+  );
+}
+
+function transportLabel(transport: string | undefined): string {
+  if (transport === "webhook") return translate("tools", "health.transport.webhook");
+  if (transport === "polling") return translate("tools", "health.transport.polling");
+  if (transport === "starting") return translate("tools", "health.transport.starting");
+  if (transport === "error") return translate("tools", "health.transport.error");
+  return translate("tools", "health.transport.disabled");
+}
+
+function botLabel(status: string | undefined, transport: string | undefined): string {
+  if (status === "not_configured") return translate("tools", "health.botStatus.notConfigured");
+  if (status === "error") return translate("tools", "health.botStatus.error");
+  if (transport === "error") return translate("tools", "health.botStatus.transportError");
+  if (transport === "starting") return translate("tools", "health.botStatus.starting");
+  if (transport === "disabled") return translate("tools", "health.botStatus.disabled");
+  return translate("tools", "health.botStatus.connected");
+}
+
+function channelLabel(status: string | undefined): string {
+  if (status === "connected") return translate("tools", "health.channelStatus.connected");
+  if (status === "permission_required") return translate("tools", "health.channelStatus.permission");
+  if (status === "bot_not_configured") return translate("tools", "health.channelStatus.botMissing");
+  if (status === "error") return translate("tools", "health.channelStatus.error");
+  return translate("tools", "health.channelStatus.notConfigured");
 }
 
 function AccountLink({
@@ -128,7 +270,7 @@ function AccountLink({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs text-muted-foreground">
-                      {t("telegram.codeExpires", { date: formatDateTime(link.expiresAt) })}
+                      One-time code — expires {formatDateTime(link.expiresAt)}
                     </p>
                     <p className="mt-1 font-mono text-xl font-semibold tracking-[0.2em]">{link.token}</p>
                   </div>
@@ -172,14 +314,16 @@ function AccountLink({
  * published edits the existing channel post rather than duplicating it.
  */
 function ChannelPosting({ canPost }: { canPost: boolean }) {
+  const t = useT("tools");
   const { session } = useAuth();
   const orgId = session?.organizationId ?? undefined;
   const auctions = useOrgAuctions(orgId);
-  const options = auctions.data?.items ?? [];
+  const options = (auctions.data?.items ?? []).filter((auction) =>
+    ["scheduled", "live", "closed", "under_review", "awarded", "cancelled"].includes(auction.status),
+  );
   const broadcast = useTelegramBroadcast();
   const [auctionId, setAuctionId] = useState<string>(NO_AUCTION);
   const selected = auctionId === NO_AUCTION ? undefined : auctionId;
-  const t = useT("tools");
 
   return (
     <Card>

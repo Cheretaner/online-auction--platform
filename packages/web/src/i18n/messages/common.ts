@@ -45,6 +45,9 @@ export const common = defineMessages(
     pagination: "Pagination",
     newVersion: "A new version is available",
     reload: "Reload",
+    requestCancelled: "Request cancelled",
+    requestTimeout: "Request timed out",
+    networkError: "Network error. Check your connection and try again.",
   },
   {
     brandName: "ጨረታኔት",
@@ -90,6 +93,9 @@ export const common = defineMessages(
     pagination: "የገጽ ማሰሻ",
     newVersion: "አዲስ እትም ይገኛል",
     reload: "እንደገና ጫን",
+    requestCancelled: "ጥያቄው ተሰርዟል",
+    requestTimeout: "ጥያቄው ጊዜው አልፎበታል",
+    networkError: "የኔትወርክ ስህተት። ግንኙነትዎን አረጋግጠው እንደገና ይሞክሩ።",
   },
 );
 
@@ -174,6 +180,7 @@ export const enums = defineMessages(
     cpo: "CPO (certified payment order)",
     bank_guarantee: "Bank guarantee",
     transfer: "Bank transfer",
+    chapa: "Chapa online payment",
     national_id: "Fayda national ID",
     kebele_id: "Kebele ID",
     passport: "Passport",
@@ -211,6 +218,7 @@ export const enums = defineMessages(
     cpo: "ሲፒኦ (በባንክ የተረጋገጠ ክፍያ ማዘዣ)",
     bank_guarantee: "የባንክ ዋስትና",
     transfer: "የባንክ ዝውውር",
+    chapa: "የቻፓ የመስመር ላይ ክፍያ",
     national_id: "የፋይዳ ብሔራዊ መታወቂያ",
     kebele_id: "የቀበሌ መታወቂያ",
     passport: "ፓስፖርት",

@@ -1,4 +1,5 @@
 import { query, queryOne, queryAll } from "../infrastructure/database/query.js";
+import { AppError } from "../shared/errors/index.js";
 import type { CategoryRecord } from "./auction-item.types.js";
 import type { CreateCategoryRequest } from "@auction/shared";
 
@@ -31,6 +32,12 @@ function mapRow(row: DbCategory): CategoryRecord {
 // AI categorization service, so no user-scoped session context is needed.
 
 export async function createCategory(data: CreateCategoryRequest): Promise<CategoryRecord> {
+  const duplicate = await queryOne<{ id: string }>(
+    `SELECT id FROM categories WHERE is_active = TRUE AND LOWER(name) = LOWER($1)`,
+    [data.name],
+  );
+  if (duplicate) throw AppError.conflict("An active category with this name already exists");
+
   const row = await queryOne<DbCategory>(
     `INSERT INTO categories (name, slug, description, parent_id, is_active)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -42,7 +49,7 @@ export async function createCategory(data: CreateCategoryRequest): Promise<Categ
 
 export async function getCategories(): Promise<CategoryRecord[]> {
   const rows = await queryAll<DbCategory>(
-    `SELECT * FROM categories ORDER BY name ASC`,
+    `SELECT * FROM categories WHERE is_active = TRUE ORDER BY name ASC`,
   );
   return rows.map(mapRow);
 }
@@ -67,6 +74,18 @@ export async function updateCategory(
   id: string,
   data: Partial<CreateCategoryRequest>,
 ): Promise<CategoryRecord> {
+  if (data.name !== undefined || data.isActive === true) {
+    const targetName = data.name ?? (await getCategoryById(id))?.name;
+    if (targetName) {
+      const duplicate = await queryOne<{ id: string }>(
+        `SELECT id FROM categories
+         WHERE is_active = TRUE AND LOWER(name) = LOWER($1) AND id <> $2`,
+        [targetName, id],
+      );
+      if (duplicate) throw AppError.conflict("An active category with this name already exists");
+    }
+  }
+
   const updates: string[] = [];
   const values: unknown[] = [];
   let paramIndex = 1;

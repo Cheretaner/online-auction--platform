@@ -63,6 +63,7 @@ export const queryKeys = {
   },
   telegram: {
     status: ["telegram", "status"] as const,
+    integration: ["telegram", "integration"] as const,
     linkToken: ["telegram", "link-token"] as const,
     broadcasts: ["telegram", "broadcasts"] as const,
   },

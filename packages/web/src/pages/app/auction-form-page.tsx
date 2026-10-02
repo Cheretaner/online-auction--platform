@@ -35,7 +35,7 @@ import {
 } from "@/features/auctions/queries";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { enumLabel, toDatetimeLocalValue } from "@/lib/format";
-import { getErrorMessage } from "@/lib/api/errors";
+import { getErrorMessage, isApiError } from "@/lib/api/errors";
 import { useEffect } from "react";
 import type { z } from "zod";
 import { useT } from "@/i18n/context";
@@ -131,15 +131,30 @@ export default function AuctionFormPage() {
                   toast.success(t("form.updated"));
                   navigate(`/app/auctions/${id}`);
                 } else {
-                  const created = await create.mutateAsync(values);
+                  // Use the normalized payload above so blank optional fields
+                  // (especially reservePrice) are omitted instead of failing
+                  // the API's money validation.
+                  const created = await create.mutateAsync(payload);
                   toast.success(t("form.created"));
                   navigate(`/app/auctions/${created.id}`);
                 }
               } catch (error) {
-                if (!applyApiFieldErrors(error, form.setError)) {
+                applyApiFieldErrors(error, form.setError);
+                if (isApiError(error)) {
+                  const firstFieldError = Object.entries(error.fieldErrors).find(([, messages]) => messages[0]);
+                  const detail = firstFieldError
+                    ? `${firstFieldError[0]}: ${firstFieldError[1][0]}`
+                    : error.formErrors[0];
+                  toast.error(detail ? `${error.message} — ${detail}` : error.message);
+                } else {
                   toast.error(getErrorMessage(error));
                 }
               }
+            }, (errors) => {
+              const firstError = Object.entries(errors).find(([, fieldError]) => fieldError?.message);
+              toast.error(firstError
+                ? `${firstError[0]}: ${String(firstError[1]?.message)}`
+                : t("form.checkFields"));
             })}
           >
             <Card>

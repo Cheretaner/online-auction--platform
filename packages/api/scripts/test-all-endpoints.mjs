@@ -422,7 +422,7 @@ async function main() {
     await call("POST", "/api/v1/categories", {
       token: adminToken,
       body: {
-        name: "Heavy Equipment & Transport Fleet",
+        name: `Automation Test Category ${STAMP}`,
         slug: catSlug,
         description: "Surplus federal utility transport, trucks, and heavy earthmoving machinery",
         isActive: true,
@@ -456,6 +456,16 @@ async function main() {
       }),
       200,
       "PATCH /api/v1/categories/:id - Update category metadata",
+    );
+
+    expectStatus(
+      "4. Taxonomy & Categories",
+      await call("PATCH", `/api/v1/categories/${categoryId}`, {
+        token: adminToken,
+        body: { isActive: false },
+      }),
+      200,
+      "PATCH /api/v1/categories/:id - Deactivate test category",
     );
   }
 

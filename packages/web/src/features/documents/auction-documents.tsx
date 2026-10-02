@@ -118,7 +118,7 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DOCUMENT_TYPES.map((type) => (
+                {DOCUMENT_TYPES.filter((type) => !["identity_document", "deposit_release_evidence"].includes(type)).map((type) => (
                   <SelectItem key={type} value={type}>
                     {enumLabel(type)}
                   </SelectItem>
