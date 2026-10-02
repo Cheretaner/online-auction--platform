@@ -80,3 +80,30 @@ export const assist: RequestHandler = async (req, res) => {
   const result = await assistantService.askAssistant(body.prompt, body.auctionId);
   res.json(result);
 };
+
+/**
+ * GET /api/v1/ai/anomalies/:id/context
+ * Get historical context for an anomaly flag
+ * Shows similar past flags, bidder risk profiles, and rule outcome statistics
+ */
+export const getAnomalyContext: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const id = routeParam(req.params.id);
+  
+  const context = await anomalyService.getAnomalyHistoricalContext(id, actorOf(auth));
+  
+  res.json(context);
+};
+
+/**
+ * GET /api/v1/ai/organizations/:orgId/compliance-patterns
+ * Get compliance patterns and historical flag trends for an organization
+ */
+export const getOrgCompliancePatterns: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const orgId = routeParam(req.params.orgId);
+  
+  const patterns = await anomalyService.getOrgCompliancePatterns(orgId, actorOf(auth));
+  
+  res.json(patterns);
+};
