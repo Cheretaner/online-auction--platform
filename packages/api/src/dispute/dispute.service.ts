@@ -8,6 +8,7 @@ import { AppError, HttpStatus } from "../shared/errors/index.js";
 import * as audit from "../audit/audit.service.js";
 import * as auctionService from "../auction/auction.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
+import * as documentService from "../document/document.service.js";
 import * as notifications from "../notification/notification.service.js";
 import * as repo from "./dispute.repository.js";
 import { assertDisputeTransition } from "./dispute.transitions.js";
@@ -126,6 +127,53 @@ export async function getDispute(id: string): Promise<DisputeRecord> {
   const dispute = await repo.findDispute(id);
   if (!dispute) throw new AppError("Dispute not found", HttpStatus.NOT_FOUND);
   return dispute;
+}
+
+export async function createEvidenceBundle(input: {
+  id: string;
+  actorId: string;
+  roles: import("@auction/shared").Role[];
+}): Promise<Record<string, unknown>> {
+  const dispute = await getDispute(input.id);
+  const auction = await biddingRepo.findAuction(dispute.auctionId);
+  if (!auction) throw new AppError("Auction not found", HttpStatus.NOT_FOUND);
+
+  await audit.appendAuditEvent({
+    auctionId: dispute.auctionId,
+    actorId: input.actorId,
+    actorRole: primaryActorRole(input.roles),
+    entityType: "dispute",
+    entityId: dispute.id,
+    action: "dispute.evidence_bundle_downloaded",
+    payload: { format: "json", version: 1 },
+  });
+
+  const [events, chainVerification, documents] = await Promise.all([
+    audit.listAuditChain(dispute.auctionId),
+    audit.verifyAuditChain(dispute.auctionId),
+    documentService.listByAuction(dispute.auctionId),
+  ]);
+
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    dispute,
+    auction: { id: auction.id, title: auction.title, status: auction.status, auctionType: auction.auctionType },
+    audit: { verification: chainVerification, events },
+    documentManifest: {
+      hashAlgorithm: "SHA-256",
+      files: documents.map((document) => ({
+        id: document.id,
+        fileName: document.fileName,
+        documentType: document.documentType,
+        mimeType: document.mimeType,
+        fileSizeBytes: document.fileSizeBytes,
+        checksumSha256: document.checksumSha256,
+        isPrivate: document.isPrivate,
+        uploadedAt: document.createdAt,
+      })),
+    },
+  };
 }
 
 export async function assignDispute(input: {

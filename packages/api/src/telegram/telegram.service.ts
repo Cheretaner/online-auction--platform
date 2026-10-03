@@ -106,7 +106,7 @@ class TelegramService {
       return false;
     }
 
-    return this.botService.sendDirectNotification(profile.telegramChatId, payload);
+    return this.botService.sendDirectNotification(profile.telegramChatId, payload, profile.telegramLanguage);
   }
 
   /**

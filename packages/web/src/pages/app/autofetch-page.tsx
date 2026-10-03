@@ -1,4 +1,5 @@
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import type { CreateAuctionItemRequest } from "@auction/shared";
 import { CheckCircle2, ChevronDown, Inbox, Radar, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
@@ -6,6 +7,7 @@ import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/quer
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -16,6 +18,7 @@ import { useOrgAuctions } from "@/features/auctions/queries";
 import {
   useApproveAutofetchItem,
   useAutofetchPending,
+  useAutofetchPendingDetail,
   useAutofetchConflicts,
   useAutofetchSources,
   useAutofetchStats,
@@ -25,7 +28,7 @@ import {
 } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
-import { useT } from "@/i18n/context";
+import { useLocale, useT } from "@/i18n/context";
 
 type PendingItem = NonNullable<ReturnType<typeof useAutofetchPending>["data"]>["items"][number];
 
@@ -149,16 +152,21 @@ function AddSourceForm() {
   const [url, setUrl] = useState("");
   const [adapterType, setAdapterType] = useState("rss-feed");
   const [mappingText, setMappingText] = useState("");
+  const [aiExtraction, setAiExtraction] = useState(true);
   const t = useT("tools");
+  const { locale } = useLocale();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     let adapterConfig: Record<string, unknown> = {};
+    if (adapterType === "web-scraper") {
+      adapterConfig.aiExtraction = aiExtraction;
+    }
     if (adapterType === "web-scraper" && mappingText.trim()) {
       try {
         const parsed: unknown = JSON.parse(mappingText);
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object");
-        adapterConfig = { mappings: parsed as Record<string, unknown> };
+        adapterConfig.mappings = parsed as Record<string, unknown>;
       } catch {
         toast.error(t("autofetch.invalidMappings"));
         return;
@@ -172,6 +180,7 @@ function AddSourceForm() {
           setName("");
           setUrl("");
           setMappingText("");
+          setAiExtraction(true);
         },
         onError: (error) => toast.error(getErrorMessage(error)),
       },
@@ -214,6 +223,21 @@ function AddSourceForm() {
           </Button>
           {adapterType === "web-scraper" && (
             <div className="space-y-1.5 md:col-span-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`${id}-ai-extraction`}
+                  checked={aiExtraction}
+                  onCheckedChange={(checked) => setAiExtraction(checked === true)}
+                />
+                <Label htmlFor={`${id}-ai-extraction`}>
+                  {locale === "am" ? "ለተዋቀሩ ያልሆኑ ገጾች AI ጥቆማዎችን ፍቀድ" : "Allow AI suggestions for unstructured pages"}
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {locale === "am"
+                  ? "የገጹ ጽሑፍ ወደ የተዋቀረ መረጃ ሲቀየር የተጠቆሙ መስኮችና ትክክለኛ የምንጭ ጥቅሶች ይታያሉ። ውጤቱ የሰው ግምገማ ይፈልጋል፤ በራስ-ሰር አይታተምም።"
+                  : "Visible page text is sent to the configured remote AI provider only when structured metadata is unavailable. Suggestions include source quotes, are capped at 45% confidence, and always require human review; they are never auto-published."}
+              </p>
               <Label htmlFor={`${id}-mappings`}>{t("autofetch.mappings")}</Label>
               <Textarea
                 id={`${id}-mappings`}
@@ -240,9 +264,42 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const [auctionId, setAuctionId] = useState("");
   const [reason, setReason] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [reviewedTitle, setReviewedTitle] = useState(item.title);
+  const [reviewedDescription, setReviewedDescription] = useState(item.description ?? "");
+  const [reviewedQuantity, setReviewedQuantity] = useState("1");
+  const [reviewedUnit, setReviewedUnit] = useState("");
+  const [reviewedCondition, setReviewedCondition] = useState("");
+  const [reviewedValue, setReviewedValue] = useState("");
+  const [reviewedRegion, setReviewedRegion] = useState("");
+  const [reviewedCity, setReviewedCity] = useState("");
   const conflictDetails = useAutofetchConflicts(item.id, showConflicts);
+  const pendingDetail = useAutofetchPendingDetail(item.id, showSuggestions);
   const conflicts = item.conflictCount ?? 0;
   const t = useT("tools");
+  const { locale } = useLocale();
+  const normalized = pendingDetail.data?.item.normalizedMetadata;
+  const sourceMetadata = normalized?.rawMetadata && typeof normalized.rawMetadata === "object"
+    ? normalized.rawMetadata as Record<string, unknown>
+    : undefined;
+  const extraction = sourceMetadata?.aiExtraction && typeof sourceMetadata.aiExtraction === "object"
+    ? sourceMetadata.aiExtraction as { provider?: unknown; evidence?: unknown; requiresHumanReview?: unknown }
+    : undefined;
+  const evidence = extraction?.evidence && typeof extraction.evidence === "object"
+    ? Object.entries(extraction.evidence as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    : [];
+
+  useEffect(() => {
+    if (!normalized) return;
+    setReviewedTitle(readInput(normalized.title) || item.title);
+    setReviewedDescription(readInput(normalized.description));
+    setReviewedQuantity(readInput(normalized.quantity) || "1");
+    setReviewedUnit(readInput(normalized.unit));
+    setReviewedCondition(readInput(normalized.condition));
+    setReviewedValue(typeof normalized.estimatedValue === "number" ? normalized.estimatedValue.toFixed(2) : readInput(normalized.estimatedValue));
+    setReviewedRegion(readInput(normalized.region));
+    setReviewedCity(readInput(normalized.city));
+  }, [item.id, item.title, normalized]);
 
   return (
     <Card>
@@ -257,6 +314,67 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               })}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">{item.description || t("autofetch.noDescription")}</p>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="mt-1 h-auto px-0"
+              aria-expanded={showSuggestions}
+              onClick={() => setShowSuggestions((value) => !value)}
+            >
+              <ChevronDown aria-hidden className={showSuggestions ? "rotate-180" : undefined} />
+              {locale === "am" ? "የተጠቆሙ መረጃዎችንና ማስረጃቸውን ይመልከቱ" : "Review suggested fields and evidence"}
+            </Button>
+            {showSuggestions && (
+              <section className="mt-2 space-y-2 rounded-md border bg-muted/30 p-3 text-sm" aria-label={locale === "am" ? "የምንጭ ማስረጃ" : "Source evidence"}>
+                {pendingDetail.isLoading ? <p className="text-muted-foreground">{locale === "am" ? "በመጫን ላይ…" : "Loading source evidence…"}</p> : null}
+                {pendingDetail.isError ? <p className="text-destructive">{getErrorMessage(pendingDetail.error)}</p> : null}
+                {extraction ? (
+                  <>
+                    <p className="font-medium text-warning-foreground">
+                      {locale === "am"
+                        ? `AI ጥቆማ (${typeof extraction.provider === "string" ? extraction.provider : "AI"})። ከምንጩ ጋር ያረጋግጡ፤ ራስ-ሰር አይታተምም።`
+                        : `AI suggestion (${typeof extraction.provider === "string" ? extraction.provider : "AI"}). Verify it against the source; it is never published automatically.`}
+                    </p>
+                    {evidence.length ? (
+                      <dl className="grid gap-2 sm:grid-cols-2">
+                        {evidence.map(([field, quote]) => (
+                          <div className="min-w-0 rounded border bg-background p-2" key={field}>
+                            <dt className="text-xs font-semibold text-muted-foreground">{fieldLabel(field, locale)}</dt>
+                            <dd className="mt-1 font-medium text-foreground">
+                              {locale === "am" ? "የተጠቆመው፦ " : "Suggested value: "}
+                              {normalized && ["string", "number"].includes(typeof normalized[field]) ? String(normalized[field]) : (locale === "am" ? "የለም" : "not provided")}
+                            </dd>
+                            <dd className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                              {locale === "am" ? "ከምንጩ የተወሰደ ጥቅስ፦ " : "Source quote: "}“{quote}”
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="text-muted-foreground">{locale === "am" ? "የተጠቀሰ ማስረጃ የለም።" : "No field evidence was recorded."}</p>
+                    )}
+                    {item.aiSuggested && normalized ? (
+                      <div className="space-y-3 border-t pt-3">
+                        <p className="font-semibold">{locale === "am" ? "ለማተም የተገመገሙ መረጃዎች" : "Reviewed values to publish"}</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1"><Label htmlFor={`${id}-title`}>{fieldLabel("title", locale)}</Label><Input id={`${id}-title`} required maxLength={200} value={reviewedTitle} onChange={(event) => setReviewedTitle(event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-quantity`}>{fieldLabel("quantity", locale)}</Label><Input id={`${id}-quantity`} type="number" min={1} step={1} required value={reviewedQuantity} onChange={(event) => setReviewedQuantity(event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-unit`}>{fieldLabel("unit", locale)}</Label><Input id={`${id}-unit`} maxLength={30} value={reviewedUnit} onChange={(event) => setReviewedUnit(event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-condition`}>{fieldLabel("condition", locale)}</Label><NativeSelect id={`${id}-condition`} value={reviewedCondition} onChange={(event) => setReviewedCondition(event.target.value)}><option value="">{locale === "am" ? "አልተገለጸም" : "Not specified"}</option>{["new", "used_good", "used_fair", "salvage", "unknown"].map((condition) => <option key={condition} value={condition}>{condition.replaceAll("_", " ")}</option>)}</NativeSelect></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-value`}>{fieldLabel("estimatedValue", locale)}</Label><Input id={`${id}-value`} inputMode="decimal" placeholder="ETB" value={reviewedValue} onChange={(event) => setReviewedValue(event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-region`}>{fieldLabel("region", locale)}</Label><Input id={`${id}-region`} maxLength={80} value={reviewedRegion} onChange={(event) => setReviewedRegion(event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-city`}>{fieldLabel("city", locale)}</Label><Input id={`${id}-city`} maxLength={100} value={reviewedCity} onChange={(event) => setReviewedCity(event.target.value)} /></div>
+                          <div className="space-y-1 sm:col-span-2"><Label htmlFor={`${id}-description`}>{fieldLabel("description", locale)}</Label><Textarea id={`${id}-description`} maxLength={5000} value={reviewedDescription} onChange={(event) => setReviewedDescription(event.target.value)} /></div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : !pendingDetail.isLoading && !pendingDetail.isError ? (
+                  <p className="text-muted-foreground">{locale === "am" ? "ይህ መረጃ በAI አልተጠቆመም።" : "This record was not AI-suggested."}</p>
+                ) : null}
+              </section>
+            )}
             {(item.estimatedValue != null || item.categoryName) && (
               <p className="mt-1 text-xs text-muted-foreground">
                 {item.estimatedValue != null && new Intl.NumberFormat(undefined, { style: "currency", currency: "ETB" }).format(item.estimatedValue)}
@@ -315,7 +433,22 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               event.preventDefault();
               if (!auctionId) return;
               approve.mutate(
-                { id: item.id, auctionId },
+                {
+                  id: item.id,
+                  auctionId,
+                  ...(item.aiSuggested ? {
+                    corrections: {
+                      title: reviewedTitle.trim(),
+                      description: reviewedDescription,
+                      quantity: Number(reviewedQuantity),
+                      unit: reviewedUnit || undefined,
+                      condition: reviewedCondition ? reviewedCondition as CreateAuctionItemRequest["condition"] : undefined,
+                      estimatedValue: reviewedValue || null,
+                      region: reviewedRegion || undefined,
+                      city: reviewedCity || undefined,
+                    },
+                  } : {}),
+                },
                 {
                   onSuccess: () => toast.success(t("autofetch.verifiedAdded")),
                   onError: (error) => toast.error(getErrorMessage(error)),
@@ -334,7 +467,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 ))}
               </NativeSelect>
             </div>
-            <Button type="submit" disabled={!auctionId || reject.isPending} loading={approve.isPending}>
+            <Button type="submit" disabled={!auctionId || reject.isPending || (item.aiSuggested && (!showSuggestions || pendingDetail.isLoading || pendingDetail.isError || !pendingDetail.data || !reviewedTitle.trim() || !Number.isInteger(Number(reviewedQuantity)) || Number(reviewedQuantity) < 1 || Boolean(reviewedValue && !/^\d+(\.\d{2})?$/.test(reviewedValue))))} loading={approve.isPending}>
               {t("autofetch.verifyAdd")}
             </Button>
           </form>
@@ -370,6 +503,27 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
       </CardContent>
     </Card>
   );
+}
+
+function fieldLabel(field: string, locale: "en" | "am") {
+  if (locale !== "am") return field.replaceAll(/([A-Z])/g, " $1");
+  const labels: Record<string, string> = {
+    title: "ርዕስ",
+    description: "መግለጫ",
+    estimatedValue: "ግምታዊ ዋጋ",
+    categoryName: "ምድብ",
+    region: "ክልል",
+    city: "ከተማ",
+    quantity: "ብዛት",
+    unit: "መለኪያ",
+    condition: "ሁኔታ",
+    externalId: "የምንጭ መለያ",
+  };
+  return labels[field] ?? field;
+}
+
+function readInput(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
 }
 
 function safePublicUrl(value?: string): string | undefined {

@@ -78,6 +78,23 @@ function AnomalyCard({ flag, showAuctionLink }: { flag: AnomalyFlagRecord; showA
             <span className="font-medium">{t("flag.decision")}</span> {flag.decisionNote}
           </p>
         ) : null}
+        {flag.relatedHistory?.length ? (
+          <div className="space-y-2 rounded-md border p-3">
+            <h4 className="text-sm font-semibold">{t("flag.relatedHistory")}</h4>
+            <ul className="space-y-2">
+              {flag.relatedHistory.map((entry) => (
+                <li key={entry.flagId} className="text-sm">
+                  <Link className="font-medium text-primary underline-offset-4 hover:underline" to={`/app/ai?flagId=${encodeURIComponent(entry.flagId)}`}>
+                    {entry.auctionTitle}
+                  </Link>
+                  <span className="text-muted-foreground"> — {statusLabel(entry.severity)} · {statusLabel(entry.status)} · {formatDateTime(entry.createdAt)}</span>
+                  {entry.decisionNote ? <p className="mt-1 text-muted-foreground">{t("flag.pastDecision")} {entry.decisionNote}</p> : null}
+                  <p className="mt-1 text-muted-foreground">{t("flag.pastOutcome", { status: statusLabel(entry.auctionStatus), amount: entry.awardAmount ? `${entry.awardAmount} ETB` : t("flag.noAwardAmount") })}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {canReview && flag.status === "open" ? (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => setDecision("dismissed")}>

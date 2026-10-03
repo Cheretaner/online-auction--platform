@@ -64,6 +64,17 @@ export const financialReconciliation: RequestHandler = async (req, res) => {
   }));
 };
 
+export const historicalInsights: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const { auctionId } = req.query as unknown as AuctionScopedQuery;
+  await assertAuctionAccess(auctionId, {
+    userId: auth.userId,
+    roles: auth.roles,
+    organizationId: auth.organizationId,
+  });
+  res.json(await service.historicalInsights(auctionId));
+};
+
 export const getById: RequestHandler = async (req, res) => {
   const report = await service.getReport(routeParam(req.params.id));
 

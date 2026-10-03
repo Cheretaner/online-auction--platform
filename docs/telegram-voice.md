@@ -2,6 +2,12 @@
 
 Voice notes are handled only in private Telegram chats. Audio is downloaded into memory with a 20 MiB cap and a 20-second download timeout; it is not written to document storage. The service submits it to a configured transcription provider, interprets the transcript, then discards the audio buffer after the update is processed.
 
+## Language
+
+Linked users can choose `/language en` or `/language am`. The preference is stored on the portal profile by migration 022 and applies to the bot's start/help, auction discovery and detail, status, audit verification, and bid confirmation/result messages. For an unlinked user, the bot follows Telegram's locale; voice replies follow the detected/request language. Amharic translations and provider transcription quality still require fluent-speaker review before being represented as production-validated.
+
+The saved preference also localizes the supported auction watchlist status and bid-activity notifications. Other notification types keep their authored message until a reviewed translation is added; unknown notification types are not machine-translated.
+
 ## Providers
 
 - Gemini processes audio and extracts a transcript and intent in one request.

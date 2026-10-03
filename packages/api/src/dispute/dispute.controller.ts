@@ -50,6 +50,22 @@ export const getById: RequestHandler = async (req, res) => {
   res.json(dispute);
 };
 
+export const downloadEvidenceBundle: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const id = routeParam(req.params.id);
+  const dispute = await service.getDispute(id);
+  await assertDisputeOrgAccess(dispute.auctionId, auth);
+  const bundle = await service.createEvidenceBundle({ id, actorId: auth.userId, roles: auth.roles });
+  res
+    .status(200)
+    .set({
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Disposition": `attachment; filename="dispute-${id}-evidence.json"`,
+      "Cache-Control": "private, no-store",
+    })
+    .send(JSON.stringify(bundle, null, 2));
+};
+
 /** Reviewing a dispute is an act on behalf of the auction's organization. */
 async function assertDisputeOrgAccess(auctionId: string, auth: ReturnType<typeof getAuth>): Promise<void> {
   await assertAuctionAccess(auctionId, {

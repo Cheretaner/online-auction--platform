@@ -12,6 +12,8 @@ import type {
 import { QUERY_STALE_TIMES } from "@/config/constants";
 import { auctionsApi, type PublicAuctionParams } from "@/lib/api/auctions";
 import { queryKeys } from "@/lib/query/keys";
+import { useAuth } from "@/features/auth/auth-provider";
+import { readPrivateBidHistory, savePrivateBidHistory } from "@/lib/query/private-bid-cache";
 
 export function usePublicAuctions(params: PublicAuctionParams = {}) {
   return useQuery({
@@ -46,10 +48,25 @@ export function useAuctionItems(auctionId: string | undefined) {
   });
 }
 
-export function useAuctionBids(auctionId: string | undefined, enabled = true) {
+export function useAuctionBids(
+  auctionId: string | undefined,
+  enabled = true,
+  options: { cacheOwnHistory?: boolean } = {},
+) {
+  const { session } = useAuth();
+  const viewerId = session?.user.id;
+  const cached = options.cacheOwnHistory && viewerId && auctionId
+    ? readPrivateBidHistory(viewerId, auctionId)
+    : undefined;
   return useQuery({
-    queryKey: queryKeys.auctions.bids(auctionId ?? ""),
-    queryFn: () => auctionsApi.listBids(auctionId!),
+    queryKey: queryKeys.auctions.bids(auctionId ?? "", viewerId),
+    queryFn: async () => {
+      const response = await auctionsApi.listBids(auctionId!);
+      if (viewerId && options.cacheOwnHistory) savePrivateBidHistory(viewerId, auctionId!, response.items);
+      return response;
+    },
+    initialData: cached?.data,
+    initialDataUpdatedAt: cached?.savedAt,
     enabled: Boolean(auctionId) && enabled,
     staleTime: QUERY_STALE_TIMES.short,
   });
@@ -72,6 +89,7 @@ export function useUpdateAuction(id: string) {
     onSuccess: (auction) => {
       queryClient.setQueryData(queryKeys.auctions.detail(id), auction);
       void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reports.historicalInsights(id) });
     },
   });
 }
@@ -93,7 +111,13 @@ export function useAuctionAction(id: string) {
       mutationFn: (body: CancelAuctionRequest) => auctionsApi.cancel(id, body),
       onSuccess: invalidate,
     }),
-    openSealed: useMutation({ mutationFn: () => auctionsApi.openSealed(id), onSuccess: invalidate }),
+    openSealed: useMutation({
+      mutationFn: () => auctionsApi.openSealed(id),
+      onSuccess: () => {
+        invalidate();
+        void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.bids(id) });
+      },
+    }),
   };
 }
 
@@ -101,7 +125,10 @@ export function useCreateAuctionItem(auctionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateAuctionItemRequest) => auctionsApi.createItem(auctionId, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.auctions.items(auctionId) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.items(auctionId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reports.historicalInsights(auctionId) });
+    },
   });
 }
 
@@ -109,7 +136,10 @@ export function useUpdateAuctionItem(auctionId: string, itemId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: UpdateAuctionItemRequest) => auctionsApi.updateItem(auctionId, itemId, body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.auctions.items(auctionId) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.items(auctionId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reports.historicalInsights(auctionId) });
+    },
   });
 }
 
@@ -117,7 +147,10 @@ export function useDeleteAuctionItem(auctionId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => auctionsApi.deleteItem(auctionId, itemId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.auctions.items(auctionId) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.auctions.items(auctionId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reports.historicalInsights(auctionId) });
+    },
   });
 }
 

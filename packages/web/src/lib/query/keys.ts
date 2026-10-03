@@ -9,7 +9,9 @@ export const queryKeys = {
     org: (orgId: string) => ["auctions", "org", orgId] as const,
     items: (auctionId: string) => ["auctions", auctionId, "items"] as const,
     item: (auctionId: string, itemId: string) => ["auctions", auctionId, "items", itemId] as const,
-    bids: (auctionId: string) => ["auctions", auctionId, "bids"] as const,
+    bids: (auctionId: string, userId?: string) => userId
+      ? ["auctions", auctionId, "bids", userId] as const
+      : ["auctions", auctionId, "bids"] as const,
     documents: (auctionId: string) => ["documents", "auction", auctionId] as const,
   },
   organizations: {
@@ -49,7 +51,9 @@ export const queryKeys = {
   reports: {
     list: (auctionId?: string) => ["reports", { auctionId }] as const,
     detail: (id: string) => ["reports", id] as const,
+    historicalInsights: (auctionId: string) => ["reports", "historical-insights", auctionId] as const,
   },
+  watchlists: { mine: ["watchlists", "me"] as const },
   audit: {
     events: ["audit", "events"] as const,
     verify: ["audit", "verify"] as const,
@@ -60,6 +64,7 @@ export const queryKeys = {
   },
   ai: {
     anomalies: (auctionId?: string) => ["ai", "anomalies", { auctionId }] as const,
+    anomaly: (id: string) => ["ai", "anomaly", id] as const,
     /** Cache of the last user-triggered AI risk scan per auction. */
     scan: (auctionId: string) => ["ai", "scan", auctionId] as const,
   },
@@ -72,6 +77,7 @@ export const queryKeys = {
   autofetch: {
     sources: ["autofetch", "sources"] as const,
     pending: (filters?: unknown) => ["autofetch", "pending", filters] as const,
+    pendingDetail: (id: string) => ["autofetch", "pending-detail", id] as const,
     conflicts: (id: string) => ["autofetch", "conflicts", id] as const,
     stats: ["autofetch", "stats"] as const,
   },

@@ -128,6 +128,7 @@ export interface PendingQueueItem {
   estimatedValue?: number;
   categoryName?: string;
   confidenceScore: number;
+  aiSuggested?: boolean;
   status: PendingItemStatus;
   conflictCount: number;
   highSeverityConflicts: number;

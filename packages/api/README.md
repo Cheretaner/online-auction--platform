@@ -69,6 +69,7 @@ start in production** without the first three:
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — production requires a working SMTP host and verifies connectivity at startup. Authentication fields must be set together. Use port 587 with STARTTLS (`SMTP_SECURE=false`) or port 465 with TLS (`SMTP_SECURE=true`). Local development can omit SMTP and receive reset links in the API console.
 - Telegram voice notes use Gemini audio understanding or OpenRouter speech-to-text (`OPENROUTER_TRANSCRIPTION_MODEL`, default `openai/whisper-1`). Configure and acceptance-check the model/languages; OpenRouter transcription may incur separate usage charges. Voice bid intents always require a button confirmation and pass the regular bidding rules. See [Telegram voice processing](../../docs/telegram-voice.md).
 - Auction document OCR runs locally with PDF.js and Tesseract (`eng+amh`). Its first run downloads language data into the writable `STORAGE_DIR/.ocr-cache`; see [document OCR setup and review flow](../../docs/document-ocr.md).
+- Auction watchlist events fan out through the transactional outbox with in-app, email, and linked Telegram channels; see [watchlist alert behavior](../../docs/watchlist-alerts.md).
 
 The web app is a separate static build; publish `packages/web/dist` as static
 assets / point the platform's CDN at it rather than serving it from the API.

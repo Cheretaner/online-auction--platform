@@ -21,7 +21,9 @@ import { useDisputes } from "@/features/operations/queries";
 import { CompliancePanel } from "@/features/workspace/compliance-panel";
 import { DepositReview } from "@/features/workspace/deposit-review";
 import { LotsManager } from "@/features/workspace/lots-manager";
+import { HistoricalInsights } from "@/features/workspace/historical-insights";
 import { ReportsPanel } from "@/features/workspace/reports-panel";
+import { SealedOpeningCeremony } from "@/features/workspace/sealed-opening-ceremony";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
 import { canApproveAuctions, canManageAuctions, enumLabel, formatDateTime, formatMoney, hasRole, regionLabel } from "@/lib/format";
@@ -88,12 +90,15 @@ function Workspace({ auction }: { auction: Auction }) {
   const openFlags = (anomalies.data?.items ?? []).filter((flag) => flag.status === "open").length;
   const openDisputes = (disputes.data?.items ?? []).filter((d) => d.status === "open" || d.status === "under_review").length;
   const reviewer = hasRole(roles, "compliance_officer", "org_admin", "super_admin");
+  const canViewInsights = hasRole(roles, "auction_officer", "org_admin", "compliance_officer", "super_admin");
   const t = useT("workspace");
 
   return (
     <div className="space-y-6">
       <LifecycleActions auction={auction} />
+      {auction.auctionType === "sealed_bid" ? <SealedOpeningCeremony auction={auction} /> : null}
       <Overview auction={auction} />
+      {canViewInsights ? <HistoricalInsights auctionId={auction.id} /> : null}
       <Tabs defaultValue="lots">
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList>
@@ -220,16 +225,6 @@ function LifecycleActions({ auction }: { auction: Auction }) {
       <p key="two-person" className="self-center text-sm text-muted-foreground">
         {t("detail.twoPerson")}
       </p>
-    ) : null,
-    auction.status === "closed" && auction.auctionType === "sealed_bid" && !auction.sealedOpenedAt ? (
-      <Button
-        key="open-sealed"
-        variant="outline"
-        loading={action.openSealed.isPending}
-        onClick={() => run(() => action.openSealed.mutateAsync(), t("detail.sealedOpened"))}
-      >
-        {t("detail.openSealed")}
-      </Button>
     ) : null,
     AWARDABLE.has(auction.status) && approver ? (
       <Button key="award" onClick={() => setAwarding(true)}>

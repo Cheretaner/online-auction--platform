@@ -23,6 +23,16 @@ export interface FinancialReconciliationSnapshot {
   exceptions: Array<{ issue: string; entityId: string; txRef: string | null; amount: string }>;
 }
 
+export interface HistoricalAuctionInsights {
+  auctionCount: number;
+  awardedCount: number;
+  medianWinningPrice: string | null;
+  medianBidCount: number | null;
+  awardRate: number | null;
+  months: number;
+  criteria: { auctionType: string; region: string | null; categories: string[] };
+}
+
 interface DbReport {
   id: string;
   auction_id: string;
@@ -210,5 +220,69 @@ export async function financialReconciliation(auctionId: string): Promise<Financ
       txRef: row.tx_ref,
       amount: row.amount,
     })),
+  };
+}
+
+export async function historicalInsights(auctionId: string): Promise<HistoricalAuctionInsights> {
+  const row = await queryOne<{
+    auction_count: string;
+    awarded_count: string;
+    median_winning_price: string | null;
+    median_bid_count: string | null;
+    award_rate: string | null;
+    auction_type: string;
+    region: string | null;
+    categories: string[] | null;
+  }>(
+    `WITH target AS (
+       SELECT a.org_id, a.auction_type, a.region,
+              ARRAY(SELECT DISTINCT i.category_id FROM auction_items i
+                    WHERE i.auction_id = a.id AND i.category_id IS NOT NULL) AS categories
+         FROM auctions a WHERE a.id = $1
+     ), history AS (
+       SELECT a.status, a.winning_amount, a.bid_count
+         FROM auctions a CROSS JOIN target t
+        WHERE a.org_id = t.org_id
+          AND a.id <> $1
+          AND a.auction_type = t.auction_type
+          AND a.status IN ('closed', 'awarded', 'cancelled')
+          AND a.closed_at >= NOW() - INTERVAL '36 months'
+          AND (t.region IS NULL OR lower(trim(a.region)) = lower(trim(t.region)))
+          AND (cardinality(t.categories) = 0 OR EXISTS (
+            SELECT 1 FROM auction_items i
+             WHERE i.auction_id = a.id AND i.category_id = ANY(t.categories)
+          ))
+     ), metrics AS (
+       SELECT COUNT(*)::text AS auction_count,
+              COUNT(*) FILTER (WHERE status = 'awarded')::text AS awarded_count,
+              round((percentile_cont(0.5) WITHIN GROUP (ORDER BY winning_amount)
+                FILTER (WHERE status = 'awarded'))::numeric, 2)::text AS median_winning_price,
+              percentile_cont(0.5) WITHIN GROUP (ORDER BY bid_count)::text AS median_bid_count,
+              round((COUNT(*) FILTER (WHERE status = 'awarded')::numeric / NULLIF(COUNT(*), 0))::numeric, 4)::text AS award_rate
+         FROM history
+     )
+     SELECT m.auction_count, m.awarded_count, m.median_winning_price, m.median_bid_count,
+            m.award_rate, t.auction_type, t.region,
+            ARRAY(SELECT c.name FROM categories c WHERE c.id = ANY(t.categories) ORDER BY c.name) AS categories
+       FROM target t CROSS JOIN metrics m`,
+    [auctionId],
+  );
+  const auctionCount = Number(row?.auction_count ?? 0);
+  return {
+    auctionCount,
+    awardedCount: Number(row?.awarded_count ?? 0),
+    medianWinningPrice: row?.median_winning_price ?? null,
+    medianBidCount: row?.median_bid_count === null || row?.median_bid_count === undefined
+      ? null
+      : Number(row.median_bid_count),
+    awardRate: row?.award_rate === null || row?.award_rate === undefined
+      ? null
+      : Number(row.award_rate),
+    months: 36,
+    criteria: {
+      auctionType: row?.auction_type ?? "unknown",
+      region: row?.region ?? null,
+      categories: row?.categories ?? [],
+    },
   };
 }

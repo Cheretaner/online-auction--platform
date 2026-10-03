@@ -14,7 +14,7 @@ import type { Pool } from 'pg';
 import type { AuctionItemRecord } from '../auction/auction-item.types.js';
 import * as auctionItemService from '../auction/auction-item.service.js';
 import { AppError } from '../shared/errors/index.js';
-import type { Role } from '@auction/shared';
+import type { CreateAuctionItemRequest, Role } from '@auction/shared';
 
 export class AutoFetchService {
   private pool: Pool;
@@ -242,7 +242,8 @@ export class AutoFetchService {
   async approveAndPublish(
     pendingItemId: string,
     actor: { userId: string; organizationId?: string; roles: Role[] },
-    auctionId: string
+    auctionId: string,
+    corrections?: Omit<Partial<Omit<CreateAuctionItemRequest, 'categorySource'>>, 'estimatedValue'> & { estimatedValue?: string | null },
   ): Promise<AuctionItemRecord> {
     try {
       logger.info({
@@ -261,16 +262,26 @@ export class AutoFetchService {
       if (pending.status !== 'pending') throw AppError.conflict('Pending item has already been reviewed');
 
       const metadata = pending.normalizedMetadata;
+      const aiExtraction = metadata.rawMetadata.aiExtraction;
+      if (aiExtraction && (!corrections?.title?.trim() || !corrections.quantity)) {
+        throw AppError.unprocessable('Review the AI-suggested fields and submit an approved title and quantity before publishing');
+      }
+      const correctedFields = corrections
+        ? Object.keys(corrections).filter((field) => (corrections as Record<string, unknown>)[field] !== (metadata as unknown as Record<string, unknown>)[field])
+        : [];
       const item = await auctionItemService.createAuctionItem(actor, auctionId, {
-        title: metadata.title,
-        description: metadata.description,
-        quantity: metadata.quantity,
-        unit: metadata.unit,
-        estimatedValue: metadata.estimatedValue === undefined ? undefined : metadata.estimatedValue.toFixed(2),
-        categoryId: metadata.categoryId,
+        title: corrections?.title ?? metadata.title,
+        description: corrections?.description ?? metadata.description,
+        quantity: corrections?.quantity ?? metadata.quantity,
+        unit: corrections?.unit ?? metadata.unit,
+        condition: corrections?.condition ?? metadata.condition as CreateAuctionItemRequest['condition'],
+        estimatedValue: corrections && Object.hasOwn(corrections, 'estimatedValue')
+          ? corrections.estimatedValue ?? undefined
+          : metadata.estimatedValue === undefined ? undefined : metadata.estimatedValue.toFixed(2),
+        categoryId: corrections?.categoryId ?? metadata.categoryId,
         categorySource: 'manual',
-        region: metadata.region,
-        city: metadata.city,
+        region: corrections?.region ?? metadata.region,
+        city: corrections?.city ?? metadata.city,
       });
 
       // Record review
@@ -286,6 +297,21 @@ export class AutoFetchService {
       await this.autofetchRepo.logAuditEvent(pendingItemId, pending.sourceId, 'approved', {
         auctionId,
         reviewedBy: actor.userId,
+        aiSuggested: Boolean(aiExtraction),
+        aiProvider: aiExtraction && typeof aiExtraction === 'object' && 'provider' in aiExtraction
+          ? aiExtraction.provider
+          : undefined,
+        correctedFields,
+        publishedFields: {
+          title: item.title,
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          condition: item.condition,
+          estimatedValue: item.estimatedValue,
+          region: item.region,
+          city: item.city,
+        },
       });
 
       logger.info({

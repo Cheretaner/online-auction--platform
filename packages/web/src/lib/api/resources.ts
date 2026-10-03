@@ -28,6 +28,7 @@ import type {
   AutofetchConflictSummary,
   AutofetchFetchResult,
   AutofetchPendingDetail,
+  AutofetchItemCorrections,
   AutofetchPendingResult,
   AutofetchStats,
   AutofetchSource,
@@ -45,11 +46,13 @@ import type {
   ItemList,
   NotificationRecord,
   ReportRecord,
+  HistoricalAuctionInsights,
   SettlementRecord,
   TelegramLinkToken,
   TelegramIntegrationStatus,
   TelegramStatus,
   VerificationRecord,
+  WatchlistRecord,
 } from "@/lib/api/types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -140,6 +143,8 @@ export const disputesApi = {
   list: (auctionId?: string) =>
     apiRequest<ItemList<DisputeRecord>>(v1(`/disputes${queryString({ auctionId })}`)),
   getById: (id: string) => apiRequest<DisputeRecord>(v1(`/disputes/${id}`)),
+  downloadEvidenceBundle: (id: string) =>
+    apiRequest<Blob>(v1(`/disputes/${id}/evidence-bundle`), { parse: "blob" }),
   assign: (id: string, body: AssignDisputeRequest) =>
     apiRequest<DisputeRecord>(v1(`/disputes/${id}/assign`), { method: "POST", body }),
   resolve: (id: string, body: ResolveDisputeRequest) =>
@@ -155,10 +160,20 @@ export const reportsApi = {
   publish: (id: string) => apiRequest<ReportRecord>(v1(`/reports/${id}/publish`), { method: "POST" }),
   financialReconciliation: (auctionId: string) =>
     apiRequest<FinancialReconciliationSnapshot>(v1(`/reports/financial-reconciliation${queryString({ auctionId })}`)),
+  historicalInsights: (auctionId: string) =>
+    apiRequest<HistoricalAuctionInsights>(v1(`/reports/historical-insights${queryString({ auctionId })}`)),
+};
+
+export const watchlistsApi = {
+  list: () => apiRequest<ItemList<WatchlistRecord>>(v1("/watchlists")),
+  save: (auctionId: string, body: { channels: Array<"in_app" | "email" | "telegram">; alertOnBids: boolean; alertOnStatus: boolean }) =>
+    apiRequest<void>(v1(`/watchlists/${auctionId}`), { method: "PUT", body }),
+  remove: (auctionId: string) => apiRequest<void>(v1(`/watchlists/${auctionId}`), { method: "DELETE" }),
 };
 
 export const auditApi = {
   events: () => apiRequest<ItemList<AuditEvent>>(v1("/audit/events")),
+  exportAnalytics: () => apiRequest<Blob>(v1("/audit/analytics/export"), { parse: "blob" }),
   verify: () => apiRequest(v1("/audit/verify")),
   verifyAuction: (auctionId: string) => apiRequest(v1(`/audit/auctions/${auctionId}/verify`)),
 };
@@ -178,6 +193,7 @@ export const aiApi = {
     apiRequest<AiAnomalyScanResult>(v1("/ai/anomaly"), { method: "POST", body }),
   listAnomalies: (auctionId?: string) =>
     apiRequest<ItemList<AnomalyFlagRecord>>(v1(`/ai/anomalies${queryString({ auctionId })}`)),
+  getAnomaly: (id: string) => apiRequest<AnomalyFlagRecord>(v1(`/ai/anomalies/${id}`)),
   reviewAnomaly: (id: string, body: ReviewAnomalyRequest) =>
     apiRequest<AnomalyFlagRecord>(v1(`/ai/anomalies/${id}/review`), { method: "POST", body }),
   assist: (body: AssistRequest) =>
@@ -220,8 +236,8 @@ export const autofetchApi = {
     unwrap(apiRequest<{ data: AutofetchPendingResult }>(v1(`/autofetch/pending${queryString(params ?? {})}`))),
   getPending: (id: string) => unwrap(apiRequest<{ data: AutofetchPendingDetail }>(v1(`/autofetch/pending/${id}`))),
   conflicts: (id: string) => unwrap(apiRequest<{ data: AutofetchConflictSummary }>(v1(`/autofetch/pending/${id}/conflicts`))),
-  approve: (id: string, auctionId: string) =>
-    unwrap(apiRequest<{ data: unknown }>(v1(`/autofetch/pending/${id}/approve`), { method: "POST", body: { auctionId } })),
+  approve: (id: string, auctionId: string, corrections?: AutofetchItemCorrections) =>
+    unwrap(apiRequest<{ data: unknown }>(v1(`/autofetch/pending/${id}/approve`), { method: "POST", body: { auctionId, ...(corrections ? { corrections } : {}) } })),
   reject: (id: string, reason: string) =>
     unwrap(apiRequest<{ data: unknown }>(v1(`/autofetch/pending/${id}/reject`), { method: "POST", body: { reason } })),
   stats: () => unwrap(apiRequest<{ data: AutofetchStats }>(v1("/autofetch/stats"))),

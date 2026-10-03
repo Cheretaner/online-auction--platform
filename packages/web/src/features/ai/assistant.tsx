@@ -13,7 +13,7 @@ import { useAiAssist } from "@/features/ai/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { cn } from "@/lib/utils";
 import { statusLabel } from "@/lib/format";
-import { useT } from "@/i18n/context";
+import { useLocale, useT } from "@/i18n/context";
 
 const SUGGESTIONS = ["suggestion1", "suggestion2", "suggestion3"] as const;
 const NO_AUCTION = "none";
@@ -36,6 +36,7 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
   const [prompt, setPrompt] = useState("");
   const [selectedAuctionId, setSelectedAuctionId] = useState(auctionId ?? NO_AUCTION);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const { locale } = useLocale();
   const t = useT("tools");
   const selectedAuction = auctions.data?.items.find((auction) => auction.id === selectedAuctionId);
   const activeAuctionId = selectedAuctionId === NO_AUCTION ? undefined : selectedAuctionId;
@@ -45,7 +46,9 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
     if (!question || assist.isPending) return;
     setPrompt("");
     setTurns((previous) => [...previous, { role: "user", text: question }]);
-    assist.mutate(activeAuctionId ? { prompt: question, auctionId: activeAuctionId } : { prompt: question }, {
+    assist.mutate(activeAuctionId
+      ? { prompt: question, auctionId: activeAuctionId, language: locale }
+      : { prompt: question, language: locale }, {
       onSuccess: (result) =>
         setTurns((previous) => [
           ...previous,

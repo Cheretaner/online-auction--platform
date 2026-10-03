@@ -32,6 +32,16 @@ export const zodErrorMap: z.ZodErrorMap = (issue, ctx) => {
 
 
 const SCHEMA_MESSAGES: Record<string, string> = {
+  "invalid amount": "ትክክለኛ የገንዘብ መጠን ያስገቡ",
+  "commitment hash must be sha256 hex": "የጨረታ ቁልፉ ትክክለኛ SHA-256 ሄክስ እሴት መሆኑን ያረጋግጡ",
+  "Invalid datetime": "ትክክለኛ ቀንና ሰዓት ያስገቡ",
+  "Fayda numbers contain 12 digits": "የፋይዳ ቁጥር 12 አሃዞች መያዝ አለበት",
+  "TIN must use 4-20 letters, numbers, / or -": "የTIN ቁጥር 4–20 ፊደሎች፣ ቁጥሮች፣ / ወይም - መያዝ አለበት",
+  "Enter a valid kebele ID number": "ትክክለኛ የቀበሌ መታወቂያ ቁጥር ያስገቡ",
+  "Enter a valid passport number": "ትክክለኛ የፓስፖርት ቁጥር ያስገቡ",
+  "Rejection reason is required": "ውድቅ ለማድረግ ምክንያት ያስፈልጋል",
+  "Either userId or email is required": "የተጠቃሚ መለያ ወይም ኢሜይል ያስፈልጋል",
+  "Decision reason is required when rejecting": "ውሳኔን ውድቅ ሲያደርጉ ምክንያት ማስገባት ያስፈልጋል",
   "Business name is required for business accounts": "ለንግድ ድርጅት መለያ የድርጅቱ ስም ያስፈልጋል",
   "TIN number is required for business accounts": "ለንግድ ድርጅት መለያ የግብር ከፋይ መለያ ቁጥር ያስፈልጋል",
 };

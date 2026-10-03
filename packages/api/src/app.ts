@@ -37,6 +37,7 @@ import { getPool } from "./infrastructure/database/pool.js";
 import path from "node:path";
 import { chapaWebhook } from "./payments/chapa.controller.js";
 import { openDataRouter } from "./open-data/open-data.routes.js";
+import { watchlistRouter } from "./watchlist/watchlist.routes.js";
 
 export function createApp(): express.Express {
   const app = express();
@@ -100,6 +101,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/ai", aiRouter);
   app.use("/api/v1/compliance", complianceRouter);
   app.use("/api/v1/notifications", notificationRouter);
+  app.use("/api/v1/watchlists", watchlistRouter);
   app.use("/api/v1/disputes", disputeRouter);
   app.use("/api/v1/reports", reportingRouter);
   app.use("/api/v1/telegram", telegramRouter);

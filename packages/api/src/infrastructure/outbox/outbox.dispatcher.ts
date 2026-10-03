@@ -6,6 +6,7 @@ import { withTransaction } from "../database/tx.js";
 import * as notificationRepo from "../../notification/notification.repository.js";
 import * as outboxRepo from "./outbox.repository.js";
 import { refundNonWinnerChapaDeposits } from "../../payments/payment.service.js";
+import { notifyWatchers } from "../../watchlist/watchlist.service.js";
 
 type ClaimedNotification = Awaited<ReturnType<typeof notificationRepo.claimNotificationById>>;
 
@@ -88,6 +89,13 @@ export async function processOutboxBatch(): Promise<number> {
           event: message.eventType,
           payload: publicPayload,
         });
+      }
+
+      if (auctionId && (
+        message.eventType === "bid.placed" ||
+        ["auction.approved", "auction.opened", "auction.closed", "auction.under_review", "auction.awarded", "auction.cancelled"].includes(message.eventType)
+      )) {
+        await notifyWatchers(message.eventType, message.payload, message.id);
       }
 
       if (auctionId && (message.eventType === "auction.awarded" || message.eventType === "auction.cancelled")) {

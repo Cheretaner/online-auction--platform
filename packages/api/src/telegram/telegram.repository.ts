@@ -13,6 +13,7 @@ interface DbProfileRow {
   telegram_username: string | null;
   telegram_chat_id: string | null;
   telegram_linked_at: Date | null;
+  telegram_language: "en" | "am" | null;
 }
 
 function mapProfileRow(row: DbProfileRow): TelegramUserProfile {
@@ -25,6 +26,7 @@ function mapProfileRow(row: DbProfileRow): TelegramUserProfile {
     telegramUsername: row.telegram_username,
     telegramChatId: row.telegram_chat_id ? String(row.telegram_chat_id) : null,
     telegramLinkedAt: row.telegram_linked_at ? row.telegram_linked_at.toISOString() : null,
+    telegramLanguage: row.telegram_language === "am" ? "am" : "en",
   };
 }
 
@@ -105,7 +107,7 @@ export async function findProfileByTelegramId(
   client?: Queryable,
 ): Promise<TelegramUserProfile | null> {
   const row = await queryOne<DbProfileRow>(
-    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at
+    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at, telegram_language
        FROM profiles
       WHERE telegram_id = $1 AND is_active = TRUE`,
     [telegramId],
@@ -119,7 +121,7 @@ export async function findProfileByUserId(
   client?: Queryable,
 ): Promise<TelegramUserProfile | null> {
   const row = await queryOne<DbProfileRow>(
-    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at
+    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at, telegram_language
        FROM profiles
       WHERE id = $1 AND is_active = TRUE`,
     [userId],
@@ -151,6 +153,13 @@ export async function findChannelPost(auctionId: string, client?: Queryable): Pr
     postedAt: new Date(row.posted_at),
     updatedAt: new Date(row.updated_at),
   };
+}
+
+export async function setTelegramLanguage(userId: string, language: "en" | "am"): Promise<void> {
+  await query(
+    `UPDATE profiles SET telegram_language = $2, updated_at = NOW() WHERE id = $1 AND is_active = TRUE`,
+    [userId, language],
+  );
 }
 
 /** Atomically applies a per-Telegram-account fixed-window action limit. */

@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import type { Role } from '@auction/shared';
+import { CreateAuctionItemRequest, type Role } from '@auction/shared';
 import type { Pool } from 'pg';
 import { requireAuth, requireOrganization } from '../shared/middleware/auth.middleware.js';
 import { asyncHandler } from '../shared/middleware/asyncHandler.js';
@@ -32,6 +32,9 @@ export function createAutofetchRouter(pool: Pool): Router {
   });
   const idParams = z.object({ sourceId: z.string().uuid() });
   const pendingIdParams = z.object({ pendingItemId: z.string().uuid() });
+  const reviewedItemCorrections = CreateAuctionItemRequest.omit({ categorySource: true })
+    .partial()
+    .extend({ estimatedValue: CreateAuctionItemRequest.shape.estimatedValue.nullable().optional() });
 
   // ========================================================================
   // Source Management
@@ -132,7 +135,7 @@ export function createAutofetchRouter(pool: Pool): Router {
     requireAuth(['org_admin', 'compliance_officer']),
     requireOrganization(),
     validate(pendingIdParams, 'params'),
-    validate(z.object({ auctionId: z.string().uuid() })),
+    validate(z.object({ auctionId: z.string().uuid(), corrections: reviewedItemCorrections.optional() })),
     asyncHandler(controller.approvePendingItem)
   );
 

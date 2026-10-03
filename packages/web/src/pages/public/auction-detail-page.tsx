@@ -16,6 +16,7 @@ import { useBidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { OpenDisputeButton } from "@/features/disputes/open-dispute-dialog";
 import { AuctionDocuments } from "@/features/documents/auction-documents";
 import { AuctionTransparencyPanel } from "@/features/auctions/auction-transparency-panel";
+import { WatchlistControls } from "@/features/auctions/watchlist-controls";
 import type { Auction } from "@/lib/api/types";
 import { enumLabel, formatDateTime, formatMoney, hasRole, regionLabel, statusLabel } from "@/lib/format";
 import { useT } from "@/i18n/context";
@@ -29,7 +30,7 @@ export default function AuctionDetailPage() {
   const auction = useAuction(id);
   const items = useAuctionItems(id);
   const { isAuthenticated, session } = useAuth();
-  const bids = useAuctionBids(id, isAuthenticated);
+  const bids = useAuctionBids(id, isAuthenticated, { cacheOwnHistory: hasRole(session?.roles ?? [], "bidder") });
   const queryClient = useQueryClient();
   const [online, setOnline] = useState(() => navigator.onLine);
 
@@ -94,6 +95,7 @@ export default function AuctionDetailPage() {
           />
 
           <KeyFacts auction={record} />
+          {isAuthenticated && ["scheduled", "live"].includes(record.status) ? <WatchlistControls auction={record} /> : null}
           <AuctionTransparencyPanel auctionId={record.id} status={record.status} />
 
           <Card>
@@ -167,6 +169,11 @@ export default function AuctionDetailPage() {
                     <CardTitle>{t("detail.bidActivity")}</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    {!online && bids.data ? (
+                      <p role="status" className="mb-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                        {t("detail.offlineBidsCached", { time: formatDateTime(new Date(bids.dataUpdatedAt).toISOString()) })}
+                      </p>
+                    ) : null}
                     {(bids.data?.items ?? []).length === 0 ? (
                       <EmptyState size="inline" icon={Gavel} title={t("detail.noBids")} />
                     ) : (

@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ScanSearch, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { AnomalyList } from "@/features/anomalies/anomaly-list";
-import { useAiAnomalies, useAiScan, useAiScanResult } from "@/features/ai/queries";
+import { useAiAnomalies, useAiAnomaly, useAiScan, useAiScanResult } from "@/features/ai/queries";
 import { useOrgAuctions } from "@/features/auctions/queries";
 import { useAuth } from "@/features/auth/auth-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +22,8 @@ import { useT } from "@/i18n/context";
 const NO_AUCTION = "none";
 
 export default function AiPage() {
+  const [searchParams] = useSearchParams();
+  const focusedFlag = useAiAnomaly(searchParams.get("flagId") ?? undefined);
   const { session } = useAuth();
   const orgId = session?.organizationId ?? undefined;
   const auctions = useOrgAuctions(orgId);
@@ -92,6 +95,15 @@ export default function AiPage() {
       {scan.isError ? <ErrorState error={scan.error} /> : null}
       {scanResult && selectedId ? (
         <ScanResult result={scanResult} auctionTitle={selectedTitle ?? t("anomaly.thisAuction")} />
+      ) : null}
+
+      {searchParams.get("flagId") ? (
+        <section className="space-y-3">
+          <SectionHeader title={t("anomaly.relatedRecord")} description={t("anomaly.relatedRecordDescription")} />
+          {focusedFlag.isLoading ? <PageSkeleton rows={1} /> : null}
+          {focusedFlag.isError ? <ErrorState error={focusedFlag.error} /> : null}
+          {focusedFlag.data ? <AnomalyList items={[focusedFlag.data]} /> : null}
+        </section>
       ) : null}
 
       <section className="space-y-4">

@@ -2,6 +2,7 @@ import type {
   AccountType,
   AuctionStatus,
   AuctionType,
+  CreateAuctionItemRequest,
   DocumentType,
   Role,
   VerificationStatus,
@@ -343,6 +344,16 @@ export interface AutofetchSource {
   createdAt?: string;
 }
 
+export interface HistoricalAuctionInsights {
+  auctionCount: number;
+  awardedCount: number;
+  medianWinningPrice: string | null;
+  medianBidCount: number | null;
+  awardRate: number | null;
+  months: number;
+  criteria: { auctionType: string; region: string | null; categories: string[] };
+}
+
 export interface DocumentOcrResult {
   documentId: string;
   status: "processing" | "completed" | "failed";
@@ -370,6 +381,16 @@ export interface DepositReferenceOcrReview {
   matchesSubmittedReference: boolean;
 }
 
+export interface WatchlistRecord {
+  auctionId: string;
+  auctionTitle: string;
+  auctionStatus: string;
+  channel: "in_app" | "email" | "telegram";
+  alertOnBids: boolean;
+  alertOnStatus: boolean;
+  createdAt: string;
+}
+
 export interface AutofetchPendingItem {
   id: string;
   sourceId: string;
@@ -382,6 +403,7 @@ export interface AutofetchPendingItem {
   estimatedValue?: number;
   categoryName?: string;
   confidenceScore?: number;
+  aiSuggested?: boolean;
   conflictCount?: number;
   highSeverityConflicts?: number;
   createdAt?: string;
@@ -402,6 +424,10 @@ export interface AutofetchConflictFlag {
   matchDetails: Record<string, unknown>;
   createdAt: string;
 }
+
+export type AutofetchItemCorrections = Partial<Omit<CreateAuctionItemRequest, "categorySource" | "estimatedValue">> & {
+  estimatedValue?: string | null;
+};
 export interface AutofetchConflictSummary { conflicts: AutofetchConflictFlag[]; count: number; critical: number; high: number; medium: number; low: number }
 export interface AutofetchStats { total: number; pending: number; approved: number; rejected: number }
 
@@ -419,6 +445,19 @@ export interface AnomalyFlagRecord {
   reviewedAt: string | null;
   decisionNote: string | null;
   createdAt: string;
+  relatedHistory?: RelatedAnomalyRecord[];
+}
+
+export interface RelatedAnomalyRecord {
+  flagId: string;
+  auctionId: string;
+  auctionTitle: string;
+  severity: "low" | "medium" | "high";
+  status: "open" | "reviewed" | "dismissed" | "escalated";
+  createdAt: string;
+  decisionNote: string | null;
+  auctionStatus: string;
+  awardAmount?: string;
 }
 
 /** Mirrors CategorizationResult in packages/api/src/ai/ai.types.ts (POST /ai/categorize). */

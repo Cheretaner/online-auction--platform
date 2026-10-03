@@ -7,6 +7,7 @@ import { setUnauthorizedHandler } from "@/lib/api/client";
 import { tokenStore } from "@/lib/auth/token-store";
 import type { AuthSession } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
+import { clearPrivateBidHistory } from "@/lib/query/private-bid-cache";
 import { useSessionQuery } from "@/features/auth/queries";
 
 interface AuthContextValue {
@@ -27,7 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       tokenStore.clear();
+      clearPrivateBidHistory();
       queryClient.setQueryData(queryKeys.session, null);
+      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === "auctions" && query.queryKey[2] === "bids" });
       navigate("/login", { replace: true });
     });
     return () => setUnauthorizedHandler(null);

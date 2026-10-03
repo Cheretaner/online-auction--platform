@@ -48,6 +48,7 @@ export async function listAuditEvents(input: {
   auctionId?: string;
   entityType?: string;
   entityId?: string;
+  orgId?: string;
   page: number;
   limit: number;
 }): Promise<{ items: AuditEvent[]; total: number }> {
@@ -96,6 +97,15 @@ export async function verifyAuditChain(auctionId?: string): Promise<ChainVerific
     eventCount: events.length,
     headHash: events.at(-1)?.hash ?? null,
   };
+}
+
+/** Returns the full ordered chain for an authorized evidence export. */
+export async function listAuditChain(auctionId: string): Promise<AuditEvent[]> {
+  return repo.listChain(auctionId);
+}
+
+export async function exportOrganizationAnalytics(orgId: string) {
+  return repo.listOrganizationAnalytics(orgId);
 }
 
 /** Actor role recorded for events raised by a scheduler or background job. */

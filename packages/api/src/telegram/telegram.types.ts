@@ -14,7 +14,10 @@ export interface TelegramUserProfile {
   telegramUsername: string | null;
   telegramChatId: string | null;
   telegramLinkedAt: string | null;
+  telegramLanguage: TelegramLanguage;
 }
+
+export type TelegramLanguage = "en" | "am";
 
 export type VoiceIntent = "bid" | "discover" | "status" | "verify" | "help" | "question";
 
