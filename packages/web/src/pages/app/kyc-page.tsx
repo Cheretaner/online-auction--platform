@@ -164,7 +164,7 @@ function SubmitForm() {
               name="documentNumber"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document number(12 digit FIN number if fayda) </FormLabel>
+                  <FormLabel>{t("kyc.documentNumberHint")}</FormLabel>
                   <FormControl>
                     <Input autoComplete="off" {...field} />
                   </FormControl>
@@ -173,7 +173,7 @@ function SubmitForm() {
               )}
             />
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="kyc-evidence">Document image or scan</Label>
+              <Label htmlFor="kyc-evidence">{t("kyc.evidence")}</Label>
               <Input
                 id="kyc-evidence"
                 type="file"

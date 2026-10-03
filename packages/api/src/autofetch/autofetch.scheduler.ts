@@ -170,7 +170,7 @@ export async function triggerRefetch(
   pool: Pool,
   sourceId: string,
   organizationId: string
-): Promise<{ queued: number; conflicts: number; errors: number }> {
+): Promise<{ fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }> {
   const service = new AutoFetchService(pool);
   return service.fetchAndQueue(sourceId, organizationId);
 }

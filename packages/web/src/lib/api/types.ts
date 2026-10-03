@@ -335,7 +335,39 @@ export interface AutofetchSource {
   name: string;
   adapterType: string;
   sourceUrl: string | null;
+  lastFetchedAt?: string;
+  lastFetchAttemptAt?: string;
+  lastFetchStatus?: "running" | "success" | "failed";
+  lastFetchSummary?: { fetched?: number; queued?: number; duplicates?: number; stale?: number; conflicts?: number; errors?: number };
+  lastFetchError?: string;
   createdAt?: string;
+}
+
+export interface DocumentOcrResult {
+  documentId: string;
+  status: "processing" | "completed" | "failed";
+  extractedText: string | null;
+  extractionMethod: "embedded_text" | "tesseract" | null;
+  confidence: number | null;
+  referenceCandidates: string[];
+  errorMessage: string | null;
+  reviewedText: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  updatedAt: string;
+}
+
+export interface DocumentOcrSearchHit {
+  documentId: string;
+  fileName: string;
+  mimeType: string;
+  excerpt: string;
+  reviewedAt: string;
+}
+
+export interface DepositReferenceOcrReview {
+  candidate: string;
+  matchesSubmittedReference: boolean;
 }
 
 export interface AutofetchPendingItem {
@@ -344,6 +376,9 @@ export interface AutofetchPendingItem {
   source?: string;
   status: string;
   title: string;
+  description?: string;
+  externalId?: string;
+  sourceUrl?: string;
   estimatedValue?: number;
   categoryName?: string;
   confidenceScore?: number;
@@ -356,9 +391,18 @@ export interface AutofetchPendingResult extends ItemList<AutofetchPendingItem> {
   total: number;
   hasMore: boolean;
 }
-export interface AutofetchFetchResult { queued: number; conflicts: number; errors: number }
+export interface AutofetchFetchResult { fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }
 export interface AutofetchPendingDetail { item: AutofetchPendingItem & { description?: string; normalizedMetadata?: Record<string, unknown> }; conflicts: unknown[] }
-export interface AutofetchConflictSummary { conflicts: unknown[]; count: number; critical: number; high: number; medium: number; low: number }
+export interface AutofetchConflictFlag {
+  id: string;
+  conflictType: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
+  confidenceScore: number;
+  conflictingAuctionId: string | null;
+  matchDetails: Record<string, unknown>;
+  createdAt: string;
+}
+export interface AutofetchConflictSummary { conflicts: AutofetchConflictFlag[]; count: number; critical: number; high: number; medium: number; low: number }
 export interface AutofetchStats { total: number; pending: number; approved: number; rejected: number }
 
 export interface AnomalyFlagRecord {

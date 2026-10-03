@@ -116,7 +116,7 @@ function Workspace({ auction }: { auction: Auction }) {
           <LotsManager auctionId={auction.id} editable={auction.status === "draft" && canManageAuctions(roles)} />
         </TabsContent>
         <TabsContent value="documents" className="pt-4">
-          <AuctionDocuments auctionId={auction.id} canUpload />
+          <AuctionDocuments auctionId={auction.id} canUpload canReview />
         </TabsContent>
         <TabsContent value="deposits" className="pt-4">
           {Number(auction.depositAmount) > 0 ? (

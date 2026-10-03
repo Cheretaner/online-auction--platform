@@ -30,6 +30,8 @@ export const queryKeys = {
   documents: {
     mine: ["documents", "me"] as const,
     detail: (id: string) => ["documents", id] as const,
+    ocr: (id: string) => ["documents", id, "ocr"] as const,
+    ocrSearch: (auctionId: string, q: string) => ["documents", "ocr-search", auctionId, q] as const,
   },
   verification: {
     mine: ["verification", "me"] as const,
@@ -70,6 +72,7 @@ export const queryKeys = {
   autofetch: {
     sources: ["autofetch", "sources"] as const,
     pending: (filters?: unknown) => ["autofetch", "pending", filters] as const,
+    conflicts: (id: string) => ["autofetch", "conflicts", id] as const,
     stats: ["autofetch", "stats"] as const,
   },
 };

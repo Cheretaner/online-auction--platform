@@ -23,6 +23,7 @@ documentRouter.post(
 );
 
 documentRouter.get("/me", requireAuth(), asyncHandler(controller.listMine));
+documentRouter.get("/ocr/search", requireAuth(), asyncHandler(controller.searchReviewedOcr));
 
 documentRouter.get(
   "/",
@@ -33,3 +34,7 @@ documentRouter.get(
 
 documentRouter.get("/:id", requireAuth(), asyncHandler(controller.getById));
 documentRouter.get("/:id/content", requireAuth(), asyncHandler(controller.download));
+documentRouter.get("/:id/ocr", requireAuth(), asyncHandler(controller.getOcr));
+documentRouter.post("/:id/ocr", requireAuth(), asyncHandler(controller.startOcr));
+documentRouter.post("/:id/ocr/review", requireAuth(), asyncHandler(controller.reviewOcr));
+documentRouter.post("/:id/ocr/reference-review", requireAuth(), asyncHandler(controller.reviewOcrReference));

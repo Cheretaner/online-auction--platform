@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { DOCUMENT_TYPES, type DocumentType } from "@auction/shared";
-import { Download, FolderOpen, Lock } from "lucide-react";
+import { Download, FolderOpen, Lock, Search } from "lucide-react";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -13,8 +13,10 @@ import { getErrorMessage } from "@/lib/api/errors";
 import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
 import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
+import { Textarea } from "@/components/ui/textarea";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { useT } from "@/i18n/context";
+import { useDocumentOcr, useReviewDocumentOcr, useSearchReviewedOcr, useStartDocumentOcr } from "@/features/operations/queries";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,12 +24,22 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DocumentRow({ doc }: { doc: DocumentRecord }) {
+const OCR_DOCUMENT_TYPES = new Set<DocumentType>(["specification", "inspection_report", "terms", "other"]);
+
+export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; canReview?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [showOcr, setShowOcr] = useState(false);
+  const [reviewedText, setReviewedText] = useState("");
   const t = useT("auctions");
   const tc = useT("common");
+  const ocr = useDocumentOcr(doc.id, canReview && showOcr);
+  const startOcr = useStartDocumentOcr(doc.id);
+  const reviewOcr = useReviewDocumentOcr(doc.id);
+  const supportsOcr = OCR_DOCUMENT_TYPES.has(doc.documentType) &&
+    (doc.mimeType === "application/pdf" || doc.mimeType.startsWith("image/"));
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 border-b py-3 first:pt-0 last:border-0 last:pb-0">
+    <li className="border-b py-3 first:pt-0 last:border-0 last:pb-0">
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
           {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("documents.private")} /> : null}
@@ -38,6 +50,22 @@ export function DocumentRow({ doc }: { doc: DocumentRecord }) {
         </p>
       </div>
       <div className="flex gap-2">
+        {canReview && supportsOcr ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (showOcr) setShowOcr(false);
+              else {
+                setShowOcr(true);
+                startOcr.mutate(undefined, {
+                  onSuccess: ({ item }) => setReviewedText(item.reviewedText ?? item.extractedText ?? ""),
+                  onError: (error) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))),
+                });
+              }
+            }}
+          >{showOcr ? t("documents.hideOcr") : ocr.data ? t("documents.viewOcr") : t("documents.extractText")}</Button>
+        ) : null}
         <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} />
         <Button
           size="sm"
@@ -54,22 +82,63 @@ export function DocumentRow({ doc }: { doc: DocumentRecord }) {
           {busy ? tc("downloading") : tc("download")}
         </Button>
       </div>
+      </div>
+      {showOcr ? (
+        <div className="mt-3 space-y-3 rounded-md border bg-muted/20 p-3">
+          {ocr.data?.status === "processing" ? <p role="status" className="text-sm">{t("documents.ocrProcessing")}</p> : null}
+          {ocr.data?.status === "failed" ? (
+            <div className="space-y-2">
+              <p role="alert" className="text-sm text-destructive">{ocr.data.errorMessage ?? t("documents.ocrFailed")}</p>
+              <Button size="sm" variant="outline" onClick={() => startOcr.mutate()} loading={startOcr.isPending}>{t("documents.retryOcr")}</Button>
+            </div>
+          ) : null}
+          {ocr.data?.status === "completed" ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {ocr.data.reviewedAt ? t("documents.humanReviewed") : t("documents.verifyNotice")}
+                {ocr.data.confidence !== null ? ` · ${t("documents.confidence", { value: Math.round(ocr.data.confidence) })}` : ""}
+              </p>
+              <Textarea
+                value={reviewedText || ocr.data.reviewedText || ocr.data.extractedText || ""}
+                onChange={(event) => setReviewedText(event.target.value)}
+                rows={10}
+                maxLength={500_000}
+                aria-label={t("documents.extractedText")}
+                readOnly={Boolean(ocr.data.reviewedAt)}
+              />
+              {!ocr.data.reviewedAt ? (
+                <Button
+                  size="sm"
+                  loading={reviewOcr.isPending}
+                  onClick={() => reviewOcr.mutate(reviewedText || ocr.data?.extractedText || "", {
+                    onSuccess: ({ item }) => setReviewedText(item.reviewedText ?? ""),
+                    onError: (error) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))),
+                  })}
+                >{t("documents.confirmOcr")}</Button>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </li>
   );
 }
 
 /** The auction's document pack. Staff also get an upload form; the API
  * decides what each viewer may see. */
-export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; canUpload?: boolean }) {
+export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionId: string; canUpload?: boolean; canReview?: boolean }) {
   const docs = useAuctionDocuments(auctionId);
   const upload = useUploadDocument();
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState<DocumentType>("specification");
   const [publicDoc, setPublicDoc] = useState(true);
+  const [ocrQuery, setOcrQuery] = useState("");
+  const [ocrSearch, setOcrSearch] = useState("");
   const t = useT("auctions");
   const tc = useT("common");
 
   const items = docs.data?.items ?? [];
+  const ocrResults = useSearchReviewedOcr(auctionId, ocrSearch);
 
   return (
     <div className="space-y-4">
@@ -82,10 +151,42 @@ export function AuctionDocuments({ auctionId, canUpload }: { auctionId: string; 
       ) : (
         <ul>
           {items.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} />
+            <DocumentRow key={doc.id} doc={doc} canReview={canReview} />
           ))}
         </ul>
       )}
+
+      {canReview ? (
+        <section className="space-y-3 rounded-lg border p-4" aria-label={t("documents.searchOcr")}>
+          <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => {
+            event.preventDefault();
+            setOcrSearch(ocrQuery.trim());
+          }}>
+            <div className="min-w-56 flex-1 space-y-1.5">
+              <Label htmlFor={`ocr-search-${auctionId}`}>{t("documents.searchOcr")}</Label>
+              <Input id={`ocr-search-${auctionId}`} value={ocrQuery} onChange={(event) => setOcrQuery(event.target.value)} minLength={2} maxLength={120} />
+            </div>
+            <Button type="submit" variant="outline" disabled={ocrQuery.trim().length < 2}><Search aria-hidden />{t("documents.search")}</Button>
+          </form>
+          {ocrSearch ? (
+            ocrResults.isLoading ? <p className="text-sm text-muted-foreground">{tc("loading")}</p> :
+            ocrResults.data?.items.length ? (
+              <ul className="space-y-2 text-sm">
+                {ocrResults.data.items.map((hit) => (
+                  <li key={hit.documentId} className="rounded-md bg-muted/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">{hit.fileName}</p>
+                      <DocumentPreviewButton documentId={hit.documentId} fileName={hit.fileName} mimeType={hit.mimeType} />
+                    </div>
+                    <p className="mt-1 text-muted-foreground">{hit.excerpt}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("documents.humanReviewed")} · {formatDateTime(hit.reviewedAt)}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-sm text-muted-foreground">{t("documents.noOcrMatches")}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       {canUpload ? (
         <form

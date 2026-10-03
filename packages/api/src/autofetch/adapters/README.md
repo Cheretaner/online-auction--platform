@@ -279,9 +279,9 @@ Config:
   "apiKey": "optional-api-key",
   "itemsPath": "data.items",  // JSON path to items array
   "mappings": {
-    "id": "externalId",
-    "name": "title",
-    "estimate": "estimatedValue"
+    "externalId": "id",
+    "title": "name",
+    "estimatedValue": "estimate"
   }
 }
 ```
@@ -297,10 +297,54 @@ Config:
   "mappings": {
     "title": "title",
     "description": "description",
-    "value": "estimatedValue"
+    "estimatedValue": "value"
   }
 }
 ```
+
+### web-scraper
+
+Fetches one public HTML page and extracts Schema.org JSON-LD product-like
+records (`Product`, `Vehicle`, and `RealEstateListing`). If no such records
+exist, it can use a single Open Graph title/description/price record. It does
+not execute JavaScript or use an AI model to guess fields. Results are always
+pending for officer review.
+
+Config:
+```json
+{
+  "mappings": {
+    "title": "name",
+    "description": "description",
+    "estimatedValue": "offers.price",
+    "region": "address.addressRegion",
+    "city": "address.addressLocality",
+    "externalId": "sku"
+  }
+}
+```
+
+Mapping keys are normalized auction fields; values are dotted paths into a
+Schema.org record. Built-in paths work when `mappings` is omitted, and a
+custom path overrides only the field named. The adapter caps HTML at 2 MiB,
+times out requests, follows at most three redirects, accepts only HTTP/HTTPS
+on standard web ports, resolves and pins public IP addresses, and rejects
+private/reserved destinations at every redirect. Pages without a mapped
+title produce no queue item. For example, create the source using:
+
+```json
+{
+  "name": "Public asset notices",
+  "adapterType": "web-scraper",
+  "sourceUrl": "https://public.example.org/notices/asset-123",
+  "adapterConfig": { "mappings": { "title": "name", "estimatedValue": "offers.price" } }
+}
+```
+
+Only scrape sources that permit automated access. Respect their published
+terms, robots directives, rate limits, and copyright restrictions; prefer an
+official API or RSS feed when one exists. JavaScript-only pages and layouts
+without supported structured metadata need a source-specific adapter.
 
 ## Guidelines
 

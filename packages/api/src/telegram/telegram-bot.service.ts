@@ -67,16 +67,35 @@ export class TelegramBotService {
       }
     });
 
-    // Logging & rate-limit stub
+    // Per-account limits apply before expensive audio processing or bidding.
     this.bot.use(async (ctx, next) => {
       const from = ctx.from;
       const incomingText = ctx.message && "text" in ctx.message ? ctx.message.text : undefined;
       logger.debug({ fromId: from?.id, username: from?.username, hasText: typeof incomingText === "string" }, "Telegram update received");
+      const callbackData = ctx.callbackQuery && "data" in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
+      const action = ctx.chat?.type === "private" && from
+        ? ctx.message && ("voice" in ctx.message || "audio" in ctx.message)
+          ? "voice"
+          : (typeof incomingText === "string" && /^\/bid(?:@\w+)?(?:\s|$)/i.test(incomingText)) ||
+              (typeof callbackData === "string" && callbackData.startsWith("bidconfirm_"))
+            ? "bid"
+            : null
+        : null;
+      if (action && from && !await telegramRepo.consumeActionRateLimit(
+        from.id,
+        action,
+        env.SUBMISSION_RATE_WINDOW_MS,
+        env.SUBMISSION_RATE_LIMIT_MAX,
+      )) {
+        await ctx.reply("Too many requests. Please wait a little before sending another voice note or bid.");
+        return;
+      }
       await next();
     });
 
     // Command: /start [param]
     this.bot.start(async (ctx) => {
+      if (!await this.requirePrivateChat(ctx)) return;
       const payload = ctx.payload?.trim();
       const from = ctx.from;
 
@@ -121,7 +140,7 @@ export class TelegramBotService {
         `• /link &lt;code&gt; - Connect your portal profile`,
         `• /help - Full command reference & voice guidance`,
         ``,
-        `🎙️ <b>Voice Enabled:</b> You can send voice notes in English or Amharic (አማርኛ) to check auctions, ask questions, or place bids!`,
+        `🎙️ <b>Voice notes:</b> ${env.AI_PROVIDER !== "stub" && (env.GEMINI_API_KEY || env.OPENROUTER_API_KEY) ? "English and Amharic voice notes are available; every bid requires your confirmation." : "Voice transcription is currently unavailable. Use the text commands below."}`,
       ].join("\n");
 
       await ctx.reply(welcome, {
@@ -141,6 +160,7 @@ export class TelegramBotService {
 
     // Command: /link <code>
     this.bot.command("link", async (ctx) => {
+      if (!await this.requirePrivateChat(ctx)) return;
       const parts = ctx.message.text.split(/\s+/);
       if (parts.length < 2) {
         await ctx.reply(
@@ -159,6 +179,7 @@ export class TelegramBotService {
 
     // Command: /view <id>
     this.bot.command("view", async (ctx) => {
+      if (!await this.requirePrivateChat(ctx)) return;
       const parts = ctx.message.text.split(/\s+/);
       if (parts.length < 2) {
         await ctx.reply("ℹ️ Please specify the auction ID. Example: <code>/view &lt;auction-id&gt;</code>", { parse_mode: "HTML" });
@@ -279,6 +300,12 @@ export class TelegramBotService {
 
   // --- HANDLERS ---
 
+  private async requirePrivateChat(ctx: any): Promise<boolean> {
+    if (ctx.chat?.type === "private") return true;
+    await ctx.reply("For account safety, please use this command in a private chat with the auction bot.");
+    return false;
+  }
+
   private async handleLinkToken(ctx: any, token: string): Promise<void> {
     const from = ctx.from;
     const consumed = await telegramRepo.consumeLinkToken(token);
@@ -354,6 +381,7 @@ export class TelegramBotService {
   }
 
   private async handleViewAuction(ctx: any, auctionId: string): Promise<void> {
+    if (!await this.requirePrivateChat(ctx)) return;
     const auction = await auctionRepo.findById(auctionId);
     if (!auction) {
       await ctx.reply("❌ Auction not found.");
@@ -402,6 +430,7 @@ export class TelegramBotService {
   }
 
   private async handlePlaceBid(ctx: any, auctionId: string, rawAmount: string): Promise<void> {
+    if (!await this.requirePrivateChat(ctx)) return;
     const from = ctx.from;
     const amount = rawAmount.replace(/[^0-9.]/g, "");
 
@@ -430,7 +459,11 @@ export class TelegramBotService {
     await ctx.sendChatAction("typing");
 
     try {
-      const idempotencyKey = `tg-${from.id}-${auctionId}-${Date.now()}`;
+      const callbackQuery = ctx.callbackQuery as { message?: { message_id?: number; chat?: { id?: number } } } | undefined;
+      const confirmationMessageId = callbackQuery?.message?.message_id;
+      const idempotencyKey = confirmationMessageId
+        ? `tg-confirm-${from.id}-${callbackQuery?.message?.chat?.id ?? ctx.chat?.id}-${confirmationMessageId}`
+        : `tg-update-${ctx.update.update_id}`;
       const result = await biddingService.placeBid({
         auctionId,
         bidderId: profile.id,
@@ -439,6 +472,11 @@ export class TelegramBotService {
         idempotencyKey,
         ip: `telegram:${from.id}`,
       });
+
+      if (result.audit.sequenceNo === 0) {
+        await ctx.reply("This bid confirmation was already processed. No additional bid was placed.");
+        return;
+      }
 
       const response = [
         `🎉 <b>Bid Placed Successfully!</b>`,
@@ -468,6 +506,7 @@ export class TelegramBotService {
   }
 
   private async handleStatus(ctx: any): Promise<void> {
+    if (!await this.requirePrivateChat(ctx)) return;
     const from = ctx.from;
     const profile = await telegramRepo.findProfileByTelegramId(from.id);
 
@@ -541,7 +580,7 @@ export class TelegramBotService {
       `• <code>/link &lt;code&gt;</code> - Connect with your portal account`,
       ``,
       `🎙️ <b>Voice Commands & Audio Notes:</b>`,
-      `Simply record and send a voice message in English or Amharic! Examples:`,
+      `Voice support depends on the configured transcription provider. Bid actions always require an explicit confirmation and still pass the regular account, KYC, deposit and bidding checks. Examples:`,
       `• <i>"Show me live vehicle auctions"</i>`,
       `• <i>"What is the current highest bid on auction 3?"</i>`,
       `• <i>"Bid 150000 birr on auction 7b2c"</i>`,
@@ -566,6 +605,10 @@ export class TelegramBotService {
       await ctx.reply("🎧 <i>Transcribing and analyzing voice message...</i>", { parse_mode: "HTML" });
 
       const result = await processVoiceNote(audioBuffer, voice.mime_type || "audio/ogg");
+      if (!result.available) {
+        await ctx.reply(`${result.details ?? "Voice transcription is unavailable."} Use /auctions, /status, /verify, or /bid as text commands.`);
+        return;
+      }
 
       const header = [
         `🎙️ <b>Voice Heard:</b> "${escapeHtml(result.transcription)}"`,
@@ -575,12 +618,16 @@ export class TelegramBotService {
       await ctx.reply(header, { parse_mode: "HTML" });
 
       // Action based on intent
-      if (result.intent === "bid" && result.amount && (result.auctionId || result.auctionNumber)) {
+      if (result.intent === "bid") {
+        if (!result.amount || (!result.auctionId && !result.auctionNumber)) {
+          await ctx.reply("I could not confidently identify both an auction and an amount. No bid was placed. Please use /bid <auction-id> <amount>.");
+          return;
+        }
+        const live = (await auctionRepo.listPublicAuctions({ status: "live", limit: 50, offset: 0 })).items;
         let targetAuctionId = result.auctionId;
 
         // If auction number was spoken (e.g. "auction 1" or "auction 2"), resolve from live list
         if (!targetAuctionId && result.auctionNumber) {
-          const live = (await auctionRepo.listPublicAuctions({ status: "live", limit: 50, offset: 0 })).items;
           const idx = Number(result.auctionNumber) - 1;
           if (idx >= 0 && idx < live.length) {
             targetAuctionId = live[idx].id;
@@ -588,7 +635,7 @@ export class TelegramBotService {
         }
 
         if (targetAuctionId) {
-          const auction = await auctionRepo.findById(targetAuctionId);
+          const auction = live.find((candidate) => candidate.id === targetAuctionId);
           if (auction) {
             await ctx.reply(
               `⚠️ <b>Confirm Voice Bid</b>\n\n` +
@@ -608,6 +655,8 @@ export class TelegramBotService {
             return;
           }
         }
+        await ctx.reply("I could not match that to a live public auction. No bid was placed. Use /auctions to see current auction IDs.");
+        return;
       }
 
       if (result.intent === "discover") {

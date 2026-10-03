@@ -21,6 +21,8 @@ export type VoiceIntent = "bid" | "discover" | "status" | "verify" | "help" | "q
 export interface VoiceParseResult {
   transcription: string;
   intent: VoiceIntent;
+  available?: boolean;
+  provider?: string;
   auctionId?: string | null;
   auctionNumber?: number | null;
   amount?: string | null;

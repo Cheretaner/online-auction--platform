@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@auction/shared": "workspace:*",
+    "@napi-rs/canvas": "^1.0.10",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -28,11 +29,13 @@
     "marked": "^18.0.14",
     "multer": "^2.4.0",
     "nodemailer": "^7.0.13",
+    "pdfjs-dist": "^4.10.38",
     "pg": "^8.16.3",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "sanitize-html": "^2.18.0",
     "telegraf": "^4.16.3",
+    "tesseract.js": "^7.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

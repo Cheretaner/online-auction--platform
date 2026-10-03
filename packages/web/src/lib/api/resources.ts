@@ -39,6 +39,9 @@ import type {
   FinancialReconciliationSnapshot,
   DisputeRecord,
   DocumentRecord,
+  DocumentOcrResult,
+  DocumentOcrSearchHit,
+  DepositReferenceOcrReview,
   ItemList,
   NotificationRecord,
   ReportRecord,
@@ -97,6 +100,14 @@ export const documentsApi = {
   listByAuction: (auctionId: string) =>
     apiRequest<ItemList<DocumentRecord>>(v1(`/documents${queryString({ auctionId })}`)),
   getById: (id: string) => apiRequest<DocumentRecord>(v1(`/documents/${id}`)),
+  getOcr: (id: string) => apiRequest<{ item: DocumentOcrResult | null }>(v1(`/documents/${id}/ocr`)),
+  startOcr: (id: string) => apiRequest<{ item: DocumentOcrResult }>(v1(`/documents/${id}/ocr`), { method: "POST" }),
+  reviewOcr: (id: string, reviewedText: string) =>
+    apiRequest<{ item: DocumentOcrResult }>(v1(`/documents/${id}/ocr/review`), { method: "POST", body: { reviewedText } }),
+  searchOcr: (auctionId: string, q: string) =>
+    apiRequest<{ items: DocumentOcrSearchHit[] }>(v1(`/documents/ocr/search${queryString({ auctionId, q })}`)),
+  reviewOcrReference: (id: string, candidate: string) =>
+    apiRequest<{ item: DepositReferenceOcrReview }>(v1(`/documents/${id}/ocr/reference-review`), { method: "POST", body: { candidate } }),
   download: (id: string) => apiRequest<Blob>(v1(`/documents/${id}/content`), { parse: "blob" }),
 };
 

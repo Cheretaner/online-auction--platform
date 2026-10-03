@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Gavel, Lock, MapPin, Package } from "lucide-react";
@@ -31,6 +31,18 @@ export default function AuctionDetailPage() {
   const { isAuthenticated, session } = useAuth();
   const bids = useAuctionBids(id, isAuthenticated);
   const queryClient = useQueryClient();
+  const [online, setOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
 
   useEffect(() => {
     if (!id || !isAuthenticated) return;
@@ -41,18 +53,26 @@ export default function AuctionDetailPage() {
   }, [id, isAuthenticated, queryClient]);
 
   const isBidder = isAuthenticated && hasRole(session?.roles ?? [], "bidder");
+  const canReviewDocuments = (session?.roles ?? []).some((role) =>
+    ["auction_officer", "org_admin", "compliance_officer", "super_admin"].includes(role),
+  );
   const record = auction.data;
   const t = useT("auctions");
 
   return (
     <QueryState
       isLoading={auction.isLoading}
-      isError={auction.isError}
+      isError={auction.isError && !auction.data}
       error={auction.error}
       onRetry={() => auction.refetch()}
     >
       {record ? (
         <div className="space-y-6">
+          {!online ? (
+            <p role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+              {t("detail.offlineCached", { time: formatDateTime(new Date(auction.dataUpdatedAt).toISOString()) })}
+            </p>
+          ) : null}
           <PageHeader
             back={{ to: "/auctions", label: t("detail.back") }}
             title={record.title}
@@ -78,20 +98,20 @@ export default function AuctionDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Lots</CardTitle>
+              <CardTitle>{t("detail.lots")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {(items.data?.items ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No lots published yet.</p>
+                <p className="text-sm text-muted-foreground">{t("detail.noLots")}</p>
               ) : (
                 items.data?.items.map((item) => (
                   <div key={item.id} className="rounded-md border p-3">
                     <p className="font-medium">{item.title}</p>
                     {item.description ? <p className="text-sm text-muted-foreground">{item.description}</p> : null}
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Quantity {item.quantity} {item.unit ?? ""}
-                      {item.condition ? ` · ${item.condition.replaceAll("_", " ")}` : ""}
-                      {item.region ? ` · ${item.region}` : ""}
+                      {t("detail.quantity", { quantity: item.quantity, unit: item.unit ?? "" })}
+                      {item.condition ? ` · ${enumLabel(item.condition)}` : ""}
+                      {item.region ? ` · ${regionLabel(item.region)}` : ""}
                     </p>
                   </div>
                 ))
@@ -136,7 +156,7 @@ export default function AuctionDetailPage() {
                     <CardDescription>{t("detail.documentsDescription")}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <AuctionDocuments auctionId={record.id} />
+                    <AuctionDocuments auctionId={record.id} canReview={canReviewDocuments} />
                   </CardContent>
                 </Card>
               ) : null}
@@ -181,7 +201,7 @@ export default function AuctionDetailPage() {
 
             <aside className="order-1 lg:sticky lg:top-32 lg:order-2" aria-label={t("detail.takePart")}>
               {isBidder ? (
-                <Participation auction={record} />
+          <Participation auction={record} online={online} />
               ) : !isAuthenticated ? (
                 <Card className="border-primary/30">
                   <CardHeader>
@@ -245,7 +265,7 @@ function KeyFacts({ auction }: { auction: Auction }) {
   );
 }
 
-function Participation({ auction }: { auction: Auction }) {
+function Participation({ auction, online }: { auction: Auction; online: boolean }) {
   const readiness = useBidderReadiness(auction);
   const t = useT("auctions");
   const open = auction.status === "live";
@@ -262,7 +282,7 @@ function Participation({ auction }: { auction: Auction }) {
       <CardContent className="@container space-y-6">
         {readiness.ready ? null : <BidderReadinessPanel auction={auction} readiness={readiness} />}
         {open ? (
-          <BidForm auction={auction} disabled={!readiness.ready && !readiness.loading} />
+          <BidForm auction={auction} disabled={!online || (!readiness.ready && !readiness.loading)} />
         ) : (
           <p className="text-sm text-muted-foreground">{t("detail.opensOn", { date: formatDateTime(auction.opensAt) })}</p>
         )}

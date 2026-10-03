@@ -121,7 +121,10 @@ export interface PendingItem {
 export interface PendingQueueItem {
   id: string;
   title: string;
+  description?: string;
+  externalId?: string;
   source: string;
+  sourceUrl?: string;
   estimatedValue?: number;
   categoryName?: string;
   confidenceScore: number;
@@ -170,6 +173,10 @@ export interface SourceConfig {
   adapterConfig: Record<string, unknown>;
   isActive: boolean;
   lastFetchedAt?: Date;
+  lastFetchAttemptAt?: Date;
+  lastFetchStatus?: 'running' | 'success' | 'failed';
+  lastFetchSummary?: Record<string, unknown>;
+  lastFetchError?: string;
   nextFetchAt?: Date;
   createdAt: Date;
   updatedAt: Date;

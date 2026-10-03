@@ -144,16 +144,19 @@ export class AutoFetchRepository {
   async updateSourceFetchMetadata(
     sourceId: string,
     lastFetchedAt: Date,
-    nextFetchAt: Date
+    nextFetchAt: Date,
+    summary: Record<string, unknown>
   ): Promise<void> {
     try {
       const query = `
         UPDATE autofetch_sources
-        SET last_fetched_at = $1, next_fetch_at = $2, updated_at = NOW()
-        WHERE id = $3
+        SET last_fetched_at = $1, next_fetch_at = $2, last_fetch_attempt_at = NOW(),
+            last_fetch_status = 'success', last_fetch_summary = $3, last_fetch_error = NULL,
+            updated_at = NOW()
+        WHERE id = $4
       `;
 
-      await this.pool.query(query, [lastFetchedAt, nextFetchAt, sourceId]);
+      await this.pool.query(query, [lastFetchedAt, nextFetchAt, JSON.stringify(summary), sourceId]);
     } catch (error) {
       logger.error({
         event: 'autofetch_repo:update_source_metadata_error',
@@ -162,6 +165,25 @@ export class AutoFetchRepository {
       });
       throw error;
     }
+  }
+
+  async markSourceFetchStarted(sourceId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE autofetch_sources
+       SET last_fetch_attempt_at = NOW(), last_fetch_status = 'running', last_fetch_error = NULL, updated_at = NOW()
+       WHERE id = $1`,
+      [sourceId],
+    );
+  }
+
+  async markSourceFetchFailed(sourceId: string, error: string, nextFetchAt: Date): Promise<void> {
+    await this.pool.query(
+      `UPDATE autofetch_sources
+       SET last_fetch_attempt_at = NOW(), last_fetch_status = 'failed', last_fetch_error = $1,
+           next_fetch_at = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [error.slice(0, 500), nextFetchAt, sourceId],
+    );
   }
 
   // ========================================================================
@@ -267,7 +289,10 @@ export class AutoFetchRepository {
         SELECT
           api.id,
           api.title,
+          api.description,
+          api.external_id,
           asrc.name as source,
+          asrc.source_url,
           api.estimated_value,
           api.category_suggestion,
           api.ai_confidence,
@@ -280,7 +305,7 @@ export class AutoFetchRepository {
         LEFT JOIN autofetch_sources asrc ON api.source_id = asrc.id
         LEFT JOIN autofetch_conflicts ac ON api.id = ac.pending_item_id
         WHERE ${whereClause}
-        GROUP BY api.id, asrc.name
+        GROUP BY api.id, asrc.name, asrc.source_url
         ORDER BY api.created_at DESC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
@@ -290,7 +315,10 @@ export class AutoFetchRepository {
       const items: PendingQueueItem[] = result.rows.map((row) => ({
         id: row.id,
         title: row.title,
+        description: row.description ?? undefined,
+        externalId: row.external_id ?? undefined,
         source: row.source,
+        sourceUrl: row.source_url ?? undefined,
         estimatedValue: row.estimated_value ? Number(row.estimated_value) : undefined,
         categoryName: row.category_suggestion,
         confidenceScore: row.ai_confidence,
@@ -500,6 +528,10 @@ export class AutoFetchRepository {
       adapterConfig: row.config || {},
       isActive: row.is_active,
       lastFetchedAt: row.last_fetched_at ? new Date(row.last_fetched_at) : undefined,
+      lastFetchAttemptAt: row.last_fetch_attempt_at ? new Date(row.last_fetch_attempt_at) : undefined,
+      lastFetchStatus: row.last_fetch_status ?? undefined,
+      lastFetchSummary: row.last_fetch_summary ?? {},
+      lastFetchError: row.last_fetch_error ?? undefined,
       nextFetchAt: row.next_fetch_at ? new Date(row.next_fetch_at) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

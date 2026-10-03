@@ -31,6 +31,7 @@ export async function askAssistant(
     `Audit workspace (authorized staff): ${webBaseUrl}/app/audit`,
   ].join("\n");
   const contextParts = [
+    "Language requirement: Reply in the same language as the user's question. Support English and Amharic (አማርኛ). Preserve auction names, identifiers, dates, and ETB amounts exactly as provided. If the question mixes languages, use the language used for the main request.",
     `Verified Cheretanet website guide:\n${PLATFORM_GUIDE}`,
     `Website base URL: ${webBaseUrl}`,
     `Verified website links (use Markdown links with these exact URLs; signed-in and staff pages require the stated access):\n${websiteLinks}`,

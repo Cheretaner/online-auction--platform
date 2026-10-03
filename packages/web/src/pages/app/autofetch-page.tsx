@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from "react";
-import { CheckCircle2, Inbox, Radar, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Inbox, Radar, RefreshCw, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
@@ -9,12 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
 import { StatCard } from "@/components/ui/stat-card";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useOrgAuctions } from "@/features/auctions/queries";
 import {
   useApproveAutofetchItem,
   useAutofetchPending,
+  useAutofetchConflicts,
   useAutofetchSources,
   useAutofetchStats,
   useCreateAutofetchSource,
@@ -96,7 +98,7 @@ export default function AutofetchPage() {
                   disabled={fetchSource.isPending}
                   onClick={() =>
                     fetchSource.mutate(source.id, {
-                      onSuccess: () => toast.success(t("autofetch.fetchFinished", { name: source.name })),
+                      onSuccess: (result) => toast.message(t("autofetch.fetchSummary", { ...result })),
                       onError: (error) => toast.error(getErrorMessage(error)),
                     })
                   }
@@ -104,6 +106,32 @@ export default function AutofetchPage() {
                   {fetchSource.isPending && fetchSource.variables === source.id ? null : <RefreshCw aria-hidden />}
                   {t("autofetch.fetch")}
                 </Button>
+                <div className="w-full text-xs text-muted-foreground">
+                  {source.lastFetchStatus === "failed" ? (
+                    <>
+                      <p className="text-destructive">{t("autofetch.lastFetchFailure", { error: source.lastFetchError ?? "Unknown error" })}</p>
+                      {source.lastFetchedAt && <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>}
+                    </>
+                  ) : source.lastFetchStatus === "running" ? (
+                    <p>{t("autofetch.fetchRunning")}</p>
+                  ) : source.lastFetchedAt ? (
+                    <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>
+                  ) : (
+                    <p>{t("autofetch.neverFetched")}</p>
+                  )}
+                  {source.lastFetchStatus === "success" && source.lastFetchSummary && (
+                    <p>
+                      {t("autofetch.fetchSummary", {
+                        fetched: source.lastFetchSummary.fetched ?? 0,
+                        queued: source.lastFetchSummary.queued ?? 0,
+                        duplicates: source.lastFetchSummary.duplicates ?? 0,
+                        stale: source.lastFetchSummary.stale ?? 0,
+                        errors: source.lastFetchSummary.errors ?? 0,
+                        conflicts: source.lastFetchSummary.conflicts ?? 0,
+                      })}
+                    </p>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -120,17 +148,30 @@ function AddSourceForm() {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [adapterType, setAdapterType] = useState("rss-feed");
+  const [mappingText, setMappingText] = useState("");
   const t = useT("tools");
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    let adapterConfig: Record<string, unknown> = {};
+    if (adapterType === "web-scraper" && mappingText.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(mappingText);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object");
+        adapterConfig = { mappings: parsed as Record<string, unknown> };
+      } catch {
+        toast.error(t("autofetch.invalidMappings"));
+        return;
+      }
+    }
     createSource.mutate(
-      { name, adapterType, sourceUrl: url, adapterConfig: {} },
+      { name, adapterType, sourceUrl: url, adapterConfig },
       {
         onSuccess: () => {
           toast.success(t("autofetch.sourceAdded"));
           setName("");
           setUrl("");
+          setMappingText("");
         },
         onError: (error) => toast.error(getErrorMessage(error)),
       },
@@ -165,11 +206,26 @@ function AddSourceForm() {
             <NativeSelect id={`${id}-type`} value={adapterType} onChange={(event) => setAdapterType(event.target.value)}>
               <option value="rss-feed">{t("autofetch.rss")}</option>
               <option value="json-feed">{t("autofetch.json")}</option>
+              <option value="web-scraper">{t("autofetch.webScraper")}</option>
             </NativeSelect>
           </div>
           <Button type="submit" loading={createSource.isPending}>
             {t("autofetch.add")}
           </Button>
+          {adapterType === "web-scraper" && (
+            <div className="space-y-1.5 md:col-span-4">
+              <Label htmlFor={`${id}-mappings`}>{t("autofetch.mappings")}</Label>
+              <Textarea
+                id={`${id}-mappings`}
+                value={mappingText}
+                onChange={(event) => setMappingText(event.target.value)}
+                placeholder={'{"title":"name","estimatedValue":"offers.price","region":"address.addressRegion"}'}
+                spellCheck={false}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">{t("autofetch.mappingsHelp")}</p>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>
@@ -183,6 +239,8 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const reject = useRejectAutofetchItem();
   const [auctionId, setAuctionId] = useState("");
   const [reason, setReason] = useState("");
+  const [showConflicts, setShowConflicts] = useState(false);
+  const conflictDetails = useAutofetchConflicts(item.id, showConflicts);
   const conflicts = item.conflictCount ?? 0;
   const t = useT("tools");
 
@@ -198,6 +256,26 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 score: item.confidenceScore ?? 0,
               })}
             </p>
+            <p className="mt-2 text-sm text-muted-foreground">{item.description || t("autofetch.noDescription")}</p>
+            {(item.estimatedValue != null || item.categoryName) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {item.estimatedValue != null && new Intl.NumberFormat(undefined, { style: "currency", currency: "ETB" }).format(item.estimatedValue)}
+                {item.estimatedValue != null && item.categoryName ? " · " : ""}
+                {item.categoryName}
+              </p>
+            )}
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {safePublicUrl(item.externalId) && (
+                <a className="underline underline-offset-2" href={safePublicUrl(item.externalId)} target="_blank" rel="noopener noreferrer">
+                  {t("autofetch.openSource")}
+                </a>
+              )}
+              {safePublicUrl(item.sourceUrl) && (
+                <a className="underline underline-offset-2 text-muted-foreground" href={safePublicUrl(item.sourceUrl)} target="_blank" rel="noopener noreferrer">
+                  {t("autofetch.sourceEndpoint")}
+                </a>
+              )}
+            </p>
           </div>
           <Badge variant={item.highSeverityConflicts ? "destructive" : conflicts ? "warning" : "muted"}>
             {conflicts === 1 ? t("autofetch.conflictsOne") : t("autofetch.conflictsOther", { count: conflicts })}
@@ -205,6 +283,32 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
         </div>
 
         <div className="grid gap-4 border-t pt-5 lg:grid-cols-2">
+          {conflicts > 0 && (
+            <section className="space-y-2 lg:col-span-2" aria-label={t("autofetch.conflictsDetails")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-expanded={showConflicts}
+                onClick={() => setShowConflicts((value) => !value)}
+              >
+                <ChevronDown aria-hidden className={showConflicts ? "rotate-180" : undefined} />
+                {t("autofetch.reviewConflicts", { count: conflicts })}
+              </Button>
+              {showConflicts && (
+                conflictDetails.isLoading ? <p className="text-sm text-muted-foreground">{t("autofetch.loadingConflicts")}</p> :
+                conflictDetails.isError ? <p className="text-sm text-destructive">{getErrorMessage(conflictDetails.error)}</p> :
+                <ul className="space-y-2 rounded-md border p-3 text-sm">
+                  {(conflictDetails.data?.conflicts ?? []).map((conflict) => (
+                    <li key={conflict.id}>
+                      <strong>{conflict.severity}</strong> · {conflict.conflictType.replaceAll("_", " ")} · {conflict.confidenceScore}%
+                      {conflict.conflictingAuctionId && <span className="text-muted-foreground"> · {t("autofetch.auctionId", { id: conflict.conflictingAuctionId })}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
           <form
             className="flex flex-col gap-2 sm:flex-row sm:items-end"
             onSubmit={(event) => {
@@ -266,4 +370,14 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
       </CardContent>
     </Card>
   );
+}
+
+function safePublicUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
 }

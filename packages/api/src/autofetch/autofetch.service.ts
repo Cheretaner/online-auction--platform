@@ -37,7 +37,8 @@ export class AutoFetchService {
   async fetchAndQueue(
     sourceId: string,
     organizationId: string
-  ): Promise<{ queued: number; conflicts: number; errors: number }> {
+  ): Promise<{ fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }> {
+    let fetchStarted = false;
     try {
       logger.info({
         event: 'autofetch:fetch_started',
@@ -56,8 +57,11 @@ export class AutoFetchService {
           event: 'autofetch:source_disabled',
           sourceId,
         });
-        return { queued: 0, conflicts: 0, errors: 0 };
+        return { fetched: 0, queued: 0, duplicates: 0, stale: 0, conflicts: 0, errors: 0 };
       }
+
+      await this.autofetchRepo.markSourceFetchStarted(sourceId);
+      fetchStarted = true;
 
       // Get adapter
       const registeredAdapter = adapterRegistry.get(source.adapterType);
@@ -86,12 +90,15 @@ export class AutoFetchService {
         item: NormalizedItem;
         raw: unknown;
       }> = [];
+      let staleCount = 0;
+      let errorCount = 0;
 
       for (const fetched of fetchedItems) {
         try {
           const normalized = await adapter.normalize(fetched.metadata);
 
           if (adapter.isStale(normalized)) {
+            staleCount++;
             logger.debug({
               event: 'autofetch:item_stale',
               externalId: fetched.externalId,
@@ -104,6 +111,7 @@ export class AutoFetchService {
 
           normalizedItems.push({ item: normalized, raw: fetched.metadata });
         } catch (error) {
+          errorCount++;
           logger.error({
             event: 'autofetch:normalization_error',
             externalId: fetched.externalId,
@@ -168,6 +176,7 @@ export class AutoFetchService {
             });
           }
         } catch (error) {
+          errorCount++;
           logger.error({
             event: 'autofetch:conflict_detection_error',
             pendingItemId: item.id,
@@ -182,19 +191,24 @@ export class AutoFetchService {
       // Update source fetch metadata
       const nextFetchAt = new Date();
       nextFetchAt.setHours(nextFetchAt.getHours() + 1); // Fetch again in 1 hour
-      await this.autofetchRepo.updateSourceFetchMetadata(sourceId, new Date(), nextFetchAt);
+      const summary = {
+        fetched: fetchedItems.length,
+        queued: queuedItems.length,
+        duplicates: Math.max(0, normalizedItems.length - queuedItems.length),
+        stale: staleCount,
+        conflicts: conflictCount,
+        errors: errorCount,
+      };
+      await this.autofetchRepo.updateSourceFetchMetadata(sourceId, new Date(), nextFetchAt, summary);
 
       logger.info({
         event: 'autofetch:fetch_completed',
         sourceId,
-        queuedCount: queuedItems.length,
-        conflictCount,
+        ...summary,
       });
 
       return {
-        queued: queuedItems.length,
-        conflicts: conflictCount,
-        errors: fetchedItems.length - queuedItems.length,
+        ...summary,
       };
     } catch (error) {
       logger.error({
@@ -202,6 +216,16 @@ export class AutoFetchService {
         sourceId,
         error,
       });
+
+      if (fetchStarted) {
+        const nextFetchAt = new Date();
+        nextFetchAt.setHours(nextFetchAt.getHours() + 1);
+        await this.autofetchRepo.markSourceFetchFailed(
+          sourceId,
+          error instanceof Error ? error.message : String(error),
+          nextFetchAt,
+        );
+      }
 
       await this.autofetchRepo.logAuditEvent(null, sourceId, 'fetch_error', {
         error: String(error),

@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
@@ -97,6 +97,7 @@ const envSchema = z
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
     OPENROUTER_MODEL: z.string().default("openrouter/free"),
+    OPENROUTER_TRANSCRIPTION_MODEL: z.string().default("openai/whisper-1"),
     OPENROUTER_SITE_URL: z.string().default("http://localhost:3000"),
     OPENROUTER_SITE_NAME: z.string().default("AI-Powered Transparent Online Auction System"),
     IDEMPOTENCY_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
@@ -139,6 +140,20 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ["FILE_SCAN_ENABLED"],
         message: "must be true in production so uploads are scanned before storage",
+      });
+    }
+    if (value.NODE_ENV === "production" && value.STORAGE_DRIVER !== "filesystem") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["STORAGE_DRIVER"],
+        message: "must be filesystem in production; use a persistent mounted volume for uploaded documents",
+      });
+    }
+    if (value.NODE_ENV === "production" && !isAbsolute(value.STORAGE_DIR)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["STORAGE_DIR"],
+        message: "must be an absolute path on a persistent mounted volume in production",
       });
     }
     if (Boolean(value.CHAPA_SECRET_KEY) !== Boolean(value.CHAPA_WEBHOOK_SECRET)) {

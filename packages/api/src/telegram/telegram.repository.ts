@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { env } from "../config/env.js";
 import { query, queryOne } from "../infrastructure/database/query.js";
 import type { Queryable } from "../infrastructure/database/query.js";
 import type { TelegramChannelPost, TelegramLinkToken, TelegramUserProfile } from "./telegram.types.js";
@@ -150,6 +151,33 @@ export async function findChannelPost(auctionId: string, client?: Queryable): Pr
     postedAt: new Date(row.posted_at),
     updatedAt: new Date(row.updated_at),
   };
+}
+
+/** Atomically applies a per-Telegram-account fixed-window action limit. */
+export async function consumeActionRateLimit(
+  telegramId: number | string,
+  action: "bid" | "voice",
+  windowMs: number,
+  maxHits: number,
+): Promise<boolean> {
+  const accountHash = crypto.createHmac("sha256", env.IP_HASH_PEPPER ?? env.JWT_SECRET).update(String(telegramId)).digest("hex");
+  const row = await queryOne<{ allowed: boolean }>(
+    `INSERT INTO telegram_user_rate_limits (telegram_account_hash, action, window_started_at, hit_count)
+     VALUES ($1, $2, NOW(), 1)
+     ON CONFLICT (telegram_account_hash, action) DO UPDATE SET
+       window_started_at = CASE
+         WHEN telegram_user_rate_limits.window_started_at <= NOW() - ($3 * INTERVAL '1 millisecond') THEN NOW()
+         ELSE telegram_user_rate_limits.window_started_at
+       END,
+       hit_count = CASE
+         WHEN telegram_user_rate_limits.window_started_at <= NOW() - ($3 * INTERVAL '1 millisecond') THEN 1
+         ELSE telegram_user_rate_limits.hit_count + 1
+       END,
+       updated_at = NOW()
+     RETURNING hit_count <= $4 AS allowed`,
+    [accountHash, action, windowMs, maxHits],
+  );
+  return row?.allowed ?? false;
 }
 
 export async function getChannelAuctionDetails(auctionId: string): Promise<{

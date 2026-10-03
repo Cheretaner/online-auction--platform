@@ -441,6 +441,51 @@ export function useAutofetchPending(enabled = true) {
   });
 }
 
+export function useDocumentOcr(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.documents.ocr(id),
+    queryFn: () => documentsApi.getOcr(id).then((result) => result.item),
+    enabled,
+    refetchInterval: (query) => query.state.data?.status === "processing" ? 2_000 : false,
+  });
+}
+
+export function useSearchReviewedOcr(auctionId: string, q: string) {
+  return useQuery({
+    queryKey: queryKeys.documents.ocrSearch(auctionId, q),
+    queryFn: () => documentsApi.searchOcr(auctionId, q),
+    enabled: q.trim().length >= 2,
+  });
+}
+
+export function useStartDocumentOcr(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => documentsApi.startOcr(id),
+    onSuccess: ({ item }) => queryClient.setQueryData(queryKeys.documents.ocr(id), item),
+  });
+}
+
+export function useReviewDocumentOcr(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reviewedText: string) => documentsApi.reviewOcr(id, reviewedText),
+    onSuccess: ({ item }) => queryClient.setQueryData(queryKeys.documents.ocr(id), item),
+  });
+}
+
+export function useReviewDepositReferenceOcr(documentId: string) {
+  return useMutation({ mutationFn: (candidate: string) => documentsApi.reviewOcrReference(documentId, candidate) });
+}
+
+export function useAutofetchConflicts(id: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.autofetch.conflicts(id),
+    queryFn: () => autofetchApi.conflicts(id),
+    enabled: Boolean(id) && enabled,
+  });
+}
+
 export function useAutofetchStats(enabled = true) {
   return useQuery({
     queryKey: queryKeys.autofetch.stats,

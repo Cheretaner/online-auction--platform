@@ -8,8 +8,13 @@ import { findAuctionOwner } from "../shared/authz/auction-access.js";
 import * as repo from "./document.repository.js";
 import type { DocumentRecord } from "./document.types.js";
 import { validateUploadedFile } from "./file-validation.js";
+import { logger } from "../shared/utils/logger.js";
+import { hashSensitive } from "../shared/security/sensitive-data.js";
+import * as ocrRepo from "./document-ocr.repository.js";
+import { extractDocumentText } from "./document-ocr.service.js";
 
 const OFFICER_ROLES = ["auction_officer", "org_admin", "compliance_officer", "super_admin"];
+const OCR_TYPES = new Set(["specification", "inspection_report", "terms", "other"]);
 
 /** Strips any directory component so a crafted filename cannot escape the store. */
 function safeFileName(name: string): string {
@@ -163,4 +168,171 @@ export async function listByAuction(auctionId: string): Promise<DocumentRecord[]
 
 export async function listByUploader(userId: string): Promise<DocumentRecord[]> {
   return repo.findByUploader(userId);
+}
+
+async function assertOcrOfficer(document: DocumentRecord, viewer: DocumentViewer): Promise<void> {
+  if (!OCR_TYPES.has(document.documentType)) {
+    throw AppError.badRequest("OCR is available for auction terms, specifications, inspection reports, and other auction documents");
+  }
+  if (viewer.roles.includes("super_admin")) return;
+  if (!viewer.organizationId || !viewer.roles.some((role) => OFFICER_ROLES.includes(role)) || !document.auctionId) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+  }
+  const owner = await findAuctionOwner(document.auctionId);
+  if (owner?.orgId !== viewer.organizationId) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+  }
+}
+
+async function runOcr(document: DocumentRecord, viewer: DocumentViewer): Promise<void> {
+  try {
+    const stored = await storageAdapter.get(document.storagePath);
+    if (!stored) throw AppError.notFound("Document content is no longer available");
+    const checksum = createHash("sha256").update(stored.data).digest("hex");
+    if (checksum !== document.checksumSha256) {
+      throw new AppError("Stored document failed its integrity check", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const result = await extractDocumentText(stored.data, document.mimeType);
+    await ocrRepo.complete({
+      documentId: document.id,
+      text: result.text,
+      method: result.method,
+      confidence: result.confidence,
+      referenceCandidates: result.referenceCandidates,
+    });
+    await audit.appendAuditEvent({
+      auctionId: document.auctionId,
+      actorId: viewer.userId,
+      actorRole: audit.actorRoleOf(viewer.roles),
+      entityType: "document",
+      entityId: document.id,
+      action: "document.ocr_completed",
+      payload: {
+        checksumSha256: document.checksumSha256,
+        extractionMethod: result.method,
+        confidence: result.confidence,
+        extractedCharacters: result.text.length,
+        referenceCandidateCount: result.referenceCandidates.length,
+      },
+    });
+  } catch (error) {
+    logger.warn({ documentId: document.id, err: error }, "Document OCR processing failed");
+    const message = error instanceof AppError
+      ? error.message
+      : "OCR processing failed. Check server language-data access and retry.";
+    await ocrRepo.fail(document.id, message);
+  }
+}
+
+export async function startDocumentOcr(id: string, viewer: DocumentViewer): Promise<ocrRepo.DocumentOcrResult> {
+  const document = await repo.findById(id);
+  if (!document) throw AppError.notFound("Document not found");
+  await assertOcrOfficer(document, viewer);
+
+  const existing = await ocrRepo.find(id);
+  if (existing?.status === "completed" || existing?.status === "processing") return existing;
+  const started = await ocrRepo.begin(id);
+  if (!started) return (await ocrRepo.find(id))!;
+
+  try {
+    await audit.appendAuditEvent({
+      auctionId: document.auctionId,
+      actorId: viewer.userId,
+      actorRole: audit.actorRoleOf(viewer.roles),
+      entityType: "document",
+      entityId: document.id,
+      action: "document.ocr_started",
+      payload: { checksumSha256: document.checksumSha256 },
+    });
+  } catch (error) {
+    await ocrRepo.fail(document.id, "OCR could not start because its audit event could not be recorded");
+    throw error;
+  }
+
+  // Respond quickly; extraction runs against the checksum-verified stored original.
+  setImmediate(() => void runOcr(document, viewer).catch((error: unknown) => {
+    logger.error({ documentId: document.id, err: error }, "Could not persist OCR processing result");
+  }));
+  return (await ocrRepo.find(id))!;
+}
+
+export async function getDocumentOcr(id: string, viewer: DocumentViewer): Promise<ocrRepo.DocumentOcrResult | null> {
+  const document = await repo.findById(id);
+  if (!document) throw AppError.notFound("Document not found");
+  await assertOcrOfficer(document, viewer);
+  return ocrRepo.find(id);
+}
+
+export async function reviewDocumentOcr(
+  id: string,
+  viewer: DocumentViewer,
+  reviewedText: string,
+): Promise<ocrRepo.DocumentOcrResult> {
+  const document = await repo.findById(id);
+  if (!document) throw AppError.notFound("Document not found");
+  await assertOcrOfficer(document, viewer);
+  const result = await ocrRepo.review(id, viewer.userId, reviewedText);
+  if (!result) throw AppError.conflict("Run OCR before reviewing extracted text");
+  await audit.appendAuditEvent({
+    auctionId: document.auctionId,
+    actorId: viewer.userId,
+    actorRole: audit.actorRoleOf(viewer.roles),
+    entityType: "document",
+    entityId: document.id,
+    action: "document.ocr_reviewed",
+    payload: {
+      checksumSha256: document.checksumSha256,
+      extractedCharacters: result.extractedText?.length ?? 0,
+      reviewedCharacters: result.reviewedText?.length ?? 0,
+    },
+  });
+  return result;
+}
+
+export async function searchReviewedOcr(
+  auctionId: string,
+  searchText: string,
+  viewer: DocumentViewer,
+): Promise<ocrRepo.DocumentOcrSearchHit[]> {
+  if (!viewer.roles.includes("super_admin")) {
+    const owner = await findAuctionOwner(auctionId);
+    const isOfficer = viewer.roles.some((role) => OFFICER_ROLES.includes(role));
+    if (!owner || !isOfficer || owner.orgId !== viewer.organizationId) {
+      throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+    }
+  }
+  return ocrRepo.searchReviewed(auctionId, searchText);
+}
+
+export async function reviewDepositReferenceSuggestion(
+  documentId: string,
+  candidate: string,
+  viewer: DocumentViewer,
+): Promise<{ candidate: string; matchesSubmittedReference: boolean }> {
+  const document = await repo.findById(documentId);
+  if (!document) throw AppError.notFound("Document not found");
+  await assertOcrOfficer(document, viewer);
+  const extraction = await ocrRepo.find(documentId);
+  if (extraction?.status !== "completed" || !extraction.referenceCandidates.includes(candidate)) {
+    throw AppError.badRequest("The selected reference is not an OCR suggestion for this document");
+  }
+  const deposit = await ocrRepo.findDepositReference(documentId);
+  if (!deposit) throw AppError.notFound("No deposit is linked to this document");
+
+  const matchesSubmittedReference = hashSensitive(candidate) === deposit.referenceHash;
+  await audit.appendAuditEvent({
+    auctionId: document.auctionId,
+    actorId: viewer.userId,
+    actorRole: audit.actorRoleOf(viewer.roles),
+    entityType: "deposit",
+    entityId: deposit.depositId,
+    action: "deposit.reference_ocr_checked",
+    payload: {
+      documentId,
+      documentChecksumSha256: document.checksumSha256,
+      candidateFingerprint: hashSensitive(candidate),
+      matchesSubmittedReference,
+    },
+  });
+  return { candidate, matchesSubmittedReference };
 }

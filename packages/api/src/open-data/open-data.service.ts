@@ -17,6 +17,21 @@ export interface PublicAuctionRecord {
   publishedAt: string;
 }
 
+export interface PublicAuctionListResponse {
+  items: PublicAuctionRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+interface PublicAuctionRow extends Omit<PublicAuctionRecord, "opensAt" | "closesAt" | "closedAt" | "awardedAt" | "publishedAt"> {
+  opensAt: Date;
+  closesAt: Date;
+  closedAt: Date | null;
+  awardedAt: Date | null;
+  publishedAt: Date;
+}
+
 const PUBLIC_FIELDS = `
   a.id,
   a.title,
@@ -34,13 +49,13 @@ const PUBLIC_FIELDS = `
   a.published_at AS "publishedAt"
 `;
 
-export async function listPublicAuctions(limit: number, offset: number) {
+export async function listPublicAuctions(limit: number, offset: number): Promise<PublicAuctionListResponse> {
   const [count, items] = await Promise.all([
     queryOne<{ total: string }>(
       `SELECT COUNT(*)::text AS total FROM auctions a
        WHERE a.published_at IS NOT NULL AND a.status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')`,
     ),
-    queryAll<PublicAuctionRecord>(
+    queryAll<PublicAuctionRow>(
       `SELECT ${PUBLIC_FIELDS}
        FROM auctions a JOIN organizations o ON o.id = a.org_id
        WHERE a.published_at IS NOT NULL AND a.status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')
@@ -49,44 +64,17 @@ export async function listPublicAuctions(limit: number, offset: number) {
       [limit, offset],
     ),
   ]);
-  return { items, total: Number(count?.total ?? 0), limit, offset };
-}
-
-export async function listFinalizedBetween(start: Date, end: Date): Promise<PublicAuctionRecord[]> {
-  return queryAll<PublicAuctionRecord>(
-    `SELECT ${PUBLIC_FIELDS}
-     FROM auctions a JOIN organizations o ON o.id = a.org_id
-     WHERE a.published_at IS NOT NULL
-       AND a.status IN ('closed', 'awarded')
-       AND COALESCE(a.awarded_at, a.closed_at) >= $1
-       AND COALESCE(a.awarded_at, a.closed_at) < $2
-     ORDER BY COALESCE(a.awarded_at, a.closed_at) ASC, a.id ASC`,
-    [start, end],
-  );
-}
-
-/** Return the previous completed Monday-to-Monday UTC reporting window. */
-export function previousWeek(now = new Date()) {
-  const currentMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const daysSinceMonday = (currentMonday.getUTCDay() + 6) % 7;
-  currentMonday.setUTCDate(currentMonday.getUTCDate() - daysSinceMonday);
-  const end = currentMonday;
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - 7);
-  return { start, end };
-}
-
-export function toCsv(records: PublicAuctionRecord[]): string {
-  const columns: Array<keyof PublicAuctionRecord> = [
-    "id", "title", "organization", "type", "status", "region", "startPrice",
-    "winningAmount", "bidCount", "opensAt", "closesAt", "closedAt", "awardedAt", "publishedAt",
-  ];
-  const cell = (value: unknown) => {
-    let raw = value == null ? "" : value instanceof Date ? value.toISOString() : String(value);
-    // Avoid spreadsheet formula execution when an exported field starts with
-    // a formula marker. All cells are quoted and embedded quotes doubled.
-    if (/^[\s]*[=+@-]/.test(raw)) raw = `'${raw}`;
-    return `"${raw.replaceAll('"', '""')}"`;
+  return {
+    items: items.map((item) => ({
+      ...item,
+      opensAt: item.opensAt.toISOString(),
+      closesAt: item.closesAt.toISOString(),
+      closedAt: item.closedAt?.toISOString() ?? null,
+      awardedAt: item.awardedAt?.toISOString() ?? null,
+      publishedAt: item.publishedAt.toISOString(),
+    })),
+    total: Number(count?.total ?? 0),
+    limit,
+    offset,
   };
-  return [columns.map(cell).join(","), ...records.map((record) => columns.map((column) => cell(record[column])).join(","))].join("\r\n");
 }
