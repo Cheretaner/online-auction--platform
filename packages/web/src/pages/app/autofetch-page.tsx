@@ -151,6 +151,7 @@ function AddSourceForm() {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [adapterType, setAdapterType] = useState("rss-feed");
+  const [includeKeywordsText, setIncludeKeywordsText] = useState("");
   const [mappingText, setMappingText] = useState("");
   const [aiExtraction, setAiExtraction] = useState(true);
   const t = useT("tools");
@@ -161,6 +162,9 @@ function AddSourceForm() {
     let adapterConfig: Record<string, unknown> = {};
     if (adapterType === "web-scraper") {
       adapterConfig.aiExtraction = aiExtraction;
+    }
+    if (adapterType === "rss-feed" && includeKeywordsText.trim()) {
+      adapterConfig.includeKeywords = includeKeywordsText.split(",").map((keyword) => keyword.trim()).filter(Boolean);
     }
     if (adapterType === "web-scraper" && mappingText.trim()) {
       try {
@@ -179,6 +183,7 @@ function AddSourceForm() {
           toast.success(t("autofetch.sourceAdded"));
           setName("");
           setUrl("");
+          setIncludeKeywordsText("");
           setMappingText("");
           setAiExtraction(true);
         },
@@ -221,6 +226,18 @@ function AddSourceForm() {
           <Button type="submit" loading={createSource.isPending}>
             {t("autofetch.add")}
           </Button>
+          {adapterType === "rss-feed" && (
+            <div className="space-y-1.5 md:col-span-4">
+              <Label htmlFor={`${id}-keywords`}>{t("autofetch.requiredKeywords")}</Label>
+              <Input
+                id={`${id}-keywords`}
+                value={includeKeywordsText}
+                onChange={(event) => setIncludeKeywordsText(event.target.value)}
+                placeholder="Ethiopia, tender"
+              />
+              <p className="text-xs text-muted-foreground">{t("autofetch.requiredKeywordsHelp")}</p>
+            </div>
+          )}
           {adapterType === "web-scraper" && (
             <div className="space-y-1.5 md:col-span-4">
               <div className="flex items-center gap-2">

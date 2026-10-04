@@ -70,7 +70,7 @@ const envSchema = z
     DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
     RUN_MIGRATIONS_ON_BOOT: z
       .enum(["true", "false"])
-      .default("false")
+      .default("true")
       .transform((value) => value === "true"),
     STORAGE_DRIVER: z.enum(["memory", "filesystem"]).default("filesystem"),
     STORAGE_DIR: z.string().default("./data/storage"),
@@ -212,6 +212,13 @@ const envSchema = z
           message: "production requires a configured Gemini or OpenRouter API key; the stub provider is for development only",
         });
       }
+    }
+    if (value.NODE_ENV === "production" && !value.JWT_REFRESH_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["JWT_REFRESH_SECRET"],
+        message: "is required in production so refresh tokens are signed with a separate secret",
+      });
     }
     if (value.NODE_ENV === "production" && value.JWT_SECRET.includes("dev-secret")) {
       ctx.addIssue({

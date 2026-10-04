@@ -110,6 +110,11 @@ function SubmitForm() {
         <CardDescription>{t("kyc.submitDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
+        <Alert variant="warning" className="mb-4">
+          <ShieldAlert aria-hidden />
+          <AlertTitle>{t("kyc.manualReviewTitle")}</AlertTitle>
+          <AlertDescription>{t("kyc.manualReviewBody")}</AlertDescription>
+        </Alert>
         <Form {...form}>
           <form
             className="grid gap-4 sm:grid-cols-2"

@@ -468,6 +468,37 @@ export class AutoFetchService {
     }
   }
 
+  async updateSource(
+    organizationId: string,
+    sourceId: string,
+    config: {
+      name: string;
+      adapterType: string;
+      sourceUrl?: string;
+      adapterConfig: Record<string, unknown>;
+      isActive: boolean;
+    },
+  ) {
+    const adapter = adapterRegistry.get(config.adapterType);
+    if (adapter.validateConfig) {
+      await adapter.validateConfig({ ...config.adapterConfig, url: config.sourceUrl ?? config.adapterConfig.url });
+    }
+
+    const source = await this.autofetchRepo.updateSourceForOrganization(sourceId, organizationId, config);
+    if (!source) throw AppError.notFound('Source not found');
+    await this.autofetchRepo.logAuditEvent(null, sourceId, 'source_updated', {
+      adapterType: source.adapterType,
+      isActive: source.isActive,
+    });
+    return source;
+  }
+
+  async removeSource(organizationId: string, sourceId: string): Promise<void> {
+    const source = await this.autofetchRepo.deactivateSourceForOrganization(sourceId, organizationId);
+    if (!source) throw AppError.notFound('Source not found');
+    await this.autofetchRepo.logAuditEvent(null, sourceId, 'source_deactivated', { name: source.name });
+  }
+
   /**
    * Create a new source
    */
@@ -504,6 +535,25 @@ export class AutoFetchService {
         sourceId: source.id,
         organizationId,
       });
+
+      try {
+        const fetchResult = await this.fetchAndQueue(source.id, organizationId);
+        logger.info({
+          event: 'autofetch:source_initial_fetch_completed',
+          sourceId: source.id,
+          organizationId,
+          queued: fetchResult.queued,
+          conflicts: fetchResult.conflicts,
+          errors: fetchResult.errors,
+        });
+      } catch (error) {
+        logger.warn({
+          event: 'autofetch:source_initial_fetch_failed',
+          sourceId: source.id,
+          organizationId,
+          error,
+        });
+      }
 
       return source;
     } catch (error) {

@@ -10,10 +10,15 @@ import {
 } from '../types/index.js';
 
 export class RssFeedAdapter implements ISourceAdapter {
-  private config: { url?: string } = {};
+  private config: { url?: string; includeKeywords: string[] } = { includeKeywords: [] };
 
   create(): ISourceAdapter { return new RssFeedAdapter(); }
-  configure(config: Record<string, unknown>): void { this.config = { url: typeof config.url === 'string' ? config.url : undefined }; }
+  configure(config: Record<string, unknown>): void {
+    this.config = {
+      url: typeof config.url === 'string' ? config.url : undefined,
+      includeKeywords: this.readKeywords(config.includeKeywords),
+    };
+  }
 
   getMetadata(): SourceMetadata {
     return { name: 'rss-feed', version: '1.0.0', description: 'Imports public RSS or Atom feeds, including social feed bridges', config: { enabled: true, timeout: 30000, retryCount: 3 } };
@@ -24,6 +29,7 @@ export class RssFeedAdapter implements ISourceAdapter {
     let parsed: URL;
     try { parsed = new URL(url); } catch { throw new Error('A public RSS/Atom URL is required'); }
     if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('RSS URL must use HTTP(S)');
+    this.readKeywords(config.includeKeywords);
   }
 
   async fetchItems(_query: string, options: FetchOptions): Promise<SourceFetch[]> {
@@ -33,7 +39,12 @@ export class RssFeedAdapter implements ISourceAdapter {
     try {
       const response = await fetch(this.config.url, { signal: controller.signal, headers: { Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml' } });
       if (!response.ok) throw new AdapterError(`HTTP ${response.status}: ${response.statusText}`, 'FETCH_FAILED');
-      return this.parse(await response.text());
+      const items = this.parse(await response.text());
+      if (this.config.includeKeywords.length === 0) return items;
+      return items.filter((item) => {
+        const searchableText = `${item.title} ${item.description ?? ''}`.toLocaleLowerCase();
+        return this.config.includeKeywords.every((keyword) => searchableText.includes(keyword));
+      });
     } catch (error) {
       if (error instanceof AdapterError) throw error;
       throw new AdapterError(`Failed to fetch RSS feed: ${error instanceof Error ? error.message : String(error)}`, 'FETCH_FAILED');
@@ -76,4 +87,11 @@ export class RssFeedAdapter implements ISourceAdapter {
   private required(value: unknown): string { const result = this.optional(value); if (!result) throw new Error('title is required'); return result; }
   private optional(value: unknown): string | undefined { const result = typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim(); return result || undefined; }
   private number(value: unknown): number | undefined { const parsed = Number(value); return value == null || value === '' || !Number.isFinite(parsed) ? undefined : parsed; }
+  private readKeywords(value: unknown): string[] {
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.length > 20 || value.some((keyword) => typeof keyword !== 'string' || keyword.trim().length === 0 || keyword.length > 100)) {
+      throw new Error('includeKeywords must contain up to 20 non-empty strings of at most 100 characters');
+    }
+    return [...new Set(value.map((keyword) => (keyword as string).trim().toLocaleLowerCase()))];
+  }
 }

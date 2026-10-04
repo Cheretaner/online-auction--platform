@@ -20,7 +20,8 @@ import { organizationRouter } from "./organization/organization.routes.js";
 import { reportingRouter } from "./reporting/reporting.routes.js";
 import { telegramRouter } from "./telegram/telegram.routes.js";
 import { settlementRouter } from "./settlement/settlement.routes.js";
-import verificationRouter from "./verification/verification.routes.js";
+import { createVerificationRouter } from "./verification/verification.routes.js";
+import type { IdentityVerificationProvider } from "./verification/identity-provider.js";
 import { attachSseStream } from "./infrastructure/realtime/realtime.adapter.js";
 import { errorMiddleware } from "./shared/middleware/error.middleware.js";
 import { notFoundMiddleware } from "./shared/middleware/notFound.middleware.js";
@@ -39,7 +40,7 @@ import { chapaWebhook } from "./payments/chapa.controller.js";
 import { openDataRouter } from "./open-data/open-data.routes.js";
 import { watchlistRouter } from "./watchlist/watchlist.routes.js";
 
-export function createApp(): express.Express {
+export function createApp(dependencies: { identityVerificationProvider?: IdentityVerificationProvider } = {}): express.Express {
   const app = express();
  const webDist = path.resolve("/app/packages/web/dist");
 
@@ -95,7 +96,7 @@ export function createApp(): express.Express {
   app.use("/api/v1/deposits", depositRouter);
   app.use("/api/v1/settlements", settlementRouter);
   app.use("/api/v1/documents", documentRouter);
-  app.use("/api/v1/verifications", verificationRouter);
+  app.use("/api/v1/verifications", createVerificationRouter(dependencies.identityVerificationProvider));
   app.use("/api/v1/audit", auditRouter);
   app.use("/api/v1/open-data", openDataRouter);
   app.use("/api/v1/ai", aiRouter);

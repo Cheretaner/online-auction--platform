@@ -268,6 +268,7 @@ export async function markSealedOpened(
   const result = await query<DbAuctionLock>(
     `UPDATE auctions
         SET sealed_opened_at = NOW(), sealed_opened_by = $2,
+            closed_at = COALESCE(closed_at, NOW()),
             winner_id = $3, winning_amount = $4,
             status = CASE WHEN $5::text IS NULL THEN status ELSE 'cancelled' END,
             cancellation_reason = COALESCE($5, cancellation_reason), updated_at = NOW()

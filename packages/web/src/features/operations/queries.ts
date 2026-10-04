@@ -419,7 +419,7 @@ export function useCreateAutofetchSource() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { name: string; adapterType: string; sourceUrl?: string; adapterConfig?: Record<string, unknown> }) => autofetchApi.createSource(body),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
   });
 }
 

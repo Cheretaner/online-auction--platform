@@ -71,7 +71,8 @@ export class WebScraperAdapter implements ISourceAdapter {
     try {
       const url = this.validateUrl(this.config.url);
       const html = await this.download(url, timeoutMs, 0);
-      let records = this.extractRecords(html, url.href);
+      let records = this.extractTelegramMessages(html, url.href);
+      if (records.length === 0) records = this.extractRecords(html, url.href);
       if (records.length === 0 && this.config.aiExtraction !== false) {
         records = await this.extractWithAi(html, url.href);
       }
@@ -166,9 +167,13 @@ export class WebScraperAdapter implements ISourceAdapter {
     // Pin the request to the address checked above. This prevents DNS rebinding
     // between validation and connection. Redirects are revalidated separately.
     const address = addresses[0]!;
-    const pinnedLookup = ((_: string, __: unknown, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+    const pinnedLookup: LookupFunction = (_: string, options, callback) => {
+      if (options.all) {
+        callback(null, [{ address: address.address, family: address.family }]);
+        return;
+      }
       callback(null, address.address, address.family);
-    }) as LookupFunction;
+    };
     const request = (url.protocol === 'https:' ? httpsRequest : httpRequest);
     const response = await new Promise<IncomingMessage>((resolve, reject) => {
       const req = request(url, {
@@ -240,6 +245,35 @@ export class WebScraperAdapter implements ISourceAdapter {
       mapped.sourceData = record;
       return mapped;
     }).filter((item) => Boolean(this.string(item.title)));
+  }
+
+  private extractTelegramMessages(html: string, sourceUrl: string): Array<Record<string, unknown>> {
+    const channel = new URL(sourceUrl).pathname.match(/^\/s\/([^/]+)/)?.[1];
+    if (!channel) return [];
+
+    const posts = [...html.matchAll(/data-post=["']([^"']+)["']/gi)];
+    return posts.flatMap((post, index) => {
+      const externalId = post[1];
+      if (!externalId?.startsWith(`${channel}/`)) return [];
+
+      const segmentStart = post.index! + post[0].length;
+      const segmentEnd = posts[index + 1]?.index ?? html.length;
+      const segment = html.slice(segmentStart, segmentEnd);
+      const textMatch = segment.match(/<div\b[^>]*class=["'][^"']*\btgme_widget_message_text\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      if (!textMatch?.[1]) return [];
+
+      const description = this.visibleText(textMatch[1]);
+      if (!description) return [];
+
+      const namedTitle = description.match(/(?:የንብረቱ\s*ስም|(?:asset|item)\s+name|title)\s*[:：-]\s*(.+?)(?=\s*(?:🆔|💰|$))/i)?.[1]?.trim();
+      return [{
+        title: (namedTitle || description).slice(0, 200),
+        description,
+        externalId,
+        sourceUrl: `https://t.me/${externalId}`,
+        channel,
+      }];
+    });
   }
 
   private async extractWithAi(html: string, sourceUrl: string): Promise<Array<Record<string, unknown>>> {

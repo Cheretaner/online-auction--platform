@@ -113,6 +113,34 @@ export class AutoFetchRepository {
     }
   }
 
+  async updateSourceForOrganization(
+    sourceId: string,
+    organizationId: string,
+    config: Pick<SourceConfig, 'name' | 'adapterType' | 'sourceUrl' | 'adapterConfig' | 'isActive'>,
+  ): Promise<SourceConfig | null> {
+    const result = await this.pool.query(
+      `UPDATE autofetch_sources
+          SET name = $3, adapter_type = $4, source_url = $5, config = $6,
+              is_active = $7, next_fetch_at = CASE WHEN $7 THEN NOW() ELSE NULL END,
+              updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *`,
+      [sourceId, organizationId, config.name, config.adapterType, config.sourceUrl, JSON.stringify(config.adapterConfig), config.isActive],
+    );
+    return result.rows[0] ? this.mapRowToSourceConfig(result.rows[0]) : null;
+  }
+
+  async deactivateSourceForOrganization(sourceId: string, organizationId: string): Promise<SourceConfig | null> {
+    const result = await this.pool.query(
+      `UPDATE autofetch_sources
+          SET is_active = false, next_fetch_at = NULL, updated_at = NOW()
+        WHERE id = $1 AND organization_id = $2
+        RETURNING *`,
+      [sourceId, organizationId],
+    );
+    return result.rows[0] ? this.mapRowToSourceConfig(result.rows[0]) : null;
+  }
+
   /**
    * Get active sources due for refetch
    */
@@ -223,7 +251,7 @@ export class AutoFetchRepository {
           raw_metadata, normalized_metadata, ai_confidence, estimated_value, category_suggestion
         )
         VALUES ${placeholders}
-        ON CONFLICT (source_id, external_id) DO NOTHING
+        ON CONFLICT (source_id, external_id) WHERE status IN ('pending', 'approved') DO NOTHING
         RETURNING *
       `;
 

@@ -65,6 +65,23 @@ export function createAutofetchRouter(pool: Pool): Router {
     asyncHandler(controller.createSource)
   );
 
+  router.put(
+    '/sources/:sourceId',
+    requireAuth(['org_admin', 'auction_officer']),
+    requireOrganization(),
+    validate(idParams, 'params'),
+    validate(sourceBody.extend({ isActive: z.boolean() })),
+    asyncHandler(controller.updateSource),
+  );
+
+  router.delete(
+    '/sources/:sourceId',
+    requireAuth(['org_admin', 'auction_officer']),
+    requireOrganization(),
+    validate(idParams, 'params'),
+    asyncHandler(controller.removeSource),
+  );
+
   /**
    * POST /api/autofetch/sources/:sourceId/fetch
    * Manually trigger fetch from a source

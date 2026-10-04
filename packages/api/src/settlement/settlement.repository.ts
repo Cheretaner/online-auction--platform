@@ -36,9 +36,35 @@ export async function createForAward(input: {
   amount: string;
 }, client?: Queryable): Promise<SettlementObligation> {
   const row = await queryOne<DbSettlement>(
-    `INSERT INTO settlement_obligations (auction_id, winner_id, amount, due_at)
-     VALUES ($1, $2, $3, NOW() + ($4 * INTERVAL '1 hour'))
-     ON CONFLICT (auction_id) DO UPDATE SET auction_id = EXCLUDED.auction_id
+    `INSERT INTO settlement_obligations (auction_id, winner_id, amount, due_at, status, paid_at, updated_at)
+     VALUES ($1, $2, $3, NOW() + ($4 * INTERVAL '1 hour'), 'due', NULL, NOW())
+     ON CONFLICT (auction_id) DO UPDATE SET
+       winner_id = CASE
+         WHEN settlement_obligations.status IN ('paid', 'payment_pending', 'reconciliation_required')
+           THEN settlement_obligations.winner_id
+         ELSE EXCLUDED.winner_id
+       END,
+       amount = CASE
+         WHEN settlement_obligations.status IN ('paid', 'payment_pending', 'reconciliation_required')
+           THEN settlement_obligations.amount
+         ELSE EXCLUDED.amount
+       END,
+       status = CASE
+         WHEN settlement_obligations.status IN ('paid', 'payment_pending', 'reconciliation_required')
+           THEN settlement_obligations.status
+         ELSE 'due'
+       END,
+       due_at = CASE
+         WHEN settlement_obligations.status IN ('paid', 'payment_pending', 'reconciliation_required')
+           THEN settlement_obligations.due_at
+         ELSE NOW() + ($4 * INTERVAL '1 hour')
+       END,
+       paid_at = CASE
+         WHEN settlement_obligations.status IN ('paid', 'payment_pending', 'reconciliation_required')
+           THEN settlement_obligations.paid_at
+         ELSE NULL
+       END,
+       updated_at = NOW()
      RETURNING *`,
     [input.auctionId, input.winnerId, input.amount, env.SETTLEMENT_DUE_HOURS],
     client,

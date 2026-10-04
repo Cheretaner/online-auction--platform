@@ -19,6 +19,9 @@ export const account = defineMessages(
       correctAndResubmit: "Correct the details and submit again.",
       submitTitle: "Submit your document",
       submitDescription: "Enter the number exactly as printed. Only compliance officers can see it.",
+      manualReviewTitle: "Manual review only",
+      manualReviewBody:
+        "Fayda numbers are checked for format only. We do not currently connect to Fayda or another identity provider. An authorized compliance officer must review your document before you are approved to bid.",
       submitted: "Submitted for review",
       document: "Document",
       documentNumber: "Document number",
@@ -153,6 +156,8 @@ export const account = defineMessages(
       correctAndResubmit: "ዝርዝሮቹን አስተካክለው እንደገና ያቅርቡ።",
       submitTitle: "ሰነድዎን ያቅርቡ",
       submitDescription: "ቁጥሩን በሰነዱ ላይ እንደተጻፈው በትክክል ያስገቡ። ማየት የሚችሉት የደንብ ተገዢነት ኃላፊዎች ብቻ ናቸው።",
+      manualReviewTitle: "በእጅ ግምገማ ብቻ",
+      manualReviewBody: "የፋይዳ ቁጥር ቅርጸቱ ብቻ ይመረመራል። በአሁኑ ጊዜ ከፋይዳ ወይም ከሌላ የማንነት አቅራቢ ጋር ግንኙነት የለንም። ለጨረታ ዋጋ ከማቅረብዎ በፊት ፈቃድ ያለው የደንብ ተገዢነት ኃላፊ ሰነድዎን መገምገም አለበት።",
       submitted: "ለግምገማ ቀርቧል",
       document: "ሰነድ",
       documentNumber: "የሰነድ ቁጥር",
