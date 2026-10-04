@@ -16,6 +16,7 @@ export interface PublicProfile {
   accountType: AccountType;
   businessName: string | null;
   region: string | null;
+  preferredLanguage: "en" | "am" | null;
   verificationStatus: VerificationStatus;
   platformRole: Role | null;
   isActive: boolean;

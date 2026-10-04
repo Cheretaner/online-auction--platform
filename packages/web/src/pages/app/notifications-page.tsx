@@ -141,6 +141,21 @@ function localizeNotification(item: NotificationRecord, locale: "en" | "am") {
       return { title: "ማስከበሪያ ተመላሽ ሆኗል", message: "ለዚህ ጨረታ ያስገቡት ማስከበሪያ ተመላሽ ሆኗል።" };
     case "settlement.paid":
       return { title: "የመጨረሻ ክፍያ ተቀብሏል", message: "ለተሸለመው ጨረታ የመጨረሻ ክፍያዎ ደርሷል።" };
+    case "deposit.refund_reconciliation_required": {
+      const status = item.message.match(/status '([^']+)'/)?.[1];
+      return {
+        title: "የማስከበሪያ ተመላሽ ግምገማ ይፈልጋል",
+        message: `የክፍያ አቅራቢው ለማስከበሪያው ተመላሽ ሁኔታ ${status ?? "ያልታወቀ"} ብሎ አሳውቋል። በእጅ ያረጋግጡ።`,
+      };
+    }
+    case "compliance.checked": {
+      const status = item.title.replace(/^Compliance\s+/i, "").toLowerCase();
+      const statusAm: Record<string, string> = { passed: "አልፏል", failed: "አልተሳካም", pending: "በመጠባበቅ ላይ" };
+      return {
+        title: `የተገዢነት ምርመራ ${statusAm[status] ?? status}`,
+        message: `ለ“${auction}” የተገዢነት ምርመራ ${statusAm[status] ?? status}።`,
+      };
+    }
     case "verification.reviewed":
       return /verified/i.test(item.title)
         ? { title: "መለያዎ ተረጋግጧል", message: "መለያዎ ተረጋግጧል።" }
@@ -152,13 +167,23 @@ function localizeNotification(item: NotificationRecord, locale: "en" | "am") {
     case "dispute.resolved":
       return { title: "የቅሬታ ውሳኔ ተመዝግቧል", message: `የገምጋሚው ምክንያት፦ ${item.message}` };
     case "organization.member_granted": {
-      const role = item.message.match(/the (.+?) role/)?.[1]?.replaceAll("_", " ");
-      return { title: "ወደ ድርጅት ተቀላቅለዋል", message: `የ${role ?? "ድርጅት አባል"} ሚና ተሰጥቶዎታል። አዲሱን ፈቃድ ለማግኘት እንደገና ይግቡ።` };
+      const roleKey = item.message.match(/the (.+?) role/)?.[1]?.toLowerCase();
+      const roleLabels: Record<string, string> = {
+        auction_officer: "የጨረታ ኃላፊ",
+        org_admin: "የድርጅት አስተዳዳሪ",
+        compliance_officer: "የተገዢነት ኃላፊ",
+        super_admin: "ሱፐር አስተዳዳሪ",
+        bidder: "ተጫራች",
+      };
+      return { title: "ወደ ድርጅት ተቀላቅለዋል", message: `የ${roleKey ? roleLabels[roleKey] ?? roleKey : "ድርጅት አባል"} ሚና ተሰጥቶዎታል። አዲሱን ፈቃድ ለማግኘት እንደገና ይግቡ።` };
     }
     case "report.published":
       return { title: "የጨረታ ሪፖርት ታትሟል", message: `ለ“${auction}” የተዘጋጀው ሪፖርት ታትሟል።` };
-    case "anomaly.flagged":
-      return { title: `ያልተለመደ እንቅስቃሴ፦ ${item.title.replace(/^Anomaly /, "")}`, message: `የማሽን ምልክት ማብራሪያ (ለሰው ግምገማ ያስፈልጋል)፦ ${item.message}` };
+    case "anomaly.flagged": {
+      const severity = item.title.replace(/^Anomaly /, "").toLowerCase();
+      const severityAm: Record<string, string> = { low: "ዝቅተኛ", medium: "መካከለኛ", high: "ከፍተኛ", critical: "እጅግ ከፍተኛ" };
+      return { title: `ያልተለመደ እንቅስቃሴ፦ ${severityAm[severity] ?? severity}`, message: `የማሽን ምልክት ማብራሪያ (ለሰው ግምገማ ያስፈልጋል)፦ ${item.message}` };
+    }
     default:
       return { title: item.title, message: item.message };
   }

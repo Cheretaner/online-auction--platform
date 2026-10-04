@@ -226,7 +226,7 @@ function DepositForm({ auction }: { auction: Auction }) {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {INSTRUMENT_TYPES.map((type) => (
+                  {INSTRUMENT_TYPES.filter((type) => type !== "chapa").map((type) => (
                     <SelectItem key={type} value={type}>
                       {enumLabel(type)}
                     </SelectItem>

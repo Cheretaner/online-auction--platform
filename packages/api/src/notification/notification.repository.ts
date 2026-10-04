@@ -1,5 +1,6 @@
 import type { NotificationChannel, NotificationStatus } from "@auction/shared";
 import { query, queryAll, queryOne } from "../infrastructure/database/query.js";
+import { withTransaction } from "../infrastructure/database/tx.js";
 import type { EnqueueNotificationInput, Notification } from "./notification.types.js";
 
 interface DbNotification {
@@ -133,6 +134,17 @@ export async function countUnread(userId: string): Promise<number> {
     [userId],
   );
   return Number(row?.count ?? 0);
+}
+
+export async function preferredLanguage(userId: string): Promise<"en" | "am" | null> {
+  return withTransaction(async (client) => {
+    const row = await queryOne<{ preferred_language: "en" | "am" | null }>(
+      "SELECT preferred_language FROM profiles WHERE id = $1 AND is_active = TRUE",
+      [userId],
+      client,
+    );
+    return row?.preferred_language ?? null;
+  }, { userId });
 }
 
 export async function markAllRead(userId: string): Promise<number> {

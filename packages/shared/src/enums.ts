@@ -94,8 +94,9 @@ export type CategorySource = (typeof CATEGORY_SOURCES)[number];
 export const DEPOSIT_STATUS = ['pending', 'verified', 'rejected', 'released'] as const;
 export type DepositStatus = (typeof DEPOSIT_STATUS)[number];
 
-export const INSTRUMENT_TYPES = ['cpo', 'bank_guarantee', 'transfer'] as const;
-export const DEPOSIT_INSTRUMENT_TYPES = [...INSTRUMENT_TYPES, "chapa"] as const;
+export const MANUAL_INSTRUMENT_TYPES = ['cpo', 'bank_guarantee', 'transfer'] as const;
+export const INSTRUMENT_TYPES = [...MANUAL_INSTRUMENT_TYPES, "chapa"] as const;
+export const DEPOSIT_INSTRUMENT_TYPES = INSTRUMENT_TYPES;
 export type InstrumentType = (typeof DEPOSIT_INSTRUMENT_TYPES)[number];
 
 // Snapshot of the National Bank of Ethiopia's published bank directory.

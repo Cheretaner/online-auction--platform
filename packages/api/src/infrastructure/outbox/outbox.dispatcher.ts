@@ -10,6 +10,24 @@ import { notifyWatchers } from "../../watchlist/watchlist.service.js";
 
 type ClaimedNotification = Awaited<ReturnType<typeof notificationRepo.claimNotificationById>>;
 
+function localizeEmailNotification(item: NonNullable<ClaimedNotification>, language: "en" | "am") {
+  if (language !== "am" || !item.type.startsWith("watchlist.")) return { title: item.title, message: item.message };
+  const auction = item.message.match(/"([^\"]+)"/)?.[1] ?? "";
+  const messages: Record<string, { title: string; message: string }> = {
+    "watchlist.bid.placed": {
+      title: "አዲስ የጨረታ እንቅስቃሴ",
+      message: `በ“${auction}” ላይ አዲስ የጨረታ እንቅስቃሴ ተመዝግቧል። ብቁ እንቅስቃሴዎችን ለማየት ጨረታውን ይክፈቱ።`,
+    },
+    "watchlist.auction.approved": { title: "ጨረታ ተዘጋጅቷል", message: `“${auction}” ተዘጋጅቶ ለመከታተል ይገኛል።` },
+    "watchlist.auction.opened": { title: "ጨረታው ተከፍቷል", message: `በ“${auction}” ላይ ጨረታ መስጠት ተጀምሯል።` },
+    "watchlist.auction.closed": { title: "የጨረታ ጊዜ ተዘግቷል", message: `በ“${auction}” ላይ የጨረታ ጊዜ ተዘግቷል። ውጤቱ በግምገማ ላይ ሊሆን ይችላል።` },
+    "watchlist.auction.under_review": { title: "ጨረታው በግምገማ ላይ ነው", message: `የ“${auction}” ውጤት በግምገማ ላይ ነው።` },
+    "watchlist.auction.awarded": { title: "ጨረታ ተሸልሟል", message: `የ“${auction}” ውጤት ተሸልሟል።` },
+    "watchlist.auction.cancelled": { title: "ጨረታ ተሰርዟል", message: `“${auction}” ተሰርዟል።` },
+  };
+  return messages[item.type] ?? { title: item.title, message: item.message };
+}
+
 /** Sends one already-claimed notification and records the outcome. Shared
  * by the outbox-triggered path (near-real-time) and the periodic retry
  * sweep, so delivery + status bookkeeping lives in exactly one place. */
@@ -19,7 +37,9 @@ async function sendClaimedNotification(item: NonNullable<ClaimedNotification>): 
       if (!item.email) {
         throw new Error("Profile email missing");
       }
-      await mailAdapter.send({ to: item.email, subject: item.title, body: item.message });
+      const language = await notificationRepo.preferredLanguage(item.userId);
+      const localized = localizeEmailNotification(item, language ?? "en");
+      await mailAdapter.send({ to: item.email, subject: localized.title, body: localized.message });
     } else if (item.channel === "telegram") {
       const delivered = await telegramService.notifyUser(item.userId, {
         title: item.title,

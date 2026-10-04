@@ -157,7 +157,9 @@ export async function findChannelPost(auctionId: string, client?: Queryable): Pr
 
 export async function setTelegramLanguage(userId: string, language: "en" | "am"): Promise<void> {
   await query(
-    `UPDATE profiles SET telegram_language = $2, updated_at = NOW() WHERE id = $1 AND is_active = TRUE`,
+    `UPDATE profiles
+        SET telegram_language = $2, preferred_language = $2, updated_at = NOW()
+      WHERE id = $1 AND is_active = TRUE`,
     [userId, language],
   );
 }

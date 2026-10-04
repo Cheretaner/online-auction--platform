@@ -20,19 +20,19 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => persistPublicAuctionCache(queryClient), [queryClient]);
 
   return (
-    <I18nProvider>
-      <ThemeProvider defaultTheme="light" storageKey="app-theme">
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider delayDuration={200}>
-            <AuthProvider>
+    <ThemeProvider defaultTheme="light" storageKey="app-theme">
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <I18nProvider>
+            <TooltipProvider delayDuration={200}>
               {children}
               <Toaster position="top-right" />
               <PwaUpdater />
-            </AuthProvider>
-          </TooltipProvider>
+            </TooltipProvider>
+          </I18nProvider>
           {import.meta.env.DEV ? <ReactQueryDevtools buttonPosition="bottom-left" /> : null}
-        </QueryClientProvider>
-      </ThemeProvider>
-    </I18nProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
