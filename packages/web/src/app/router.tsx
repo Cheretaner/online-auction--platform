@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { lazy, Suspense, useLayoutEffect } from "react";
+import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
 import { PublicShell } from "@/components/layout/public-shell";
 import { PageSkeleton } from "@/components/feedback/query-state";
@@ -52,6 +52,13 @@ function Fallback() {
 }
 
 function RootProviders() {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("product-theme", pathname !== "/");
+    return () => root.classList.remove("product-theme");
+  }, [pathname]);
+
   return (
     <AppProviders>
       <Suspense fallback={<Fallback />}>

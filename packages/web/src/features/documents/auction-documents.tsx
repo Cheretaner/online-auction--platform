@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { DOCUMENT_TYPES, type DocumentType } from "@auction/shared";
-import { Download, FolderOpen, Lock, Search } from "lucide-react";
+import { Download, FileText, FolderOpen, Lock, Search } from "lucide-react";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -42,6 +42,7 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
       <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
+          <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("documents.private")} /> : null}
           {doc.fileName}
         </p>

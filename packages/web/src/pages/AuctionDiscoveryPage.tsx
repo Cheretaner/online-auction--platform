@@ -40,7 +40,7 @@ export default function AuctionDiscoveryPage() {
       />
       <div className="flex flex-col gap-6">
         <SearchFilterBar total={total} />
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:gap-8">
           <ListingFeed
             auctions={items}
             issuerName={issuerName}

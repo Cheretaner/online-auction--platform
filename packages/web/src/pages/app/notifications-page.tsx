@@ -101,7 +101,7 @@ export default function NotificationsPage() {
 
 function localizeNotification(item: NotificationRecord, locale: "en" | "am") {
   if (locale !== "am") return { title: item.title, message: item.message };
-  const auction = item.message.match(/"([^\"]+)"/)?.[1] ?? "";
+  const auction = item.message.match(/"([^"]+)"/)?.[1] ?? "";
   const watchlist: Record<string, { title: string; message: string }> = {
     "watchlist.bid.placed": { title: "አዲስ የጨረታ እንቅስቃሴ", message: `በ“${auction}” ላይ አዲስ የጨረታ እንቅስቃሴ ተመዝግቧል። ብቁ እንቅስቃሴዎችን ለማየት ጨረታውን ይክፈቱ።` },
     "watchlist.auction.approved": { title: "ጨረታ ተዘጋጅቷል", message: `“${auction}” ተዘጋጅቶ ለመከታተል ይገኛል።` },

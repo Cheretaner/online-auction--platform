@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Clock, HelpCircle, LayoutDashboard, Menu, Search } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { BrandLogo } from "@/components/layout/brand-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -108,13 +109,13 @@ function SearchBox({ className }: { className?: string }) {
         className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
         aria-hidden
       />
-      <input
+      <Input
         id="site-search"
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder={t("header.searchPlaceholder")}
-        className="h-10 w-full rounded-md border border-input bg-card pr-3 pl-9 text-sm shadow-xs outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 focus-visible:ring-offset-0"
+        className="pr-3 pl-9"
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { NotificationChannel } from "@auction/shared";
 import type { Auction } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
@@ -17,28 +17,27 @@ const CHANNELS: Array<{ value: WatchlistChannel; key: "inApp" | "email" | "teleg
   { value: "telegram", key: "telegram" },
 ];
 
-export function WatchlistControls({ auction }: { auction: Auction }) {
+function WatchlistEditor({ auction }: { auction: Auction }) {
   const t = useT("auctions");
   const watchlists = useWatchlists();
   const save = useSaveWatchlist();
   const remove = useRemoveWatchlist();
   const records = watchlists.data?.items ?? [];
   const current = records.filter((record) => record.auctionId === auction.id);
-  const [channels, setChannels] = useState<WatchlistChannel[]>(["in_app"]);
-  const [alertOnBids, setAlertOnBids] = useState(true);
-  const [alertOnStatus, setAlertOnStatus] = useState(true);
-
-  useEffect(() => {
-    if (watchlists.isLoading) return;
-    setChannels(current.length ? current.map((record) => record.channel) : ["in_app"]);
-    setAlertOnBids(current.some((record) => record.alertOnBids));
-    setAlertOnStatus(current.some((record) => record.alertOnStatus));
-  }, [auction.id, watchlists.data, watchlists.isLoading]);
+  const [channelSelection, setChannelSelection] = useState<WatchlistChannel[] | null>(null);
+  const [bidAlertSelection, setBidAlertSelection] = useState<boolean | null>(null);
+  const [statusAlertSelection, setStatusAlertSelection] = useState<boolean | null>(null);
+  const channels = channelSelection ?? (current.length ? current.map((record) => record.channel) : ["in_app"]);
+  const alertOnBids = bidAlertSelection ?? (current.length ? current.some((record) => record.alertOnBids) : true);
+  const alertOnStatus = statusAlertSelection ?? (current.length ? current.some((record) => record.alertOnStatus) : true);
 
   const toggleChannel = (channel: WatchlistChannel, checked: boolean) => {
-    setChannels((selected) => checked
-      ? [...new Set([...selected, channel])]
-      : selected.filter((value) => value !== channel));
+    setChannelSelection((selected) => {
+      const currentSelection = selected ?? channels;
+      return checked
+        ? [...new Set([...currentSelection, channel])]
+        : currentSelection.filter((value) => value !== channel);
+    });
   };
 
   return (
@@ -51,7 +50,7 @@ export function WatchlistControls({ auction }: { auction: Auction }) {
         {watchlists.isError ? <ErrorState error={watchlists.error} onRetry={() => void watchlists.refetch()} /> : null}
         {watchlists.isError ? null : (
           <>
-            <fieldset className="space-y-2">
+            <fieldset disabled={watchlists.isLoading} className="space-y-2 disabled:opacity-60">
               <legend className="mb-2 text-sm font-medium">{t("detail.watchlist.channels")}</legend>
               {CHANNELS.map(({ value, key }) => (
                 <label key={value} className="flex items-center gap-2 text-sm">
@@ -61,14 +60,14 @@ export function WatchlistControls({ auction }: { auction: Auction }) {
                 </label>
               ))}
             </fieldset>
-            <fieldset className="space-y-2">
+            <fieldset disabled={watchlists.isLoading} className="space-y-2 disabled:opacity-60">
               <legend className="mb-2 text-sm font-medium">{t("detail.watchlist.alertTypes")}</legend>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={alertOnBids} onChange={(event) => setAlertOnBids(event.target.checked)} />
+                <input type="checkbox" checked={alertOnBids} onChange={(event) => setBidAlertSelection(event.target.checked)} />
                 {t("detail.watchlist.bids")}
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={alertOnStatus} onChange={(event) => setAlertOnStatus(event.target.checked)} />
+                <input type="checkbox" checked={alertOnStatus} onChange={(event) => setStatusAlertSelection(event.target.checked)} />
                 {t("detail.watchlist.status")}
               </label>
               <p className="text-xs text-muted-foreground">{t("detail.watchlist.frequency")}</p>
@@ -94,4 +93,8 @@ export function WatchlistControls({ auction }: { auction: Auction }) {
       </CardContent>
     </Card>
   );
+}
+
+export function WatchlistControls({ auction }: { auction: Auction }) {
+  return <WatchlistEditor key={auction.id} auction={auction} />;
 }

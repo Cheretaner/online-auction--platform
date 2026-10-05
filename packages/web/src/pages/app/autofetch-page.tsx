@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import type { CreateAuctionItemRequest } from "@auction/shared";
 import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Inbox, Pencil, Radar, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -534,21 +534,39 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const [reason, setReason] = useState("");
   const [showConflicts, setShowConflicts] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [reviewedTitle, setReviewedTitle] = useState(item.title);
   const cleanDescription = cleanImportedDescription(item.description);
-  const [reviewedDescription, setReviewedDescription] = useState(cleanDescription);
-  const [reviewedQuantity, setReviewedQuantity] = useState("1");
-  const [reviewedUnit, setReviewedUnit] = useState("");
-  const [reviewedCondition, setReviewedCondition] = useState("");
-  const [reviewedValue, setReviewedValue] = useState("");
-  const [reviewedRegion, setReviewedRegion] = useState("");
-  const [reviewedCity, setReviewedCity] = useState("");
   const conflictDetails = useAutofetchConflicts(item.id, showConflicts);
   const pendingDetail = useAutofetchPendingDetail(item.id, showSuggestions);
   const conflicts = item.conflictCount ?? 0;
   const t = useT("tools");
   const { locale } = useLocale();
   const normalized = pendingDetail.data?.item.normalizedMetadata;
+  const [reviewedOverrides, setReviewedOverrides] = useState<Partial<{
+    title: string;
+    description: string;
+    quantity: string;
+    unit: string;
+    condition: string;
+    value: string;
+    region: string;
+    city: string;
+  }>>({});
+  const suggestedValues = {
+    title: readInput(normalized?.title) || item.title,
+    description: normalized ? readInput(normalized.description) : cleanDescription,
+    quantity: readInput(normalized?.quantity) || "1",
+    unit: readInput(normalized?.unit),
+    condition: readInput(normalized?.condition),
+    value: typeof normalized?.estimatedValue === "number"
+      ? normalized.estimatedValue.toFixed(2)
+      : readInput(normalized?.estimatedValue),
+    region: readInput(normalized?.region),
+    city: readInput(normalized?.city),
+  };
+  const reviewed = { ...suggestedValues, ...reviewedOverrides };
+  const updateReviewed = (field: keyof typeof suggestedValues, value: string) => {
+    setReviewedOverrides((current) => ({ ...current, [field]: value }));
+  };
   const sourceMetadata = normalized?.rawMetadata && typeof normalized.rawMetadata === "object"
     ? normalized.rawMetadata as Record<string, unknown>
     : undefined;
@@ -558,18 +576,6 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const evidence = extraction?.evidence && typeof extraction.evidence === "object"
     ? Object.entries(extraction.evidence as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string")
     : [];
-
-  useEffect(() => {
-    if (!normalized) return;
-    setReviewedTitle(readInput(normalized.title) || item.title);
-    setReviewedDescription(readInput(normalized.description));
-    setReviewedQuantity(readInput(normalized.quantity) || "1");
-    setReviewedUnit(readInput(normalized.unit));
-    setReviewedCondition(readInput(normalized.condition));
-    setReviewedValue(typeof normalized.estimatedValue === "number" ? normalized.estimatedValue.toFixed(2) : readInput(normalized.estimatedValue));
-    setReviewedRegion(readInput(normalized.region));
-    setReviewedCity(readInput(normalized.city));
-  }, [item.id, item.title, normalized]);
 
   return (
     <Card>
@@ -628,14 +634,14 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                       <div className="space-y-3 border-t pt-3">
                         <p className="font-semibold">{locale === "am" ? "ለማተም የተገመገሙ መረጃዎች" : "Reviewed values to publish"}</p>
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1"><Label htmlFor={`${id}-title`}>{fieldLabel("title", locale)}</Label><Input id={`${id}-title`} required maxLength={200} value={reviewedTitle} onChange={(event) => setReviewedTitle(event.target.value)} /></div>
-                          <div className="space-y-1"><Label htmlFor={`${id}-quantity`}>{fieldLabel("quantity", locale)}</Label><Input id={`${id}-quantity`} type="number" min={1} step={1} required value={reviewedQuantity} onChange={(event) => setReviewedQuantity(event.target.value)} /></div>
-                          <div className="space-y-1"><Label htmlFor={`${id}-unit`}>{fieldLabel("unit", locale)}</Label><Input id={`${id}-unit`} maxLength={30} value={reviewedUnit} onChange={(event) => setReviewedUnit(event.target.value)} /></div>
-                          <div className="space-y-1"><Label htmlFor={`${id}-condition`}>{fieldLabel("condition", locale)}</Label><NativeSelect id={`${id}-condition`} value={reviewedCondition} onChange={(event) => setReviewedCondition(event.target.value)}><option value="">{locale === "am" ? "አልተገለጸም" : "Not specified"}</option>{["new", "used_good", "used_fair", "salvage", "unknown"].map((condition) => <option key={condition} value={condition}>{condition.replaceAll("_", " ")}</option>)}</NativeSelect></div>
-                          <div className="space-y-1"><Label htmlFor={`${id}-value`}>{fieldLabel("estimatedValue", locale)}</Label><Input id={`${id}-value`} inputMode="decimal" placeholder="ETB" value={reviewedValue} onChange={(event) => setReviewedValue(event.target.value)} /></div>
-                          <div className="space-y-1"><Label htmlFor={`${id}-region`}>{fieldLabel("region", locale)}</Label><Input id={`${id}-region`} maxLength={80} value={reviewedRegion} onChange={(event) => setReviewedRegion(event.target.value)} /></div>
-                          <div className="space-y-1"><Label htmlFor={`${id}-city`}>{fieldLabel("city", locale)}</Label><Input id={`${id}-city`} maxLength={100} value={reviewedCity} onChange={(event) => setReviewedCity(event.target.value)} /></div>
-                          <div className="space-y-1 sm:col-span-2"><Label htmlFor={`${id}-description`}>{fieldLabel("description", locale)}</Label><Textarea id={`${id}-description`} maxLength={5000} value={reviewedDescription} onChange={(event) => setReviewedDescription(event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-title`}>{fieldLabel("title", locale)}</Label><Input id={`${id}-title`} required maxLength={200} value={reviewed.title} onChange={(event) => updateReviewed("title", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-quantity`}>{fieldLabel("quantity", locale)}</Label><Input id={`${id}-quantity`} type="number" min={1} step={1} required value={reviewed.quantity} onChange={(event) => updateReviewed("quantity", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-unit`}>{fieldLabel("unit", locale)}</Label><Input id={`${id}-unit`} maxLength={30} value={reviewed.unit} onChange={(event) => updateReviewed("unit", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-condition`}>{fieldLabel("condition", locale)}</Label><NativeSelect id={`${id}-condition`} value={reviewed.condition} onChange={(event) => updateReviewed("condition", event.target.value)}><option value="">{locale === "am" ? "አልተገለጸም" : "Not specified"}</option>{["new", "used_good", "used_fair", "salvage", "unknown"].map((condition) => <option key={condition} value={condition}>{condition.replaceAll("_", " ")}</option>)}</NativeSelect></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-value`}>{fieldLabel("estimatedValue", locale)}</Label><Input id={`${id}-value`} inputMode="decimal" placeholder="ETB" value={reviewed.value} onChange={(event) => updateReviewed("value", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-region`}>{fieldLabel("region", locale)}</Label><Input id={`${id}-region`} maxLength={80} value={reviewed.region} onChange={(event) => updateReviewed("region", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-city`}>{fieldLabel("city", locale)}</Label><Input id={`${id}-city`} maxLength={100} value={reviewed.city} onChange={(event) => updateReviewed("city", event.target.value)} /></div>
+                          <div className="space-y-1 sm:col-span-2"><Label htmlFor={`${id}-description`}>{fieldLabel("description", locale)}</Label><Textarea id={`${id}-description`} maxLength={5000} value={reviewed.description} onChange={(event) => updateReviewed("description", event.target.value)} /></div>
                         </div>
                       </div>
                     ) : null}
@@ -708,14 +714,14 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                   auctionId,
                   ...(item.aiSuggested ? {
                     corrections: {
-                      title: reviewedTitle.trim(),
-                      description: reviewedDescription,
-                      quantity: Number(reviewedQuantity),
-                      unit: reviewedUnit || undefined,
-                      condition: reviewedCondition ? reviewedCondition as CreateAuctionItemRequest["condition"] : undefined,
-                      estimatedValue: reviewedValue || null,
-                      region: reviewedRegion || undefined,
-                      city: reviewedCity || undefined,
+                      title: reviewed.title.trim(),
+                      description: reviewed.description,
+                      quantity: Number(reviewed.quantity),
+                      unit: reviewed.unit || undefined,
+                      condition: reviewed.condition ? reviewed.condition as CreateAuctionItemRequest["condition"] : undefined,
+                      estimatedValue: reviewed.value || null,
+                      region: reviewed.region || undefined,
+                      city: reviewed.city || undefined,
                     },
                   } : {}),
                 },
@@ -738,7 +744,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 ))}
               </NativeSelect>
             </div>
-            <Button type="submit" disabled={!auctionId || reject.isPending || auctions.length === 0 || (item.aiSuggested && (!showSuggestions || pendingDetail.isLoading || pendingDetail.isError || !pendingDetail.data || !reviewedTitle.trim() || !Number.isInteger(Number(reviewedQuantity)) || Number(reviewedQuantity) < 1 || Boolean(reviewedValue && !/^\d+(\.\d{2})?$/.test(reviewedValue))))} loading={approve.isPending}>
+            <Button type="submit" disabled={!auctionId || reject.isPending || auctions.length === 0 || (item.aiSuggested && (!showSuggestions || pendingDetail.isLoading || pendingDetail.isError || !pendingDetail.data || !reviewed.title.trim() || !Number.isInteger(Number(reviewed.quantity)) || Number(reviewed.quantity) < 1 || Boolean(reviewed.value && !/^\d+(\.\d{2})?$/.test(reviewed.value))))} loading={approve.isPending}>
               {t("autofetch.verifyAdd")}
             </Button>
           </form>

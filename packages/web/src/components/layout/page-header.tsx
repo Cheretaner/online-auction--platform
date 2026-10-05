@@ -24,7 +24,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("mb-6 sm:mb-8", className)}>
+    <header className={cn("mb-7 border-b border-border/70 pb-6 sm:mb-9 sm:pb-7", className)}>
       {back ? (
         <Link
           to={back.to}
@@ -34,13 +34,13 @@ export function PageHeader({
           {back.label}
         </Link>
       ) : null}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
-          <h1 className="text-2xl leading-tight font-semibold sm:text-3xl">{title}</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-2.5">
+          <h1 className="text-3xl leading-tight font-semibold tracking-tight sm:text-4xl">{title}</h1>
           {meta ? <div className="flex flex-wrap items-center gap-2">{meta}</div> : null}
-          {description ? <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
+          {description ? <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">{description}</p> : null}
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap gap-2">{actions}</div> : null}
+        {actions ? <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">{actions}</div> : null}
       </div>
     </header>
   );
