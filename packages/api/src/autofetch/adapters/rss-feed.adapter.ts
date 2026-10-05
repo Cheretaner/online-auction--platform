@@ -1,4 +1,5 @@
 import type { ISourceAdapter } from './adapter.interface.js';
+import { fetchPublicSource, validatePublicSourceUrl } from './public-http.js';
 import {
   AdapterError,
   NormalizationError,
@@ -8,6 +9,43 @@ import {
   type SourceFetch,
   type SourceMetadata,
 } from '../types/index.js';
+
+function decodeEntities(value: string): string {
+  const namedEntities: Record<string, string> = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+  return value.replace(/&(#(?:x[\da-f]+|\d+)|[a-z]+);/gi, (entity, code: string) => {
+    if (code[0] !== '#') return namedEntities[code.toLowerCase()] ?? entity;
+    const hex = code[1]?.toLowerCase() === 'x';
+    const point = Number.parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10);
+    if (!Number.isInteger(point) || point < 0 || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) return '\uFFFD';
+    return String.fromCodePoint(point);
+  });
+}
+
+function plainFeedText(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  let text = value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+  for (let pass = 0; pass < 3; pass += 1) {
+    const decoded = decodeEntities(text);
+    if (decoded === text) break;
+    text = decoded;
+  }
+  text = text
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&(?:nbsp|#160);/gi, ' ')
+    .replace(/&(?:amp|lt|gt|quot|apos);/gi, (entity) => decodeEntities(entity))
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text ? text.slice(0, 20_000) : undefined;
+}
 
 export class RssFeedAdapter implements ISourceAdapter {
   private config: { url?: string; includeKeywords: string[] } = { includeKeywords: [] };
@@ -26,29 +64,34 @@ export class RssFeedAdapter implements ISourceAdapter {
 
   async validateConfig(config: Record<string, unknown>): Promise<void> {
     const url = typeof config.url === 'string' ? config.url : '';
-    let parsed: URL;
-    try { parsed = new URL(url); } catch { throw new Error('A public RSS/Atom URL is required'); }
-    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('RSS URL must use HTTP(S)');
+    validatePublicSourceUrl(url);
     this.readKeywords(config.includeKeywords);
   }
 
   async fetchItems(_query: string, options: FetchOptions): Promise<SourceFetch[]> {
     if (!this.config.url) throw new AdapterError('Adapter not configured with URL', 'CONFIG_INVALID');
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), options.timeout ?? 30000);
     try {
-      const response = await fetch(this.config.url, { signal: controller.signal, headers: { Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml' } });
-      if (!response.ok) throw new AdapterError(`HTTP ${response.status}: ${response.statusText}`, 'FETCH_FAILED');
-      const items = this.parse(await response.text());
-      if (this.config.includeKeywords.length === 0) return items;
-      return items.filter((item) => {
+      const response = await fetchPublicSource(this.config.url, {
+        timeoutMs: Math.min(Math.max(options.timeout ?? 30_000, 1_000), 30_000),
+        maxBytes: 5 * 1024 * 1024,
+        acceptedContentType: (type) => !type || /xml|rss|atom|text\/plain/.test(type),
+        headers: {
+          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+          'User-Agent': 'Cheretanet-Auction-SourceImporter/1.0',
+        },
+      });
+      const items = this.parse(response.body.toString('utf8'));
+      const matchingItems = this.config.includeKeywords.length === 0
+        ? items
+        : items.filter((item) => {
         const searchableText = `${item.title} ${item.description ?? ''}`.toLocaleLowerCase();
         return this.config.includeKeywords.every((keyword) => searchableText.includes(keyword));
       });
+      return matchingItems.slice(0, Math.max(0, Math.min(options.limit ?? 100, 500)));
     } catch (error) {
       if (error instanceof AdapterError) throw error;
       throw new AdapterError(`Failed to fetch RSS feed: ${error instanceof Error ? error.message : String(error)}`, 'FETCH_FAILED');
-    } finally { clearTimeout(timeoutId); }
+    }
   }
 
   async normalize(raw: unknown): Promise<NormalizedItem> {
@@ -76,11 +119,12 @@ export class RssFeedAdapter implements ISourceAdapter {
   private parse(xml: string): SourceFetch[] {
     const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/(item|entry)>/gi)].map((match) => match[0]);
     return entries.map((entry, index) => {
-      const value = (name: string) => entry.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i'))?.[1]?.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, '').trim();
-      const link = value('link') ?? entry.match(/<link[^>]+href=["']([^"']+)["']/i)?.[1];
-      const title = value('title') ?? `Feed item ${index + 1}`;
-      const description = value('description') ?? value('summary');
-      return { id: `rss-feed:${index}:${link ?? title}`, externalId: link ?? title, title, description, metadata: { id: link ?? title, title, description, link, category: value('category') }, source: 'rss-feed', fetchedAt: new Date() };
+      const value = (name: string) => entry.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`, 'i'))?.[1];
+      const rawLink = value('link') ?? entry.match(/<link[^>]+href=["']([^"']+)["']/i)?.[1];
+      const link = plainFeedText(rawLink);
+      const title = plainFeedText(value('title')) ?? `Feed item ${index + 1}`;
+      const description = plainFeedText(value('description') ?? value('summary'));
+      return { id: `rss-feed:${index}:${link ?? title}`, externalId: link ?? title, title, description, metadata: { id: link ?? title, title, description, link, category: plainFeedText(value('category')) }, source: 'rss-feed', fetchedAt: new Date() };
     });
   }
 

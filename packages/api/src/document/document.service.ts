@@ -48,7 +48,7 @@ export async function uploadDocument(input: {
   await storageAdapter.put(storagePath, input.data, validatedFile.mimeType);
 
   try {
-    return await withTransaction(
+    const savedDoc = await withTransaction(
       async () => {
         const document = await repo.createDocument({
           auctionId: input.auctionId,
@@ -83,6 +83,8 @@ export async function uploadDocument(input: {
       },
       { userId: input.uploadedBy },
     );
+
+    return savedDoc;
   } catch (error) {
     // Do not leave an orphaned blob behind if the row could not be written.
     await storageAdapter.delete(storagePath).catch(() => undefined);
@@ -230,9 +232,13 @@ export async function startDocumentOcr(id: string, viewer: DocumentViewer): Prom
   await assertOcrOfficer(document, viewer);
 
   const existing = await ocrRepo.find(id);
-  if (existing?.status === "completed" || existing?.status === "processing") return existing;
+  if (existing?.status === "completed") return existing;
   const started = await ocrRepo.begin(id);
-  if (!started) return (await ocrRepo.find(id))!;
+  if (!started) {
+    const current = await ocrRepo.find(id);
+    if (!current) throw AppError.conflict("OCR could not be started; retry the request");
+    return current;
+  }
 
   try {
     await audit.appendAuditEvent({

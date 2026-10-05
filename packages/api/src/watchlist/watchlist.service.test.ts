@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { queryOne } from "../infrastructure/database/query.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import * as repo from "./watchlist.repository.js";
-import { setWatchlist } from "./watchlist.service.js";
+import { getUserWatchlist, setWatchlist } from "./watchlist.service.js";
 
 vi.mock("../infrastructure/database/query.js", () => ({ queryOne: vi.fn() }));
 vi.mock("../infrastructure/database/tx.js", () => ({
@@ -16,6 +16,8 @@ vi.mock("./watchlist.repository.js", () => ({
   countAuctionUsers: vi.fn(),
   replaceForAuction: vi.fn(),
   removeForAuction: vi.fn(),
+  getUserWatchlist: vi.fn(),
+  countUserWatchlist: vi.fn(),
 }));
 
 describe("watchlist service", () => {
@@ -85,5 +87,17 @@ describe("watchlist service", () => {
       alertOnStatus: false,
     })).rejects.toThrow("Select at least one alert type");
     expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  it("returns the full count and clamps legacy watchlist pagination", async () => {
+    vi.mocked(repo.getUserWatchlist).mockResolvedValue([]);
+    vi.mocked(repo.countUserWatchlist).mockResolvedValue(135);
+
+    await expect(getUserWatchlist("user-1", 1000, -1)).resolves.toEqual({
+      items: [],
+      total: 135,
+    });
+    expect(repo.getUserWatchlist).toHaveBeenCalledWith("user-1", 100, 0);
+    expect(repo.countUserWatchlist).toHaveBeenCalledWith("user-1");
   });
 });

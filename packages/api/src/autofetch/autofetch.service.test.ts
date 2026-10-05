@@ -17,6 +17,7 @@ describe("AutoFetchService.createSource", () => {
       isStale: vi.fn(),
     };
 
+    vi.spyOn(adapterRegistry, "has").mockReturnValue(true);
     vi.spyOn(adapterRegistry, "get").mockReturnValue(adapter as any);
     vi.spyOn(AutoFetchRepository.prototype, "createSource").mockResolvedValue({
       id: "source-123",
@@ -55,8 +56,10 @@ describe("AutoFetchService source management", () => {
   it("validates and updates an organization-owned source", async () => {
     const adapter = { validateConfig: vi.fn().mockResolvedValue(undefined) };
     const updatedSource = { id: "source-1", organizationId: "org-1", isActive: true };
+    vi.spyOn(adapterRegistry, "has").mockReturnValue(true);
     vi.spyOn(adapterRegistry, "get").mockReturnValue(adapter as any);
     const updateSpy = vi.spyOn(AutoFetchRepository.prototype, "updateSourceForOrganization").mockResolvedValue(updatedSource as any);
+    vi.spyOn(AutoFetchRepository.prototype, "logAuditEvent").mockResolvedValue(undefined);
 
     const service = new AutoFetchService({} as any);
     await expect(service.updateSource("org-1", "source-1", {

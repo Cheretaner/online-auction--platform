@@ -4,6 +4,7 @@ import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
 import * as controller from "./document.controller.js";
+import * as searchController from "./document-search.controller.js";
 import { documentUpload } from "./upload.middleware.js";
 
 export const documentRouter = Router();
@@ -15,6 +16,7 @@ documentRouter.post(
   asyncHandler(controller.upload),
 );
 
+documentRouter.get("/search", requireAuth(), asyncHandler(searchController.searchDocuments));
 documentRouter.get("/me", requireAuth(), asyncHandler(controller.listMine));
 documentRouter.get("/ocr/search", requireAuth(), asyncHandler(controller.searchReviewedOcr));
 

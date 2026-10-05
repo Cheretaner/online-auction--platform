@@ -172,3 +172,168 @@ export async function reviewAnomaly(input: {
     return (await enrichFlags([updated]))[0];
   }, { userId: input.reviewerId });
 }
+
+/**
+ * Get historical context for an anomaly flag
+ * Returns similar past flags and their outcomes
+ */
+export async function getAnomalyHistoricalContext(
+  flagId: string,
+  actor: { userId: string; roles: Role[]; organizationId?: string },
+): Promise<{
+  currentFlag: AnomalyFlag;
+  similarFlagsByBidders: AnomalyFlag[];
+  similarFlagsByRules: AnomalyFlag[];
+  bidderProfiles: Array<{
+    bidderId: string;
+    totalFlags: number;
+    highSeverityFlags: number;
+    recentFlags: number;
+    mostCommonRules: string[];
+    dismissalRate: number;
+    lastFlaggedAt: Date | null;
+  }>;
+  ruleOutcomes: Array<{
+    rule: string;
+    totalFlags: number;
+    reviewedCount: number;
+    dismissedCount: number;
+    escalatedCount: number;
+    avgScore: number;
+    avgResolutionDays: number | null;
+  }>;
+}> {
+  const currentFlag = await repo.findFlag(flagId);
+  if (!currentFlag) {
+    throw new AppError("Anomaly flag not found", HttpStatus.NOT_FOUND);
+  }
+
+  // Authorization: only officers can view historical context
+  const isOfficer = actor.roles.some((r) =>
+    ["org_admin", "auction_officer", "compliance_officer", "super_admin"].includes(r),
+  );
+
+  if (!isOfficer) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+  }
+
+  // Get historical flags for same bidders
+  const similarFlagsByBidders = await repo.getHistoricalFlagsForBidders(
+    currentFlag.subjectAccounts,
+    20,
+  );
+
+  // Get historical flags with same rule patterns
+  const similarFlagsByRules = await repo.getHistoricalFlagsByRules(
+    currentFlag.triggeredRules,
+    20,
+  );
+
+  // Get risk profiles for all subject bidders
+  const bidderProfiles = await Promise.all(
+    currentFlag.subjectAccounts.map((bidderId) =>
+      repo.getBidderRiskProfile(bidderId),
+    ),
+  );
+
+  // Get outcome statistics for each triggered rule
+  const ruleOutcomes = await Promise.all(
+    currentFlag.triggeredRules.map((rule) =>
+      repo.getFlagOutcomeStatsByRule(rule),
+    ),
+  );
+
+  logger.info({
+    event: "anomaly:historical_context_viewed",
+    flagId,
+    userId: actor.userId,
+    similarBidderFlags: similarFlagsByBidders.length,
+    similarRuleFlags: similarFlagsByRules.length,
+  });
+
+  return {
+    currentFlag,
+    similarFlagsByBidders: similarFlagsByBidders.filter((f) => f.id !== flagId),
+    similarFlagsByRules: similarFlagsByRules.filter((f) => f.id !== flagId),
+    bidderProfiles,
+    ruleOutcomes,
+  };
+}
+
+/**
+ * Get compliance patterns for an organization
+ * Shows historical flag trends and resolution patterns
+ */
+export async function getOrgCompliancePatterns(
+  orgId: string,
+  actor: { userId: string; roles: Role[]; organizationId?: string },
+): Promise<{
+  totalFlags: number;
+  flagsByRule: Record<string, number>;
+  flagsBySeverity: Record<string, number>;
+  flagsByStatus: Record<string, number>;
+  avgResolutionDays: number;
+  recentFlags: AnomalyFlag[];
+}> {
+  // Authorization
+  const isOfficer = actor.roles.some((r) =>
+    ["org_admin", "auction_officer", "compliance_officer", "super_admin"].includes(r),
+  );
+
+  if (!isOfficer) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+  }
+
+  if (!actor.roles.includes("super_admin") && actor.organizationId !== orgId) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN);
+  }
+
+  const allFlags = await repo.getHistoricalFlagsForOrg(orgId, 200);
+
+  // Aggregate statistics
+  const flagsByRule: Record<string, number> = {};
+  const flagsBySeverity: Record<string, number> = {};
+  const flagsByStatus: Record<string, number> = {};
+  let totalResolutionDays = 0;
+  let resolvedCount = 0;
+
+  for (const flag of allFlags) {
+    // Count by rules
+    for (const rule of flag.triggeredRules) {
+      flagsByRule[rule] = (flagsByRule[rule] || 0) + 1;
+    }
+
+    // Count by severity
+    flagsBySeverity[flag.severity] = (flagsBySeverity[flag.severity] || 0) + 1;
+
+    // Count by status
+    flagsByStatus[flag.status] = (flagsByStatus[flag.status] || 0) + 1;
+
+    // Calculate resolution time
+    if (flag.reviewedAt) {
+      const created = new Date(flag.createdAt);
+      const reviewed = new Date(flag.reviewedAt);
+      const days = (reviewed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+      totalResolutionDays += days;
+      resolvedCount++;
+    }
+  }
+
+  const avgResolutionDays = resolvedCount > 0 ? totalResolutionDays / resolvedCount : 0;
+
+  logger.info({
+    event: "anomaly:org_patterns_viewed",
+    orgId,
+    userId: actor.userId,
+    totalFlags: allFlags.length,
+  });
+
+  return {
+    totalFlags: allFlags.length,
+    flagsByRule,
+    flagsBySeverity,
+    flagsByStatus,
+    avgResolutionDays,
+    recentFlags: allFlags.slice(0, 10),
+  };
+}

@@ -158,6 +158,8 @@ export interface DocumentRecord {
   checksumSha256: string;
   isPrivate: boolean;
   summary: string | null;
+  extractedText: string | null;
+  ocrStatus: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -336,12 +338,15 @@ export interface AutofetchSource {
   id: string;
   name: string;
   adapterType: string;
-  sourceUrl: string | null;
-  lastFetchedAt?: string;
+  sourceUrl?: string | null;
+  adapterConfig?: Record<string, unknown>;
+  isActive?: boolean;
+  lastFetchedAt?: string | null;
   lastFetchAttemptAt?: string;
   lastFetchStatus?: "running" | "success" | "failed";
   lastFetchSummary?: { fetched?: number; queued?: number; duplicates?: number; stale?: number; conflicts?: number; errors?: number };
   lastFetchError?: string;
+  nextFetchAt?: string | null;
   createdAt?: string;
 }
 
@@ -412,6 +417,8 @@ export interface AutofetchPendingItem {
 
 export interface AutofetchPendingResult extends ItemList<AutofetchPendingItem> {
   total: number;
+  limit: number;
+  offset: number;
   hasMore: boolean;
 }
 export interface AutofetchFetchResult { fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }
@@ -430,7 +437,14 @@ export type AutofetchItemCorrections = Partial<Omit<CreateAuctionItemRequest, "c
   estimatedValue?: string | null;
 };
 export interface AutofetchConflictSummary { conflicts: AutofetchConflictFlag[]; count: number; critical: number; high: number; medium: number; low: number }
-export interface AutofetchStats { total: number; pending: number; approved: number; rejected: number }
+export interface AutofetchStats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  published?: number;
+  expired?: number;
+}
 
 export interface AnomalyFlagRecord {
   id: string;

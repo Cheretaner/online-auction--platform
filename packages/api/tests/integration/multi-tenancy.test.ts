@@ -76,7 +76,10 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
 
   it("keeps outsider uploads private and limits them to the auction's organization", async () => {
     const form = new FormData();
-    form.set("file", new Blob(["CPO scan"], { type: "text/plain" }), "cpo.txt");
+    // Upload middleware validates both MIME type and file signature. Use a
+    // small valid PNG so this test exercises tenant privacy, not file rejection.
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jS6sAAAAASUVORK5CYII="), (char) => char.charCodeAt(0));
+    form.set("file", new Blob([png], { type: "image/png" }), "cpo.png");
     form.set("docType", "other");
     form.set("auctionId", auctionA);
     form.set("isPrivate", "false");
@@ -140,7 +143,12 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
 
   it("scopes anomaly flags, audits reviews and blocks award while a high flag is open", async () => {
     const closed = await createAuction(ctx, { orgId: orgA, createdBy: officerA, status: "live" });
-    await ctx.pool.query(`UPDATE auctions SET status = 'under_review' WHERE id = $1`, [closed]);
+    // Put the auction in a valid award-ready state so the 422 below specifically
+    // proves the unresolved anomaly guard is blocking the award.
+    await ctx.pool.query(
+      `UPDATE auctions SET status = 'under_review', winner_id = $2, winning_amount = '100.00' WHERE id = $1`,
+      [closed, bidderId],
+    );
     const { rows } = await ctx.pool.query(
       `INSERT INTO anomaly_flags (auction_id, subject_accounts, score, severity, status)
        VALUES ($1, ARRAY[$2::uuid], 85, 'high', 'open') RETURNING id`,

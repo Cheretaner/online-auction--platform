@@ -9,7 +9,9 @@ import { getErrorMessage } from "@/lib/api/errors";
 import { toast } from "sonner";
 import { useT } from "@/i18n/context";
 
-const CHANNELS: Array<{ value: NotificationChannel; key: "inApp" | "email" | "telegram" }> = [
+type WatchlistChannel = Exclude<NotificationChannel, "voice">;
+
+const CHANNELS: Array<{ value: WatchlistChannel; key: "inApp" | "email" | "telegram" }> = [
   { value: "in_app", key: "inApp" },
   { value: "email", key: "email" },
   { value: "telegram", key: "telegram" },
@@ -22,7 +24,7 @@ export function WatchlistControls({ auction }: { auction: Auction }) {
   const remove = useRemoveWatchlist();
   const records = watchlists.data?.items ?? [];
   const current = records.filter((record) => record.auctionId === auction.id);
-  const [channels, setChannels] = useState<NotificationChannel[]>(["in_app"]);
+  const [channels, setChannels] = useState<WatchlistChannel[]>(["in_app"]);
   const [alertOnBids, setAlertOnBids] = useState(true);
   const [alertOnStatus, setAlertOnStatus] = useState(true);
 
@@ -33,7 +35,7 @@ export function WatchlistControls({ auction }: { auction: Auction }) {
     setAlertOnStatus(current.some((record) => record.alertOnStatus));
   }, [auction.id, watchlists.data, watchlists.isLoading]);
 
-  const toggleChannel = (channel: NotificationChannel, checked: boolean) => {
+  const toggleChannel = (channel: WatchlistChannel, checked: boolean) => {
     setChannels((selected) => checked
       ? [...new Set([...selected, channel])]
       : selected.filter((value) => value !== channel));

@@ -1,12 +1,30 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import type { CreateAuctionItemRequest } from "@auction/shared";
-import { CheckCircle2, ChevronDown, Inbox, Radar, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Inbox, Pencil, Radar, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +42,9 @@ import {
   useAutofetchStats,
   useCreateAutofetchSource,
   useFetchAutofetchSource,
+  useRemoveAutofetchSource,
   useRejectAutofetchItem,
+  useUpdateAutofetchSource,
 } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
@@ -32,15 +52,42 @@ import { useLocale, useT } from "@/i18n/context";
 
 type PendingItem = NonNullable<ReturnType<typeof useAutofetchPending>["data"]>["items"][number];
 
+function cleanImportedDescription(value: string | undefined): string {
+  if (!value) return "";
+  let text = value;
+  for (let pass = 0; pass < 3; pass += 1) {
+    const decoded = text.replace(/&(#(?:x[\da-f]+|\d+)|amp|lt|gt|quot|apos|nbsp);/gi, (entity, code: string) => {
+      if (code[0] !== "#") {
+        return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }[code.toLowerCase()] ?? entity);
+      }
+      const hex = code[1]?.toLowerCase() === "x";
+      const point = Number.parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10);
+      return Number.isInteger(point) && point >= 0 && point <= 0x10ffff
+        ? String.fromCodePoint(point)
+        : "\uFFFD";
+    });
+    if (decoded === text) break;
+    text = decoded;
+  }
+  return text
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function AutofetchPage() {
-  const { organizationId } = useAuth();
+  const [queueOffset, setQueueOffset] = useState(0);
+  const { organizationId, roles } = useAuth();
+  const canReview = roles.includes("org_admin") || roles.includes("compliance_officer");
+  const canManageSources = roles.includes("org_admin") || roles.includes("auction_officer");
   const sources = useAutofetchSources();
-  const pending = useAutofetchPending();
-  const stats = useAutofetchStats();
-  const auctions = useOrgAuctions(organizationId ?? undefined);
-  const fetchSource = useFetchAutofetchSource();
-  const sourceItems = sources.data?.items ?? [];
+  const pending = useAutofetchPending(queueOffset, canReview);
+  const stats = useAutofetchStats(canReview);
+  const auctions = useOrgAuctions(canReview ? organizationId ?? undefined : undefined);
+  const sourceItems = sources.data ?? [];
   const pendingItems = pending.data?.items ?? [];
+  const draftAuctions = auctions.data?.items.filter((auction) => auction.status === "draft") ?? [];
   const t = useT("tools");
 
   return (
@@ -50,18 +97,23 @@ export default function AutofetchPage() {
         description={t("autofetch.description")}
       />
 
-      <section aria-label={t("autofetch.totals")} className="grid gap-4 sm:grid-cols-3">
-        <StatCard label={t("autofetch.pending")} value={String(stats.data?.pending ?? 0)} icon={Inbox} loading={stats.isLoading} />
-        <StatCard label={t("autofetch.approved")} value={String(stats.data?.approved ?? 0)} icon={CheckCircle2} loading={stats.isLoading} />
-        <StatCard label={t("autofetch.rejected")} value={String(stats.data?.rejected ?? 0)} icon={XCircle} loading={stats.isLoading} />
-      </section>
+      {canReview ? (
+        <section aria-label={t("autofetch.totals")} className="grid gap-4 sm:grid-cols-3">
+          <StatCard label={t("autofetch.pending")} value={String(stats.data?.pending ?? 0)} icon={Inbox} loading={stats.isLoading} />
+          <StatCard label={t("autofetch.approved")} value={String(stats.data?.approved ?? 0)} icon={CheckCircle2} loading={stats.isLoading} />
+          <StatCard label={t("autofetch.rejected")} value={String(stats.data?.rejected ?? 0)} icon={XCircle} loading={stats.isLoading} />
+        </section>
+      ) : null}
+      {canReview && stats.isError ? <ErrorState error={stats.error} onRetry={() => void stats.refetch()} /> : null}
 
       <section className="space-y-4">
         <SectionHeader
           title={t("autofetch.queue")}
           description={t("autofetch.queueDescription")}
         />
-        {pending.isLoading ? (
+        {!canReview ? (
+          <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">{t("autofetch.reviewerAccess")}</p>
+        ) : pending.isLoading ? (
           <PageSkeleton rows={2} />
         ) : pending.isError ? (
           <ErrorState error={pending.error} onRetry={() => void pending.refetch()} />
@@ -71,77 +123,252 @@ export default function AutofetchPage() {
           <ul className="space-y-4">
             {pendingItems.map((item) => (
               <li key={item.id}>
-                <QueueItem item={item} auctions={auctions.data?.items ?? []} />
+                <QueueItem item={item} auctions={draftAuctions} />
               </li>
             ))}
           </ul>
         )}
+        {canReview && pending.data && pending.data.total > 5 ? (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">{pending.data.offset + 1}–{Math.min(pending.data.offset + pending.data.items.length, pending.data.total)} of {pending.data.total}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={queueOffset === 0 || pending.isFetching} onClick={() => setQueueOffset((offset) => Math.max(0, offset - 5))}>
+                <ChevronLeft aria-hidden /> Previous
+              </Button>
+              <Button variant="outline" size="sm" disabled={!pending.data.hasMore || pending.isFetching} onClick={() => setQueueOffset((offset) => offset + 5)}>
+                Next <ChevronRight aria-hidden />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="space-y-4">
         <SectionHeader title={t("autofetch.sources")} />
         {sources.isLoading ? (
           <PageSkeleton rows={2} />
+        ) : sources.isError ? (
+          <ErrorState error={sources.error} onRetry={() => void sources.refetch()} />
         ) : sourceItems.length === 0 ? (
           <EmptyState size="inline" icon={Radar} title={t("autofetch.noSources")} description={t("autofetch.addBelow")} />
         ) : (
           <ul className="divide-y rounded-lg border bg-card shadow-xs">
             {sourceItems.map((source) => (
-              <li key={source.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <SourceRow key={source.id} source={source} canManage={canManageSources} />
+            ))}
+          </ul>
+        )}
+        {canManageSources ? <AddSourceForm /> : null}
+      </section>
+    </div>
+  );
+}
+
+function SourceRow({ source, canManage }: { source: NonNullable<ReturnType<typeof useAutofetchSources>["data"]>[number]; canManage: boolean }) {
+  const fetchSource = useFetchAutofetchSource();
+  const updateSource = useUpdateAutofetchSource();
+  const removeSource = useRemoveAutofetchSource();
+  const [editing, setEditing] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [name, setName] = useState(source.name);
+  const [adapterType, setAdapterType] = useState(source.adapterType);
+  const [sourceUrl, setSourceUrl] = useState(source.sourceUrl ?? "");
+  const [adapterConfig, setAdapterConfig] = useState(JSON.stringify(source.adapterConfig ?? {}, null, 2));
+  const t = useT("tools");
+
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(adapterConfig);
+    } catch {
+      toast.error("Adapter configuration must be valid JSON");
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      toast.error("Adapter configuration must be a JSON object");
+      return;
+    }
+    updateSource.mutate({
+      sourceId: source.id,
+      body: {
+        name: name.trim(),
+        adapterType,
+        sourceUrl: sourceUrl.trim() || undefined,
+        adapterConfig: parsed as Record<string, unknown>,
+        isActive: source.isActive ?? true,
+      },
+    }, {
+      onSuccess: () => {
+        toast.success(t("autofetch.sourceUpdated"));
+        setEditing(false);
+      },
+      onError: (error) => toast.error(getErrorMessage(error)),
+    });
+  };
+
+  return (
+    <>
+      <li className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div className="min-w-0">
                   <p className="font-medium">{source.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     <span className="font-mono">{source.adapterType}</span> · {source.sourceUrl}
                   </p>
+                  {source.isActive === false ? <Badge variant="secondary">Inactive</Badge> : null}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={fetchSource.isPending && fetchSource.variables === source.id}
-                  disabled={fetchSource.isPending}
-                  onClick={() =>
-                    fetchSource.mutate(source.id, {
-                      onSuccess: (result) => toast.message(t("autofetch.fetchSummary", { ...result })),
-                      onError: (error) => toast.error(getErrorMessage(error)),
-                    })
-                  }
-                >
-                  {fetchSource.isPending && fetchSource.variables === source.id ? null : <RefreshCw aria-hidden />}
-                  {t("autofetch.fetch")}
-                </Button>
-                <div className="w-full text-xs text-muted-foreground">
-                  {source.lastFetchStatus === "failed" ? (
-                    <>
-                      <p className="text-destructive">{t("autofetch.lastFetchFailure", { error: source.lastFetchError ?? "Unknown error" })}</p>
-                      {source.lastFetchedAt && <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>}
-                    </>
-                  ) : source.lastFetchStatus === "running" ? (
-                    <p>{t("autofetch.fetchRunning")}</p>
-                  ) : source.lastFetchedAt ? (
-                    <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>
-                  ) : (
-                    <p>{t("autofetch.neverFetched")}</p>
-                  )}
-                  {source.lastFetchStatus === "success" && source.lastFetchSummary && (
-                    <p>
-                      {t("autofetch.fetchSummary", {
-                        fetched: source.lastFetchSummary.fetched ?? 0,
-                        queued: source.lastFetchSummary.queued ?? 0,
-                        duplicates: source.lastFetchSummary.duplicates ?? 0,
-                        stale: source.lastFetchSummary.stale ?? 0,
-                        errors: source.lastFetchSummary.errors ?? 0,
-                        conflicts: source.lastFetchSummary.conflicts ?? 0,
-                      })}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <AddSourceForm />
-      </section>
-    </div>
+                {canManage ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={fetchSource.isPending && fetchSource.variables === source.id}
+                      disabled={fetchSource.isPending || source.isActive === false}
+                      onClick={() =>
+                        fetchSource.mutate(source.id, {
+                          onSuccess: (result) => toast.message(t("autofetch.fetchSummary", {
+                            fetched: result.fetched,
+                            queued: result.queued,
+                            duplicates: result.duplicates,
+                            stale: result.stale,
+                            errors: result.errors,
+                            conflicts: result.conflicts,
+                          })),
+                          onError: (error) => toast.error(getErrorMessage(error)),
+                        })
+                      }
+                    >
+                      {fetchSource.isPending && fetchSource.variables === source.id ? null : <RefreshCw aria-hidden />}
+                      {t("autofetch.fetch")}
+                    </Button>
+                    {source.isActive === false ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={updateSource.isPending}
+                        onClick={() => updateSource.mutate({
+                          sourceId: source.id,
+                          body: {
+                            name: source.name,
+                            adapterType: source.adapterType,
+                            sourceUrl: source.sourceUrl ?? undefined,
+                            adapterConfig: source.adapterConfig ?? {},
+                            isActive: true,
+                          },
+                        }, {
+                          onSuccess: () => toast.success(t("autofetch.sourceEnabled")),
+                          onError: (error) => toast.error(getErrorMessage(error)),
+                        })}
+                      >
+                        Enable
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="outline" aria-label={`Edit ${source.name}`} onClick={() => {
+                      setName(source.name);
+                      setAdapterType(source.adapterType);
+                      setSourceUrl(source.sourceUrl ?? "");
+                      setAdapterConfig(JSON.stringify(source.adapterConfig ?? {}, null, 2));
+                      setEditing(true);
+                    }}>
+                      <Pencil aria-hidden /> {t("autofetch.editSource")}
+                    </Button>
+                    <Button size="sm" variant="destructive" aria-label={`Remove ${source.name}`} onClick={() => setConfirmRemove(true)}>
+                      <Trash2 aria-hidden /> {t("autofetch.removeSource")}
+                    </Button>
+                    <div className="w-full text-xs text-muted-foreground">
+                      {source.lastFetchStatus === "failed" ? (
+                        <>
+                          <p className="text-destructive">{t("autofetch.lastFetchFailure", { error: source.lastFetchError ?? "Unknown error" })}</p>
+                          {source.lastFetchedAt && <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>}
+                        </>
+                      ) : source.lastFetchStatus === "running" ? (
+                        <p>{t("autofetch.fetchRunning")}</p>
+                      ) : source.lastFetchedAt ? (
+                        <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>
+                      ) : (
+                        <p>{t("autofetch.neverFetched")}</p>
+                      )}
+                      {source.lastFetchStatus === "success" && source.lastFetchSummary && (
+                        <p>
+                          {t("autofetch.fetchSummary", {
+                            fetched: source.lastFetchSummary.fetched ?? 0,
+                            queued: source.lastFetchSummary.queued ?? 0,
+                            duplicates: source.lastFetchSummary.duplicates ?? 0,
+                            stale: source.lastFetchSummary.stale ?? 0,
+                            errors: source.lastFetchSummary.errors ?? 0,
+                            conflicts: source.lastFetchSummary.conflicts ?? 0,
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+      </li>
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("autofetch.editSourceTitle")}</DialogTitle>
+            <DialogDescription>{t("autofetch.editSourceDescription")}</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={save}>
+            <div className="space-y-2">
+              <Label htmlFor={`source-name-${source.id}`}>Name</Label>
+              <Input id={`source-name-${source.id}`} value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`source-type-${source.id}`}>{t("autofetch.sourceType")}</Label>
+              <NativeSelect id={`source-type-${source.id}`} value={adapterType} onChange={(event) => setAdapterType(event.target.value)}>
+                <option value="rss-feed">RSS / Atom Feed</option>
+                <option value="json-feed">JSON Feed</option>
+                <option value="web-scraper">Web Scraper</option>
+                <option value="telegram-rss">Telegram Channel (RSS + AI)</option>
+                <option value="csv-upload">CSV Upload</option>
+              </NativeSelect>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`source-url-${source.id}`}>{t("autofetch.sourceUrl")}</Label>
+              <Input id={`source-url-${source.id}`} type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`source-config-${source.id}`}>{t("autofetch.adapterConfiguration")}</Label>
+              <Textarea id={`source-config-${source.id}`} value={adapterConfig} onChange={(event) => setAdapterConfig(event.target.value)} rows={6} className="font-mono text-xs" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(false)}>{t("autofetch.cancel")}</Button>
+              <Button type="submit" loading={updateSource.isPending}>{t("autofetch.saveChanges")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("autofetch.removeSourceTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("autofetch.removeSourceDescription", { name: source.name })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("autofetch.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeSource.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                removeSource.mutate(source.id, {
+                  onSuccess: () => {
+                    toast.success(t("autofetch.sourceRemoved"));
+                    setConfirmRemove(false);
+                  },
+                  onError: (error) => toast.error(getErrorMessage(error)),
+                });
+              }}
+            >
+              {t("autofetch.removeSource")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -154,12 +381,23 @@ function AddSourceForm() {
   const [includeKeywordsText, setIncludeKeywordsText] = useState("");
   const [mappingText, setMappingText] = useState("");
   const [aiExtraction, setAiExtraction] = useState(true);
+  const [adapterConfigText, setAdapterConfigText] = useState("{}");
   const t = useT("tools");
   const { locale } = useLocale();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    let adapterConfig: Record<string, unknown> = {};
+    let adapterConfig: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(adapterConfigText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Adapter configuration must be a JSON object");
+      }
+      adapterConfig = parsed as Record<string, unknown>;
+    } catch {
+      toast.error(t("autofetch.invalidMappings"));
+      return;
+    }
     if (adapterType === "web-scraper") {
       adapterConfig.aiExtraction = aiExtraction;
     }
@@ -186,6 +424,7 @@ function AddSourceForm() {
           setIncludeKeywordsText("");
           setMappingText("");
           setAiExtraction(true);
+          setAdapterConfigText("{}");
         },
         onError: (error) => toast.error(getErrorMessage(error)),
       },
@@ -196,10 +435,10 @@ function AddSourceForm() {
     <Card>
       <CardHeader>
         <CardTitle>{t("autofetch.addSource")}</CardTitle>
-        <CardDescription>{t("autofetch.addSourceDescription")}</CardDescription>
+      <CardDescription>{t("autofetch.addSourceDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form className="grid gap-4 md:grid-cols-[1fr_1.4fr_14rem_auto] md:items-end" onSubmit={submit}>
+        <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-name`}>{t("autofetch.sourceName")}</Label>
             <Input id={`${id}-name`} required value={name} onChange={(event) => setName(event.target.value)} />
@@ -221,12 +460,25 @@ function AddSourceForm() {
               <option value="rss-feed">{t("autofetch.rss")}</option>
               <option value="json-feed">{t("autofetch.json")}</option>
               <option value="web-scraper">{t("autofetch.webScraper")}</option>
+              <option value="telegram-rss">{t("autofetch.telegramFeed")}</option>
             </NativeSelect>
           </div>
-          <Button type="submit" loading={createSource.isPending}>
+          {adapterType === "json-feed" ? <div className="space-y-1.5 md:col-span-2">
+            <Label htmlFor={`${id}-config`}>Adapter configuration (JSON)</Label>
+            <Textarea
+              id={`${id}-config`}
+              value={adapterConfigText}
+              onChange={(event) => setAdapterConfigText(event.target.value)}
+              rows={3}
+              className="font-mono text-xs"
+              placeholder={'{"itemsPath":"data.items","mappings":{"title":"name"}}'}
+            />
+            <p className="text-xs text-muted-foreground">Use itemsPath and mappings to map fields from the JSON feed.</p>
+          </div> : null}
+          <Button type="submit" loading={createSource.isPending} className="md:col-span-2 md:justify-self-end">
             {t("autofetch.add")}
           </Button>
-          {adapterType === "rss-feed" && (
+          {(adapterType === "rss-feed" || adapterType === "telegram-rss") && (
             <div className="space-y-1.5 md:col-span-4">
               <Label htmlFor={`${id}-keywords`}>{t("autofetch.requiredKeywords")}</Label>
               <Input
@@ -283,7 +535,8 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const [showConflicts, setShowConflicts] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [reviewedTitle, setReviewedTitle] = useState(item.title);
-  const [reviewedDescription, setReviewedDescription] = useState(item.description ?? "");
+  const cleanDescription = cleanImportedDescription(item.description);
+  const [reviewedDescription, setReviewedDescription] = useState(cleanDescription);
   const [reviewedQuantity, setReviewedQuantity] = useState("1");
   const [reviewedUnit, setReviewedUnit] = useState("");
   const [reviewedCondition, setReviewedCondition] = useState("");
@@ -330,7 +583,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 score: item.confidenceScore ?? 0,
               })}
             </p>
-            <p className="mt-2 text-sm text-muted-foreground">{item.description || t("autofetch.noDescription")}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{cleanDescription || t("autofetch.noDescription")}</p>
             <Button
               type="button"
               variant="link"
@@ -477,6 +730,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
               <Label htmlFor={`${id}-auction`}>{t("autofetch.addToAuction")}</Label>
               <NativeSelect id={`${id}-auction`} value={auctionId} onChange={(event) => setAuctionId(event.target.value)}>
                 <option value="">{t("autofetch.chooseAuction")}</option>
+                {auctions.length === 0 ? <option value="" disabled>No draft auctions available</option> : null}
                 {auctions.map((auction) => (
                   <option key={auction.id} value={auction.id}>
                     {auction.title}
@@ -484,7 +738,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 ))}
               </NativeSelect>
             </div>
-            <Button type="submit" disabled={!auctionId || reject.isPending || (item.aiSuggested && (!showSuggestions || pendingDetail.isLoading || pendingDetail.isError || !pendingDetail.data || !reviewedTitle.trim() || !Number.isInteger(Number(reviewedQuantity)) || Number(reviewedQuantity) < 1 || Boolean(reviewedValue && !/^\d+(\.\d{2})?$/.test(reviewedValue))))} loading={approve.isPending}>
+            <Button type="submit" disabled={!auctionId || reject.isPending || auctions.length === 0 || (item.aiSuggested && (!showSuggestions || pendingDetail.isLoading || pendingDetail.isError || !pendingDetail.data || !reviewedTitle.trim() || !Number.isInteger(Number(reviewedQuantity)) || Number(reviewedQuantity) < 1 || Boolean(reviewedValue && !/^\d+(\.\d{2})?$/.test(reviewedValue))))} loading={approve.isPending}>
               {t("autofetch.verifyAdd")}
             </Button>
           </form>

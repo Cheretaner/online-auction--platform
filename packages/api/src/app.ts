@@ -35,10 +35,11 @@ import { logger } from "./shared/utils/logger.js";
 import { registerBuiltInAdapters } from "./autofetch/adapters/index.js";
 import { createAutofetchRouter } from "./autofetch/autofetch.routes.js";
 import { getPool } from "./infrastructure/database/pool.js";
+import { analyticsRouter } from "./analytics/analytics.routes.js";
+import { watchlistRouter, savedSearchRouter, notificationPreferencesRouter } from "./watchlist/watchlist.routes.js";
 import path from "node:path";
 import { chapaWebhook } from "./payments/chapa.controller.js";
 import { openDataRouter } from "./open-data/open-data.routes.js";
-import { watchlistRouter } from "./watchlist/watchlist.routes.js";
 
 export function createApp(dependencies: { identityVerificationProvider?: IdentityVerificationProvider } = {}): express.Express {
   const app = express();
@@ -107,6 +108,10 @@ export function createApp(dependencies: { identityVerificationProvider?: Identit
   app.use("/api/v1/reports", reportingRouter);
   app.use("/api/v1/telegram", telegramRouter);
   app.use("/api/v1/autofetch", createAutofetchRouter(getPool()));
+  app.use("/api/v1/analytics", analyticsRouter);
+  app.use("/api/v1/watchlist", watchlistRouter);
+  app.use("/api/v1/saved-searches", savedSearchRouter);
+  app.use("/api/v1/notification-preferences", notificationPreferencesRouter);
 
   // Server-sent events for live bid/auction updates. Clients subscribe to
   // exactly one channel: their own `user:<id>` feed or an `auction:<id>` they

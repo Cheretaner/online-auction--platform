@@ -5,6 +5,8 @@
  */
 
 import type { ISourceAdapter } from './adapter.interface.js';
+import { createHash } from 'node:crypto';
+import { fetchPublicSource, validatePublicSourceUrl } from './public-http.js';
 import {
   SourceFetch,
   NormalizedItem,
@@ -26,7 +28,14 @@ export class JsonFeedAdapter implements ISourceAdapter {
   private config: JsonFeedConfig = {};
 
   configure(config: Record<string, unknown>): void {
-    this.config = config as JsonFeedConfig;
+    this.config = {
+      url: typeof config.url === 'string' ? config.url : undefined,
+      apiKey: typeof config.apiKey === 'string' ? config.apiKey : undefined,
+      itemsPath: typeof config.itemsPath === 'string' ? config.itemsPath : undefined,
+      mappings: config.mappings && typeof config.mappings === 'object' && !Array.isArray(config.mappings)
+        ? Object.fromEntries(Object.entries(config.mappings).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+        : undefined,
+    };
   }
 
   create(): ISourceAdapter {
@@ -47,23 +56,20 @@ export class JsonFeedAdapter implements ISourceAdapter {
   }
 
   async validateConfig(config: Record<string, unknown>): Promise<void> {
-    const jsonConfig = config as unknown as JsonFeedConfig;
-
-    if (!jsonConfig.url) {
-      throw new Error('url is required for json-feed adapter');
+    if (typeof config.url !== 'string' || !config.url) {
+      throw new Error('A public JSON feed URL is required');
     }
-
-    // Try to validate URL format
-    try {
-      const url = new URL(jsonConfig.url);
-      const host = url.hostname.toLowerCase();
-      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
-          host === 'localhost' || host.endsWith('.localhost') ||
-          /^(127\.|10\.|192\.168\.|169\.254\.|0\.|::1$|fc|fd)/i.test(host)) {
-        throw new Error('URL must be a public HTTP(S) endpoint');
-      }
-    } catch {
-      throw new Error(`Invalid URL: ${jsonConfig.url}`);
+    validatePublicSourceUrl(config.url);
+    if (config.itemsPath !== undefined && (typeof config.itemsPath !== 'string' || config.itemsPath.length > 200)) {
+      throw new Error('itemsPath must be a string of at most 200 characters');
+    }
+    if (config.mappings !== undefined && (typeof config.mappings !== 'object' || config.mappings === null || Array.isArray(config.mappings) ||
+        Object.entries(config.mappings).length > 30 ||
+        Object.entries(config.mappings).some(([key, value]) => !key || key.length > 100 || typeof value !== 'string' || value.length > 100))) {
+      throw new Error('mappings must contain at most 30 valid field mappings');
+    }
+    if (config.apiKey !== undefined && (typeof config.apiKey !== 'string' || config.apiKey.length > 4096)) {
+      throw new Error('apiKey must be a string of at most 4096 characters');
     }
   }
 
@@ -76,30 +82,21 @@ export class JsonFeedAdapter implements ISourceAdapter {
         throw new Error('Adapter not configured with URL');
       }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        options.timeout || 30000
-      );
-
-      const response = await fetch(this.config.url, {
-        signal: controller.signal,
-        headers: this.config.apiKey
-          ? { Authorization: `Bearer ${this.config.apiKey}` }
-          : {},
+      const response = await fetchPublicSource(this.config.url, {
+        timeoutMs: Math.min(Math.max(options.timeout ?? 30_000, 1_000), 30_000),
+        maxBytes: 5 * 1024 * 1024,
+        acceptedContentType: (type) => !type || /application\/(?:[a-z0-9.+-]*\+)?json|text\/json/.test(type),
+        headers: {
+          Accept: 'application/json',
+          ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
+        },
       });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new AdapterError(
-          `HTTP ${response.status}: ${response.statusText}`,
-          'FETCH_FAILED',
-          { url: this.config.url, status: response.status }
-        );
+      let data: unknown;
+      try {
+        data = JSON.parse(response.body.toString('utf8'));
+      } catch {
+        throw new AdapterError('Source returned invalid JSON', 'INVALID_FORMAT');
       }
-
-      const data = await response.json();
 
       // Extract items array from JSON path
       const items = this.extractItems(data);
@@ -112,11 +109,14 @@ export class JsonFeedAdapter implements ISourceAdapter {
         );
       }
 
-      return items.map((item, index) => {
+      const itemLimit = Math.max(0, Math.min(options.limit ?? 100, 500));
+      return items.slice(0, itemLimit).map((item, index) => {
         const record = this.asRecord(item);
+        const stableId = record.id ?? record.externalId ?? record.url ?? record.link ??
+          createHash('sha256').update(JSON.stringify(record)).digest('hex');
         return {
-        id: `json-feed:${index}:${record.id ?? index}`,
-        externalId: String(record.id ?? index),
+        id: `json-feed:${String(stableId)}`,
+        externalId: String(stableId),
         title: String(record.title ?? `Item ${index}`),
         description: typeof record.description === 'string' ? record.description : undefined,
         metadata: record,
@@ -163,7 +163,7 @@ export class JsonFeedAdapter implements ISourceAdapter {
           mapped.region || item.region || item.location
         ),
         city: this.normalizeOptionalString(mapped.city || item.city),
-        externalId: String(item.id || ''),
+        externalId: String(item.id || item.externalId || item.url || item.link || ''),
         externalSource: 'json-feed',
         rawMetadata: item,
       };

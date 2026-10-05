@@ -150,7 +150,10 @@ export class AutoFetchRepository {
     try {
       const query = `
         SELECT * FROM autofetch_sources
-        WHERE is_active = true AND (next_fetch_at IS NULL OR next_fetch_at <= NOW())
+        WHERE is_active = true
+          AND (next_fetch_at IS NULL OR next_fetch_at <= NOW())
+          AND (last_fetch_status IS DISTINCT FROM 'running'
+               OR last_fetch_attempt_at < NOW() - INTERVAL '15 minutes')
         ORDER BY next_fetch_at ASC
         LIMIT 1000
       `;
@@ -195,13 +198,17 @@ export class AutoFetchRepository {
     }
   }
 
-  async markSourceFetchStarted(sourceId: string): Promise<void> {
-    await this.pool.query(
+  async markSourceFetchStarted(sourceId: string): Promise<boolean> {
+    const result = await this.pool.query(
       `UPDATE autofetch_sources
        SET last_fetch_attempt_at = NOW(), last_fetch_status = 'running', last_fetch_error = NULL, updated_at = NOW()
-       WHERE id = $1`,
+       WHERE id = $1 AND is_active = true
+         AND (last_fetch_status IS DISTINCT FROM 'running'
+              OR last_fetch_attempt_at < NOW() - INTERVAL '15 minutes')
+       RETURNING id`,
       [sourceId],
     );
+    return result.rowCount === 1;
   }
 
   async markSourceFetchFailed(sourceId: string, error: string, nextFetchAt: Date): Promise<void> {
@@ -307,6 +314,19 @@ export class AutoFetchRepository {
         params.push(filters.sourceId);
       }
 
+      if (filters.severityMin) {
+        const minimumSeverity = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 }[filters.severityMin as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'];
+        whereClause += ` AND EXISTS (
+          SELECT 1 FROM autofetch_conflicts acf
+          WHERE acf.pending_item_id = api.id
+            AND CASE acf.severity
+              WHEN 'LOW' THEN 1 WHEN 'MEDIUM' THEN 2
+              WHEN 'HIGH' THEN 3 WHEN 'CRITICAL' THEN 4 ELSE 0
+            END >= $${params.length + 1}
+        )`;
+        params.push(minimumSeverity);
+      }
+
       // Get total count
       const countQuery = `SELECT COUNT(*) as total FROM autofetch_pending_items api WHERE ${whereClause}`;
       const countResult = await this.pool.query(countQuery, params);
@@ -329,7 +349,7 @@ export class AutoFetchRepository {
           api.created_at,
           api.updated_at,
           COALESCE(COUNT(ac.id), 0)::INT as conflict_count,
-          COALESCE(SUM(CASE WHEN ac.severity = 'CRITICAL' THEN 1 ELSE 0 END), 0)::INT as high_severity_conflicts
+          COALESCE(SUM(CASE WHEN ac.severity IN ('HIGH', 'CRITICAL') THEN 1 ELSE 0 END), 0)::INT as high_severity_conflicts
         FROM autofetch_pending_items api
         LEFT JOIN autofetch_sources asrc ON api.source_id = asrc.id
         LEFT JOIN autofetch_conflicts ac ON api.id = ac.pending_item_id
@@ -374,6 +394,35 @@ export class AutoFetchRepository {
       });
       throw error;
     }
+  }
+
+  async getQueueStats(organizationId: string): Promise<{
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    published: number;
+    expired: number;
+  }> {
+    const result = await this.pool.query<{
+      total: number;
+      pending: number;
+      approved: number;
+      rejected: number;
+      published: number;
+      expired: number;
+    }>(
+      `SELECT COUNT(*)::INT AS total,
+              COUNT(*) FILTER (WHERE status = 'pending')::INT AS pending,
+              COUNT(*) FILTER (WHERE status = 'approved')::INT AS approved,
+              COUNT(*) FILTER (WHERE status = 'rejected')::INT AS rejected,
+              COUNT(*) FILTER (WHERE status = 'published')::INT AS published,
+              COUNT(*) FILTER (WHERE status = 'expired')::INT AS expired
+         FROM autofetch_pending_items
+        WHERE organization_id = $1`,
+      [organizationId],
+    );
+    return result.rows[0];
   }
 
   /**
@@ -432,6 +481,26 @@ export class AutoFetchRepository {
       });
       throw error;
     }
+  }
+
+  async claimPendingItem(pendingItemId: string, organizationId: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE autofetch_pending_items
+       SET status = 'processing', updated_at = NOW()
+       WHERE id = $1 AND organization_id = $2 AND status = 'pending'
+       RETURNING id`,
+      [pendingItemId, organizationId],
+    );
+    return result.rowCount === 1;
+  }
+
+  async releasePendingItemClaim(pendingItemId: string, organizationId: string): Promise<void> {
+    await this.pool.query(
+      `UPDATE autofetch_pending_items
+       SET status = 'pending', updated_at = NOW()
+       WHERE id = $1 AND organization_id = $2 AND status = 'processing'`,
+      [pendingItemId, organizationId],
+    );
   }
 
   /**

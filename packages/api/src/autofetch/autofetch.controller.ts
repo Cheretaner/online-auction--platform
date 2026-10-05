@@ -192,7 +192,7 @@ export function createAutofetchController(pool: Pool) {
 
     res.json({
       success: true,
-      message: 'Pending item approved and published',
+      message: 'Imported item approved and added to the auction draft',
       data: item,
     });
   };
@@ -237,7 +237,7 @@ export function createAutofetchController(pool: Pool) {
   const getStats: RequestHandler = async (req, res) => {
     const organizationId = getAuth(req).organizationId!;
 
-    const stats = await service.getConflictStats(organizationId);
+    const stats = await service.getQueueStats(organizationId);
 
     res.json({
       success: true,

@@ -24,5 +24,15 @@ export const PublicAuctionListQuery = z.object({
   region: z.string().trim().min(1).max(80).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(24),
   offset: z.coerce.number().int().min(0).max(10_000).default(0),
+  /**
+   * When true, the full-text search in `q` also scans OCR-extracted text
+   * from documents attached to each auction.  Off by default so standard
+   * catalogue requests stay fast.
+   */
+  includeDocumentSearch: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true")
+    .optional(),
 });
 export type PublicAuctionListQuery = z.infer<typeof PublicAuctionListQuery>;

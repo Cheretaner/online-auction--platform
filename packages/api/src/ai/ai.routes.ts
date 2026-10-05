@@ -47,4 +47,16 @@ aiRouter.post(
   asyncHandler(controller.reviewAnomaly),
 );
 
+aiRouter.get(
+  "/anomalies/:id/context",
+  requireAuth(["compliance_officer", "org_admin", "auction_officer", "super_admin"]),
+  asyncHandler(controller.getAnomalyContext),
+);
+
+aiRouter.get(
+  "/organizations/:orgId/compliance-patterns",
+  requireAuth(["compliance_officer", "org_admin", "super_admin"]),
+  asyncHandler(controller.getOrgCompliancePatterns),
+);
+
 aiRouter.post("/assist", requireAuth(), validate(AssistRequest), asyncHandler(controller.assist));

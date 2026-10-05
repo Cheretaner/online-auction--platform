@@ -223,13 +223,22 @@ export const telegramApi = {
 };
 
 export const autofetchApi = {
-  listSources: () => unwrap(apiRequest<{ data: ItemList<AutofetchSource> }>(v1("/autofetch/sources"))),
+  listSources: () => unwrap(apiRequest<{ data: ItemList<AutofetchSource> }>(v1("/autofetch/sources"))).then(({ items }) => items),
   createSource: (body: {
     name: string;
     adapterType: string;
     sourceUrl?: string;
     adapterConfig?: Record<string, unknown>;
   }) => unwrap(apiRequest<{ data: AutofetchSource }>(v1("/autofetch/sources"), { method: "POST", body })),
+  updateSource: (sourceId: string, body: {
+    name: string;
+    adapterType: string;
+    sourceUrl?: string;
+    adapterConfig: Record<string, unknown>;
+    isActive: boolean;
+  }) => unwrap(apiRequest<{ data: AutofetchSource }>(v1(`/autofetch/sources/${sourceId}`), { method: "PUT", body })),
+  removeSource: (sourceId: string) =>
+    apiRequest<void>(v1(`/autofetch/sources/${sourceId}`), { method: "DELETE", parse: "void" }),
   fetchSource: (sourceId: string) =>
     unwrap(apiRequest<{ data: AutofetchFetchResult }>(v1(`/autofetch/sources/${sourceId}/fetch`), { method: "POST" })),
   pending: (params?: { limit?: number; offset?: number; status?: string; sourceId?: string }) =>

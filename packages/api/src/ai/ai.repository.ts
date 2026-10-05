@@ -230,3 +230,198 @@ export async function findItemAuctionId(itemId: string): Promise<string | null> 
   );
   return row?.auction_id ?? null;
 }
+
+/**
+ * Get historical flags for specific bidders
+ * Used to show pattern of past behavior
+ */
+export async function getHistoricalFlagsForBidders(
+  bidderIds: string[],
+  limit: number = 50,
+): Promise<AnomalyFlag[]> {
+  if (bidderIds.length === 0) return [];
+
+  const rows = await queryAll<DbFlag>(
+    `SELECT * FROM anomaly_flags
+     WHERE subject_accounts && $1::uuid[]
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [bidderIds, limit],
+  );
+  return rows.map(mapFlag);
+}
+
+/**
+ * Get historical flags by specific rule types
+ * Used to find similar past patterns
+ */
+export async function getHistoricalFlagsByRules(
+  rules: string[],
+  limit: number = 50,
+): Promise<AnomalyFlag[]> {
+  if (rules.length === 0) return [];
+
+  const rows = await queryAll<DbFlag>(
+    `SELECT * FROM anomaly_flags
+     WHERE triggered_rules && $1::text[]
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [rules, limit],
+  );
+  return rows.map(mapFlag);
+}
+
+/**
+ * Get flags for a specific auction's organization
+ * Shows historical compliance context
+ */
+export async function getHistoricalFlagsForOrg(
+  orgId: string,
+  limit: number = 100,
+): Promise<AnomalyFlag[]> {
+  const rows = await queryAll<DbFlag>(
+    `SELECT f.* FROM anomaly_flags f
+     JOIN auctions a ON a.id = f.auction_id
+     WHERE a.org_id = $1
+     ORDER BY f.created_at DESC
+     LIMIT $2`,
+    [orgId, limit],
+  );
+  return rows.map(mapFlag);
+}
+
+/**
+ * Get statistics on flag outcomes by rule type
+ * Shows how similar flags were resolved historically
+ */
+export async function getFlagOutcomeStatsByRule(
+  rule: string,
+): Promise<{
+  rule: string;
+  totalFlags: number;
+  reviewedCount: number;
+  dismissedCount: number;
+  escalatedCount: number;
+  avgScore: number;
+  avgResolutionDays: number | null;
+}> {
+  const row = await queryOne<{
+    rule: string;
+    total_flags: number;
+    reviewed_count: number;
+    dismissed_count: number;
+    escalated_count: number;
+    avg_score: number;
+    avg_resolution_days: number | null;
+  }>(
+    `SELECT 
+      $1 as rule,
+      COUNT(*) as total_flags,
+      COUNT(CASE WHEN status = 'reviewed' THEN 1 END) as reviewed_count,
+      COUNT(CASE WHEN status = 'dismissed' THEN 1 END) as dismissed_count,
+      COUNT(CASE WHEN status = 'escalated' THEN 1 END) as escalated_count,
+      AVG(score::numeric) as avg_score,
+      AVG(CASE 
+        WHEN reviewed_at IS NOT NULL 
+        THEN EXTRACT(EPOCH FROM (reviewed_at - created_at)) / 86400
+      END) as avg_resolution_days
+     FROM anomaly_flags
+     WHERE $1 = ANY(triggered_rules)`,
+    [rule],
+  );
+
+  if (!row) {
+    return {
+      rule,
+      totalFlags: 0,
+      reviewedCount: 0,
+      dismissedCount: 0,
+      escalatedCount: 0,
+      avgScore: 0,
+      avgResolutionDays: null,
+    };
+  }
+
+  return {
+    rule: row.rule,
+    totalFlags: row.total_flags,
+    reviewedCount: row.reviewed_count,
+    dismissedCount: row.dismissed_count,
+    escalatedCount: row.escalated_count,
+    avgScore: row.avg_score,
+    avgResolutionDays: row.avg_resolution_days,
+  };
+}
+
+/**
+ * Get bidder risk profile based on historical flags
+ */
+export async function getBidderRiskProfile(
+  bidderId: string,
+): Promise<{
+  bidderId: string;
+  totalFlags: number;
+  highSeverityFlags: number;
+  recentFlags: number; // Last 6 months
+  mostCommonRules: string[];
+  dismissalRate: number;
+  lastFlaggedAt: Date | null;
+}> {
+  const row = await queryOne<{
+    bidder_id: string;
+    total_flags: number;
+    high_severity_flags: number;
+    recent_flags: number;
+    most_common_rules: string[];
+    dismissal_rate: number;
+    last_flagged_at: Date | null;
+  }>(
+    `WITH bidder_flags AS (
+      SELECT *
+      FROM anomaly_flags
+      WHERE $1 = ANY(subject_accounts)
+    )
+    SELECT 
+      $1 as bidder_id,
+      COUNT(*) as total_flags,
+      COUNT(CASE WHEN severity = 'high' THEN 1 END) as high_severity_flags,
+      COUNT(CASE WHEN created_at >= NOW() - INTERVAL '6 months' THEN 1 END) as recent_flags,
+      (
+        SELECT ARRAY_AGG(DISTINCT rule)
+        FROM bidder_flags bf, UNNEST(bf.triggered_rules) AS rule
+        GROUP BY rule
+        ORDER BY COUNT(*) DESC
+        LIMIT 3
+      ) as most_common_rules,
+      CASE 
+        WHEN COUNT(*) > 0 
+        THEN (COUNT(CASE WHEN status = 'dismissed' THEN 1 END)::numeric / COUNT(*)::numeric * 100)
+        ELSE 0 
+      END as dismissal_rate,
+      MAX(created_at) as last_flagged_at
+    FROM bidder_flags`,
+    [bidderId],
+  );
+
+  if (!row || row.total_flags === 0) {
+    return {
+      bidderId,
+      totalFlags: 0,
+      highSeverityFlags: 0,
+      recentFlags: 0,
+      mostCommonRules: [],
+      dismissalRate: 0,
+      lastFlaggedAt: null,
+    };
+  }
+
+  return {
+    bidderId: row.bidder_id,
+    totalFlags: row.total_flags,
+    highSeverityFlags: row.high_severity_flags,
+    recentFlags: row.recent_flags,
+    mostCommonRules: row.most_common_rules || [],
+    dismissalRate: row.dismissal_rate,
+    lastFlaggedAt: row.last_flagged_at,
+  };
+}
