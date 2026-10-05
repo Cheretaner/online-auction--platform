@@ -236,14 +236,22 @@ export function ListingFeed({
       />
     )
   } else {
-    body = auctions.map((auction, index) => (
-      <AuctionListing
-        key={auction.id}
-        auction={auction}
-        issuer={issuerName(auction.orgId)}
-        featured={index === 0 && auction.status === 'live'}
-      />
-    ))
+    body = (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {auctions.map((auction, index) => {
+          const featured = index === 0 && auction.status === 'live'
+          return (
+            <div key={auction.id} className={featured ? 'sm:col-span-2' : undefined}>
+              <AuctionListing
+                auction={auction}
+                issuer={issuerName(auction.orgId)}
+                featured={featured}
+              />
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
