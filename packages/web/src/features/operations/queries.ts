@@ -368,10 +368,10 @@ export function usePublishReport() {
   });
 }
 
-export function useAuditEvents(enabled = true) {
+export function useAuditEvents(page = 1, limit = 50, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.audit.events,
-    queryFn: () => auditApi.events(),
+    queryKey: queryKeys.audit.events(page, limit),
+    queryFn: () => auditApi.events(page, limit),
     enabled,
   });
 }

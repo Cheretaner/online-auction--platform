@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
-import { EmptyState, QueryState } from "@/components/feedback/query-state";
+import { EmptyState, ErrorState, QueryState } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useAuction, useAuctionBids, useAuctionItems } from "@/features/auctions/queries";
@@ -98,29 +98,6 @@ export default function AuctionDetailPage() {
           {isAuthenticated && ["scheduled", "live"].includes(record.status) ? <WatchlistControls auction={record} /> : null}
           <AuctionTransparencyPanel auctionId={record.id} status={record.status} />
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("detail.lots")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {(items.data?.items ?? []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("detail.noLots")}</p>
-              ) : (
-                items.data?.items.map((item) => (
-                  <div key={item.id} className="rounded-md border p-3">
-                    <p className="font-medium">{item.title}</p>
-                    {item.description ? <p className="text-sm text-muted-foreground">{item.description}</p> : null}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t("detail.quantity", { quantity: item.quantity, unit: item.unit ?? "" })}
-                      {item.condition ? ` · ${enumLabel(item.condition)}` : ""}
-                      {item.region ? ` · ${regionLabel(item.region)}` : ""}
-                    </p>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
             <div className="order-2 space-y-6 lg:order-1">
               <Card>
@@ -128,8 +105,12 @@ export default function AuctionDetailPage() {
                   <CardTitle>{t("detail.lots")}</CardTitle>
                   <CardDescription>{t("detail.lotsDescription")}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {(items.data?.items ?? []).length === 0 ? (
+                <CardContent aria-busy={items.isLoading}>
+                  {items.isLoading ? (
+                    <p role="status" className="text-sm text-muted-foreground">{t("detail.loadingLots")}</p>
+                  ) : items.isError ? (
+                    <ErrorState error={items.error} onRetry={() => void items.refetch()} />
+                  ) : (items.data?.items ?? []).length === 0 ? (
                     <EmptyState size="inline" icon={Package} title={t("detail.noLots")} />
                   ) : (
                     <ul className="divide-y rounded-md border">

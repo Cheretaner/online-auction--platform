@@ -143,7 +143,7 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
         <StatusChips auction={auction} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] md:items-stretch">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] lg:items-stretch">
         <div className="min-w-0 space-y-2.5">
           <h2 className="text-xl leading-snug font-semibold sm:text-2xl">
             <Link to={`/auctions/${auction.id}`} className="rounded-sm transition-colors hover:text-primary focus-visible:text-primary">
@@ -237,11 +237,11 @@ export function ListingFeed({
     )
   } else {
     body = (
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {auctions.map((auction, index) => {
           const featured = index === 0 && auction.status === 'live'
           return (
-            <div key={auction.id} className={featured ? 'sm:col-span-2' : undefined}>
+            <div key={auction.id} className={featured ? 'lg:col-span-2' : undefined}>
               <AuctionListing
                 auction={auction}
                 issuer={issuerName(auction.orgId)}

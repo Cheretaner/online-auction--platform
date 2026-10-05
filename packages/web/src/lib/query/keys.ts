@@ -55,7 +55,7 @@ export const queryKeys = {
   },
   watchlists: { mine: ["watchlists", "me"] as const },
   audit: {
-    events: ["audit", "events"] as const,
+    events: (page = 1, limit = 50) => ["audit", "events", { page, limit }] as const,
     verify: ["audit", "verify"] as const,
     verifyAuction: (auctionId: string) => ["audit", "verify", auctionId] as const,
   },

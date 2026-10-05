@@ -30,6 +30,7 @@ const WorkspaceAuctionDetailPage = lazy(
 const KycPage = lazy(() => import("@/pages/app/kyc-page"));
 const DepositsPage = lazy(() => import("@/pages/app/deposits-page"));
 const DocumentsPage = lazy(() => import("@/pages/app/documents-page"));
+const WatchlistPage = lazy(() => import("@/pages/app/watchlist-page"));
 const NotificationsPage = lazy(() => import("@/pages/app/notifications-page"));
 const DisputesPage = lazy(() => import("@/pages/app/disputes-page"));
 const ReportsPage = lazy(() => import("@/pages/app/reports-page"));
@@ -103,6 +104,7 @@ export const router = createBrowserRouter([
               { path: "kyc", element: <KycPage /> },
               { path: "deposits", element: <DepositsPage /> },
               { path: "documents", element: <DocumentsPage /> },
+              { path: "watchlist", element: <WatchlistPage /> },
               { path: "notifications", element: <NotificationsPage /> },
               { path: "disputes", element: <DisputesPage /> },
               { path: "telegram", element: <TelegramPage /> },

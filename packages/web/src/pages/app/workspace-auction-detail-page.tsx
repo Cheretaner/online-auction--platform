@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
-import { EmptyState, QueryState } from "@/components/feedback/query-state";
+import { EmptyState, ErrorState, PageSkeleton, QueryState } from "@/components/feedback/query-state";
 import { ExternalLink, Pencil, ScanSearch, Scale, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
@@ -108,11 +108,11 @@ function Workspace({ auction }: { auction: Auction }) {
             <TabsTrigger value="compliance">{t("detail.tabs.compliance")}</TabsTrigger>
             <TabsTrigger value="anomalies">
               {t("detail.tabs.anomalies")}
-              {openFlags ? <Badge variant="warning" className="px-1.5">{openFlags}</Badge> : null}
+              {!anomalies.isLoading && openFlags ? <Badge variant="warning" className="px-1.5">{openFlags}</Badge> : null}
             </TabsTrigger>
             <TabsTrigger value="disputes">
               {t("detail.tabs.disputes")}
-              {openDisputes ? <Badge variant="warning" className="px-1.5">{openDisputes}</Badge> : null}
+              {!disputes.isLoading && openDisputes ? <Badge variant="warning" className="px-1.5">{openDisputes}</Badge> : null}
             </TabsTrigger>
             <TabsTrigger value="reports">{t("detail.tabs.reports")}</TabsTrigger>
           </TabsList>
@@ -134,14 +134,18 @@ function Workspace({ auction }: { auction: Auction }) {
           <CompliancePanel auctionId={auction.id} canRun={reviewer} />
         </TabsContent>
         <TabsContent value="anomalies" className="pt-4">
-          {(anomalies.data?.items ?? []).length === 0 ? (
+          {anomalies.isLoading ? <PageSkeleton rows={2} /> : anomalies.isError ? (
+            <ErrorState error={anomalies.error} onRetry={() => void anomalies.refetch()} />
+          ) : (anomalies.data?.items ?? []).length === 0 ? (
             <EmptyState size="inline" icon={ScanSearch} title={t("detail.noFlags")} />
           ) : (
             <AnomalyList items={anomalies.data?.items ?? []} showAuctionLink={false} />
           )}
         </TabsContent>
         <TabsContent value="disputes" className="pt-4">
-          {(disputes.data?.items ?? []).length === 0 ? (
+          {disputes.isLoading ? <PageSkeleton rows={2} /> : disputes.isError ? (
+            <ErrorState error={disputes.error} onRetry={() => void disputes.refetch()} />
+          ) : (disputes.data?.items ?? []).length === 0 ? (
             <EmptyState size="inline" icon={Scale} title={t("detail.noDisputes")} />
           ) : (
             <DisputeList items={disputes.data?.items ?? []} showAuctionLink={false} />

@@ -22,7 +22,8 @@ import type {
   AiAssistResult,
   AiCategorizationResult,
   AnomalyFlagRecord,
-  AuditEvent,
+  AuditEventPage,
+  AuditChainVerification,
   ComplianceCheckRecord,
   DuplicateCheckResult,
   AutofetchConflictSummary,
@@ -172,10 +173,11 @@ export const watchlistsApi = {
 };
 
 export const auditApi = {
-  events: () => apiRequest<ItemList<AuditEvent>>(v1("/audit/events")),
+  events: (page = 1, limit = 50) =>
+    apiRequest<AuditEventPage>(v1(`/audit/events${queryString({ page, limit })}`)),
   exportAnalytics: () => apiRequest<Blob>(v1("/audit/analytics/export"), { parse: "blob" }),
-  verify: () => apiRequest(v1("/audit/verify")),
-  verifyAuction: (auctionId: string) => apiRequest(v1(`/audit/auctions/${auctionId}/verify`)),
+  verify: () => apiRequest<AuditChainVerification>(v1("/audit/verify")),
+  verifyAuction: (auctionId: string) => apiRequest<AuditChainVerification>(v1(`/audit/auctions/${auctionId}/verify`)),
 };
 
 export const complianceApi = {
