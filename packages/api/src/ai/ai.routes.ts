@@ -34,6 +34,12 @@ aiRouter.get(
   asyncHandler(controller.listAnomalies),
 );
 
+aiRouter.get(
+  "/anomalies/:id",
+  requireAuth(["compliance_officer", "org_admin", "auction_officer", "super_admin"]),
+  asyncHandler(controller.getAnomaly),
+);
+
 aiRouter.post(
   "/anomalies/:id/review",
   requireAuth(["compliance_officer", "org_admin", "super_admin"]),

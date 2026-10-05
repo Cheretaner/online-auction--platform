@@ -15,6 +15,7 @@ import { useUnreadCount } from "@/features/operations/queries";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { useT } from "@/i18n/context";
+import { PwaInstallButton } from "@/components/pwa/pwa-install-button";
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { roles } = useAuth();
@@ -132,7 +133,7 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="flex min-h-svh bg-background">
+    <div className="product-ui flex min-h-svh bg-background">
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
         <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
           <BrandLogo tone="inverse" to="/" className="focus-visible:ring-highlight focus-visible:ring-offset-sidebar" />
@@ -184,6 +185,7 @@ export function AppShell() {
             </Badge>
           ) : null}
           <div className="ml-auto flex items-center gap-1">
+            <PwaInstallButton />
             <LanguageSwitcher />
             <ThemeToggle />
             <NotificationsButton />
@@ -193,7 +195,7 @@ export function AppShell() {
         <main
           id="main-content"
           tabIndex={-1}
-          className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-8"
+          className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-8"
         >
           <div className="mb-5 md:hidden">
             <OrgSwitcher />

@@ -5,6 +5,8 @@ import { authApi } from "@/lib/api/auth";
 import { tokenStore } from "@/lib/auth/token-store";
 import type { AuthSession } from "@/lib/api/types";
 import { queryKeys } from "@/lib/query/keys";
+import { ApiError } from "@/lib/api/errors";
+import { clearPrivateBidHistory } from "@/lib/query/private-bid-cache";
 
 function persistSession(session: AuthSession) {
   tokenStore.setSession(session);
@@ -25,7 +27,8 @@ export function useSessionQuery() {
           return next;
         }
         return stored;
-      } catch {
+      } catch (error) {
+        if (stored && error instanceof ApiError && error.status === 0) return stored;
         const refreshToken = tokenStore.getRefreshToken();
         if (!refreshToken) {
           tokenStore.clear();
@@ -101,7 +104,9 @@ export function useLogout() {
     const refreshToken = tokenStore.getRefreshToken();
     if (refreshToken) void authApi.logout(refreshToken).catch(() => undefined);
     tokenStore.clear();
+    clearPrivateBidHistory();
     queryClient.setQueryData(queryKeys.session, null);
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] === "auctions" && query.queryKey[2] === "bids" });
     queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== "auctions" && query.queryKey[0] !== "categories" && query.queryKey[0] !== "organizations" && query.queryKey[0] !== "health" });
   };
 }

@@ -28,9 +28,15 @@ export { AiRssAdapter } from './ai-rss.adapter.js';
  * Called from app.ts before any autofetch operations
  */
 export function registerBuiltInAdapters() {
-  adapterRegistry.register('json-feed', new JsonFeedAdapter());
-  adapterRegistry.register('csv-upload', new CsvUploadAdapter());
-  adapterRegistry.register('rss-feed', new RssFeedAdapter());
-  adapterRegistry.register('web-scraper', new WebScraperAdapter());
-  adapterRegistry.register('telegram-rss', new AiRssAdapter());
+  const adapters = [
+    ['json-feed', new JsonFeedAdapter()],
+    ['csv-upload', new CsvUploadAdapter()],
+    ['rss-feed', new RssFeedAdapter()],
+    ['web-scraper', new WebScraperAdapter()],
+    ['telegram-rss', new AiRssAdapter()],
+  ] as const;
+
+  for (const [name, adapter] of adapters) {
+    if (!adapterRegistry.has(name)) adapterRegistry.register(name, adapter);
+  }
 }

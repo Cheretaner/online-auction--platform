@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from "express";
+import multer from "multer";
 import { ZodError } from "zod";
 import { AppError, HttpStatus } from "../errors/index.js";
 import { logger } from "../utils/logger.js";
@@ -19,6 +20,17 @@ export const errorMiddleware: ErrorRequestHandler = (error, req, res, _next) => 
       error: {
         message: "Validation failed",
         details: error.flatten(),
+      },
+    });
+    return;
+  }
+
+  if (error instanceof multer.MulterError) {
+    const tooLarge = error.code === "LIMIT_FILE_SIZE";
+    res.status(tooLarge ? 413 : HttpStatus.BAD_REQUEST).json({
+      error: {
+        message: tooLarge ? "Uploaded file is too large" : "Invalid multipart upload",
+        code: error.code,
       },
     });
     return;

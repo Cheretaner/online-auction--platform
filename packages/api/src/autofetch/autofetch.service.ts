@@ -14,7 +14,7 @@ import type { Pool } from 'pg';
 import type { AuctionItemRecord } from '../auction/auction-item.types.js';
 import * as auctionItemService from '../auction/auction-item.service.js';
 import { AppError } from '../shared/errors/index.js';
-import type { Role } from '@auction/shared';
+import type { CreateAuctionItemRequest, Role } from '@auction/shared';
 
 export class AutoFetchService {
   private pool: Pool;
@@ -37,8 +37,8 @@ export class AutoFetchService {
   async fetchAndQueue(
     sourceId: string,
     organizationId: string
-  ): Promise<{ queued: number; conflicts: number; errors: number }> {
-    let normalizationErrors = 0;
+  ): Promise<{ fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }> {
+    let fetchStarted = false;
     try {
       logger.info({
         event: 'autofetch:fetch_started',
@@ -57,8 +57,12 @@ export class AutoFetchService {
           event: 'autofetch:source_disabled',
           sourceId,
         });
-        return { queued: 0, conflicts: 0, errors: 0 };
+        return { fetched: 0, queued: 0, duplicates: 0, stale: 0, conflicts: 0, errors: 0 };
       }
+
+      const claimed = await this.autofetchRepo.markSourceFetchStarted(sourceId);
+      if (!claimed) throw AppError.conflict('Source fetch is already running or the source is inactive');
+      fetchStarted = true;
 
       // Get adapter
       const registeredAdapter = adapterRegistry.get(source.adapterType);
@@ -74,6 +78,7 @@ export class AutoFetchService {
       const fetchedItems = await adapter.fetchItems(fetchQuery, {
         timeout: 30000,
         retryCount: 3,
+        limit: 200,
       });
 
       logger.debug({
@@ -87,6 +92,8 @@ export class AutoFetchService {
         item: NormalizedItem;
         raw: unknown;
       }> = [];
+      let staleCount = 0;
+      let errorCount = 0;
 
       for (const fetched of fetchedItems) {
         try {
@@ -98,6 +105,7 @@ export class AutoFetchService {
           normalized.externalId = fetched.externalId;
 
           if (adapter.isStale(normalized)) {
+            staleCount++;
             logger.debug({
               event: 'autofetch:item_stale',
               externalId: fetched.externalId,
@@ -110,7 +118,7 @@ export class AutoFetchService {
 
           normalizedItems.push({ item: normalized, raw: fetched.metadata });
         } catch (error) {
-          normalizationErrors++;
+          errorCount++;
           logger.error({
             event: 'autofetch:normalization_error',
             externalId: fetched.externalId,
@@ -175,6 +183,7 @@ export class AutoFetchService {
             });
           }
         } catch (error) {
+          errorCount++;
           logger.error({
             event: 'autofetch:conflict_detection_error',
             pendingItemId: item.id,
@@ -189,19 +198,24 @@ export class AutoFetchService {
       // Update source fetch metadata
       const nextFetchAt = new Date();
       nextFetchAt.setHours(nextFetchAt.getHours() + 1); // Fetch again in 1 hour
-      await this.autofetchRepo.updateSourceFetchMetadata(sourceId, new Date(), nextFetchAt);
+      const summary = {
+        fetched: fetchedItems.length,
+        queued: queuedItems.length,
+        duplicates: Math.max(0, normalizedItems.length - queuedItems.length),
+        stale: staleCount,
+        conflicts: conflictCount,
+        errors: errorCount,
+      };
+      await this.autofetchRepo.updateSourceFetchMetadata(sourceId, new Date(), nextFetchAt, summary);
 
       logger.info({
         event: 'autofetch:fetch_completed',
         sourceId,
-        queuedCount: queuedItems.length,
-        conflictCount,
+        ...summary,
       });
 
       return {
-        queued: queuedItems.length,
-        conflicts: conflictCount,
-        errors: normalizationErrors,
+        ...summary,
       };
     } catch (error) {
       logger.error({
@@ -209,6 +223,16 @@ export class AutoFetchService {
         sourceId,
         error,
       });
+
+      if (fetchStarted) {
+        const nextFetchAt = new Date();
+        nextFetchAt.setHours(nextFetchAt.getHours() + 1);
+        await this.autofetchRepo.markSourceFetchFailed(
+          sourceId,
+          error instanceof Error ? error.message : String(error),
+          nextFetchAt,
+        );
+      }
 
       await this.autofetchRepo.logAuditEvent(null, sourceId, 'fetch_error', {
         error: String(error),
@@ -225,7 +249,8 @@ export class AutoFetchService {
   async approveAndPublish(
     pendingItemId: string,
     actor: { userId: string; organizationId?: string; roles: Role[] },
-    auctionId: string
+    auctionId: string,
+    corrections?: Omit<Partial<Omit<CreateAuctionItemRequest, 'categorySource'>>, 'estimatedValue'> & { estimatedValue?: string | null },
   ): Promise<AuctionItemRecord> {
     let pending: Awaited<ReturnType<AutoFetchRepository["getPendingItemForOrganization"]>> = null;
     let claimed = false;
@@ -249,16 +274,26 @@ export class AutoFetchService {
       if (!claimed) throw AppError.conflict('Pending item is already being reviewed');
 
       const metadata = pending.normalizedMetadata;
+      const aiExtraction = metadata.rawMetadata.aiExtraction;
+      if (aiExtraction && (!corrections?.title?.trim() || !corrections.quantity)) {
+        throw AppError.unprocessable('Review the AI-suggested fields and submit an approved title and quantity before publishing');
+      }
+      const correctedFields = corrections
+        ? Object.keys(corrections).filter((field) => (corrections as Record<string, unknown>)[field] !== (metadata as unknown as Record<string, unknown>)[field])
+        : [];
       const item = await auctionItemService.createAuctionItem(actor, auctionId, {
-        title: metadata.title,
-        description: metadata.description,
-        quantity: metadata.quantity,
-        unit: metadata.unit,
-        estimatedValue: metadata.estimatedValue === undefined ? undefined : metadata.estimatedValue.toFixed(2),
-        categoryId: metadata.categoryId,
+        title: corrections?.title ?? metadata.title,
+        description: corrections?.description ?? metadata.description,
+        quantity: corrections?.quantity ?? metadata.quantity,
+        unit: corrections?.unit ?? metadata.unit,
+        condition: corrections?.condition ?? metadata.condition as CreateAuctionItemRequest['condition'],
+        estimatedValue: corrections && Object.hasOwn(corrections, 'estimatedValue')
+          ? corrections.estimatedValue ?? undefined
+          : metadata.estimatedValue === undefined ? undefined : metadata.estimatedValue.toFixed(2),
+        categoryId: corrections?.categoryId ?? metadata.categoryId,
         categorySource: 'manual',
-        region: metadata.region,
-        city: metadata.city,
+        region: corrections?.region ?? metadata.region,
+        city: corrections?.city ?? metadata.city,
       });
       itemCreated = true;
 
@@ -277,6 +312,21 @@ export class AutoFetchService {
       await this.autofetchRepo.logAuditEvent(pendingItemId, pending.sourceId, 'approved', {
         auctionId,
         reviewedBy: actor.userId,
+        aiSuggested: Boolean(aiExtraction),
+        aiProvider: aiExtraction && typeof aiExtraction === 'object' && 'provider' in aiExtraction
+          ? aiExtraction.provider
+          : undefined,
+        correctedFields,
+        publishedFields: {
+          title: item.title,
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          condition: item.condition,
+          estimatedValue: item.estimatedValue,
+          region: item.region,
+          city: item.city,
+        },
       });
 
       logger.info({
@@ -435,10 +485,20 @@ export class AutoFetchService {
       });
       throw error;
     }
+
   }
 
   async getQueueStats(organizationId: string) {
-    return this.autofetchRepo.getQueueStats(organizationId);
+    try {
+      return await this.autofetchRepo.getQueueStats(organizationId);
+    } catch (error) {
+      logger.error({
+        event: 'autofetch:get_queue_stats_error',
+        organizationId,
+        error,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -455,6 +515,44 @@ export class AutoFetchService {
       });
       throw error;
     }
+  }
+
+  async updateSource(
+    organizationId: string,
+    sourceId: string,
+    config: {
+      name: string;
+      adapterType: string;
+      sourceUrl?: string;
+      adapterConfig: Record<string, unknown>;
+      isActive: boolean;
+    },
+  ) {
+    if (!adapterRegistry.has(config.adapterType)) {
+      throw AppError.badRequest(`Unsupported AutoFetch source type: ${config.adapterType}`);
+    }
+    const adapter = adapterRegistry.get(config.adapterType);
+    if (adapter.validateConfig) {
+      try {
+        await adapter.validateConfig({ ...config.adapterConfig, url: config.sourceUrl ?? config.adapterConfig.url });
+      } catch (error) {
+        throw AppError.badRequest(error instanceof Error ? error.message : 'Invalid AutoFetch source configuration');
+      }
+    }
+
+    const source = await this.autofetchRepo.updateSourceForOrganization(sourceId, organizationId, config);
+    if (!source) throw AppError.notFound('Source not found');
+    await this.autofetchRepo.logAuditEvent(null, sourceId, 'source_updated', {
+      adapterType: source.adapterType,
+      isActive: source.isActive,
+    });
+    return source;
+  }
+
+  async removeSource(organizationId: string, sourceId: string): Promise<void> {
+    const source = await this.autofetchRepo.deactivateSourceForOrganization(sourceId, organizationId);
+    if (!source) throw AppError.notFound('Source not found');
+    await this.autofetchRepo.logAuditEvent(null, sourceId, 'source_deactivated', { name: source.name });
   }
 
   /**
@@ -500,6 +598,25 @@ export class AutoFetchService {
         sourceId: source.id,
         organizationId,
       });
+
+      try {
+        const fetchResult = await this.fetchAndQueue(source.id, organizationId);
+        logger.info({
+          event: 'autofetch:source_initial_fetch_completed',
+          sourceId: source.id,
+          organizationId,
+          queued: fetchResult.queued,
+          conflicts: fetchResult.conflicts,
+          errors: fetchResult.errors,
+        });
+      } catch (error) {
+        logger.warn({
+          event: 'autofetch:source_initial_fetch_failed',
+          sourceId: source.id,
+          organizationId,
+          error,
+        });
+      }
 
       return source;
     } catch (error) {

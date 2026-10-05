@@ -14,13 +14,18 @@ export interface TelegramUserProfile {
   telegramUsername: string | null;
   telegramChatId: string | null;
   telegramLinkedAt: string | null;
+  telegramLanguage: TelegramLanguage;
 }
+
+export type TelegramLanguage = "en" | "am";
 
 export type VoiceIntent = "bid" | "discover" | "status" | "verify" | "help" | "question";
 
 export interface VoiceParseResult {
   transcription: string;
   intent: VoiceIntent;
+  available?: boolean;
+  provider?: string;
   auctionId?: string | null;
   auctionNumber?: number | null;
   amount?: string | null;

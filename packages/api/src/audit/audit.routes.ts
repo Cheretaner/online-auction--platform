@@ -13,6 +13,12 @@ auditRouter.get(
 );
 
 auditRouter.get(
+  "/analytics/export",
+  requireAuth(["compliance_officer", "org_admin", "auction_officer", "super_admin"]),
+  asyncHandler(controller.exportAnalytics),
+);
+
+auditRouter.get(
   "/events",
   requireAuth(["compliance_officer", "org_admin", "auction_officer", "super_admin"]),
   asyncHandler(controller.list),

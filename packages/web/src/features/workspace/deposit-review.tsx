@@ -9,7 +9,15 @@ import { StatusBadge } from "@/components/feedback/status-badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useAuctionDeposits, useReleaseDeposit, useReviewDeposit, useUploadDocument } from "@/features/operations/queries";
+import {
+  useAuctionDeposits,
+  useDocumentOcr,
+  useReleaseDeposit,
+  useReviewDeposit,
+  useReviewDepositReferenceOcr,
+  useStartDocumentOcr,
+  useUploadDocument,
+} from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction, DepositRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
@@ -18,6 +26,66 @@ import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { useT } from "@/i18n/context";
 
 const RELEASABLE = new Set(["closed", "awarded", "cancelled"]);
+
+function DepositReferenceOcr({ deposit }: { deposit: DepositRecord }) {
+  const [open, setOpen] = useState(false);
+  const [checked, setChecked] = useState<{ candidate: string; matches: boolean } | null>(null);
+  const t = useT("workspace");
+  const documentId = deposit.documentId ?? "";
+  const extraction = useDocumentOcr(documentId, open);
+  const start = useStartDocumentOcr(documentId);
+  const reviewCandidate = useReviewDepositReferenceOcr(documentId);
+  if (!documentId) return null;
+
+  return (
+    <div className="space-y-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setOpen(true);
+          start.mutate(undefined, {
+            onError: (error) => toast.error(getErrorMessage(error, t("deposits.ocrFailed"))),
+          });
+        }}
+        loading={start.isPending}
+      >{t("deposits.readReference")}</Button>
+      {open && extraction.data?.status === "processing" ? (
+        <p role="status" className="text-xs text-muted-foreground">{t("deposits.ocrProcessing")}</p>
+      ) : null}
+      {open && extraction.data?.status === "failed" ? (
+        <p role="alert" className="text-xs text-destructive">
+          {extraction.data.errorMessage ?? getErrorMessage(extraction.error, t("deposits.ocrFailed"))}
+        </p>
+      ) : null}
+      {open && extraction.data?.status === "completed" ? (
+        <div className="space-y-2 rounded-md border bg-muted/30 p-2">
+          <p className="text-xs text-muted-foreground">{t("deposits.ocrVerifyNotice")}</p>
+          {extraction.data.referenceCandidates.length ? (
+            <ul className="space-y-1">
+              {extraction.data.referenceCandidates.map((candidate) => (
+                <li key={candidate} className="flex flex-wrap items-center gap-2 text-xs">
+                  <code className="rounded bg-background px-1.5 py-1">{candidate}</code>
+                  <Button size="sm" variant="ghost" loading={reviewCandidate.isPending}
+                    onClick={() => reviewCandidate.mutate(candidate, {
+                      onSuccess: ({ item }) => setChecked({ candidate: item.candidate, matches: item.matchesSubmittedReference }),
+                      onError: (error) => toast.error(getErrorMessage(error, t("deposits.ocrFailed"))),
+                    })}
+                  >{t("deposits.checkSuggestion")}</Button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-xs text-muted-foreground">{t("deposits.noOcrReference")}</p>}
+          {checked ? (
+            <p role="status" className="text-xs font-medium">
+              {checked.candidate}: {checked.matches ? t("deposits.referenceMatches") : t("deposits.referenceDiffers")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** Bid security review for one auction: verify or reject what bidders
  * registered, and release instruments once the auction is over. */
@@ -90,6 +158,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
                   <div className="flex flex-wrap justify-end gap-2">
                     {deposit.documentId ? (
                       <>
+                        <DepositReferenceOcr deposit={deposit} />
                         <DocumentPreviewButton documentId={deposit.documentId} fileName={`deposit-${deposit.id}`} allowUnknown />
                         <Button
                           size="sm"

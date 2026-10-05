@@ -1,5 +1,6 @@
 import { queryAll, queryOne } from "../infrastructure/database/query.js";
 import type { Queryable } from "../infrastructure/database/query.js";
+import type { Role } from "@auction/shared";
 
 export interface DocumentSearchResult {
   id: string;
@@ -19,6 +20,11 @@ export interface DocumentSearchFilters {
   auctionId?: string;
   documentType?: string;
   uploadedBy?: string;
+  viewer?: {
+    userId: string;
+    roles: Role[];
+    organizationId?: string;
+  };
   language?: 'english' | 'amharic' | 'both';
   limit: number;
   offset: number;
@@ -109,11 +115,47 @@ export async function searchDocuments(
     where.push(`uploaded_by = ${param(filters.uploadedBy)}`);
   }
 
+  if (filters.viewer) {
+    const userId = param(filters.viewer.userId);
+    const organizationId = param(filters.viewer.organizationId ?? null);
+    const isSuperAdmin = param(filters.viewer.roles.includes("super_admin"));
+    const isCompliance = param(filters.viewer.roles.includes("compliance_officer"));
+    const isOfficer = param(filters.viewer.roles.some((role) =>
+      ["org_admin", "auction_officer", "compliance_officer"].includes(role),
+    ));
+    where.push(`(
+      is_private = FALSE
+      OR uploaded_by = ${userId}
+      OR ${isSuperAdmin}::BOOLEAN
+      OR (${isCompliance}::BOOLEAN AND auction_id IS NULL)
+      OR (
+        ${isOfficer}::BOOLEAN AND auction_id IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM auctions a
+           WHERE a.id = searchable_documents.auction_id
+             AND a.org_id = ${organizationId}
+        )
+      )
+    )`);
+  }
+
   const whereSql = where.join(" AND ");
+  const searchableDocuments = `
+    WITH searchable_documents AS (
+      SELECT d.id, d.file_name AS filename, d.document_type, d.auction_id, d.uploaded_by,
+             d.created_at AS uploaded_at,
+             COALESCE(ocr.extracted_text, d.extracted_text) AS extracted_text,
+             COALESCE(ocr.status, d.ocr_status) AS ocr_status,
+             d.is_private
+        FROM documents d
+        LEFT JOIN document_ocr_results ocr ON ocr.document_id = d.id
+    )
+  `;
 
   // Count total matches
   const countRow = await queryOne<{ total: string }>(
-    `SELECT count(*)::text AS total FROM documents WHERE ${whereSql}`,
+    `${searchableDocuments}
+     SELECT count(*)::text AS total FROM searchable_documents WHERE ${whereSql}`,
     values,
     client,
   );
@@ -136,7 +178,8 @@ export async function searchDocuments(
     : `ts_headline('english', extracted_text, to_tsquery('english', ${queryParam}), 'MaxWords=50, MinWords=25, ShortWord=3')`;
 
   const rows = await queryAll<DbSearchResult>(
-    `SELECT 
+    `${searchableDocuments}
+     SELECT
       id,
       filename,
       document_type,
@@ -147,7 +190,7 @@ export async function searchDocuments(
       ocr_status,
       ${headlineFunction} as headline,
       ${rankFunction} as rank
-    FROM documents
+    FROM searchable_documents
     WHERE ${whereSql}
     ORDER BY rank DESC, uploaded_at DESC
     LIMIT ${limit} OFFSET ${offset}`,

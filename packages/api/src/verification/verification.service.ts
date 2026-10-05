@@ -23,6 +23,29 @@ export class VerificationService {
     ) {
       throw AppError.badRequest("KYC evidence must be a private document uploaded by you");
     }
+
+    const profile = await this.identityRepo.findProfileById(user.userId);
+    if (!profile) {
+      throw AppError.notFound("Profile not found");
+    }
+
+    if (data.documentType === "national_id") {
+      const normalizedSubmitted = data.documentNumber.replace(/[\s-]/g, "");
+      const normalizedProfile = profile.nationalId?.replace(/[\s-]/g, "") ?? null;
+      if (normalizedProfile && normalizedProfile !== normalizedSubmitted) {
+        throw AppError.badRequest("The submitted Fayda number does not match the one on your profile");
+      }
+    }
+
+    const duplicateMatches = await this.repository.checkDuplicateNationalIdOrTin(
+      profile.nationalId,
+      profile.tinNumber,
+    );
+    const otherDuplicateMatches = duplicateMatches.filter((row) => row.id !== user.userId);
+    if (otherDuplicateMatches.length > 0) {
+      throw AppError.conflict("This national ID or TIN is already in use by another active profile");
+    }
+
     const screening = await this.identityProvider.precheck({
       documentType: data.documentType,
       documentNumber: data.documentNumber,

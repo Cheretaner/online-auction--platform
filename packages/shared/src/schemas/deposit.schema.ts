@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEPOSIT_STATUS, ETHIOPIAN_BANKS, INSTRUMENT_TYPES } from "../enums.js";
+import { DEPOSIT_STATUS, DEPOSIT_INSTRUMENT_TYPES, ETHIOPIAN_BANKS } from "../enums.js";
 import { Money } from "./money.js";
 
 export const CreateDepositRequest = z.object({
@@ -7,7 +7,7 @@ export const CreateDepositRequest = z.object({
   amount: Money,
   referenceNumber: z.string().trim().min(3).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9./_-]*$/),
   issuingBank: z.enum(ETHIOPIAN_BANKS),
-  instrumentType: z.enum(INSTRUMENT_TYPES),
+  instrumentType: z.enum(DEPOSIT_INSTRUMENT_TYPES),
   documentId: z.string().uuid().optional(),
 });
 

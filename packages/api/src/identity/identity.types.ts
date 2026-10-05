@@ -11,6 +11,7 @@ export interface Profile {
   nationalId: string | null;
   tinNumber: string | null;
   region: string | null;
+  preferredLanguage: "en" | "am" | null;
   verificationStatus: VerificationStatus;
   platformRole: Role | null;
   isActive: boolean;

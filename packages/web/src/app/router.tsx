@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import { lazy, Suspense, useLayoutEffect } from "react";
+import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
 import { PublicShell } from "@/components/layout/public-shell";
 import { PageSkeleton } from "@/components/feedback/query-state";
@@ -30,6 +30,7 @@ const WorkspaceAuctionDetailPage = lazy(
 const KycPage = lazy(() => import("@/pages/app/kyc-page"));
 const DepositsPage = lazy(() => import("@/pages/app/deposits-page"));
 const DocumentsPage = lazy(() => import("@/pages/app/documents-page"));
+const WatchlistPage = lazy(() => import("@/pages/app/watchlist-page"));
 const NotificationsPage = lazy(() => import("@/pages/app/notifications-page"));
 const DisputesPage = lazy(() => import("@/pages/app/disputes-page"));
 const ReportsPage = lazy(() => import("@/pages/app/reports-page"));
@@ -52,6 +53,13 @@ function Fallback() {
 }
 
 function RootProviders() {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("product-theme", pathname !== "/");
+    return () => root.classList.remove("product-theme");
+  }, [pathname]);
+
   return (
     <AppProviders>
       <Suspense fallback={<Fallback />}>
@@ -96,6 +104,7 @@ export const router = createBrowserRouter([
               { path: "kyc", element: <KycPage /> },
               { path: "deposits", element: <DepositsPage /> },
               { path: "documents", element: <DocumentsPage /> },
+              { path: "watchlist", element: <WatchlistPage /> },
               { path: "notifications", element: <NotificationsPage /> },
               { path: "disputes", element: <DisputesPage /> },
               { path: "telegram", element: <TelegramPage /> },

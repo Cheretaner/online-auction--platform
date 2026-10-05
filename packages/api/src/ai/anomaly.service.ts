@@ -112,7 +112,7 @@ export async function evaluateAuction(
     })),
   );
 
-  return flag;
+  return enrichFlags([flag]).then((items) => items[0]);
 }
 
 /**
@@ -133,13 +133,18 @@ export async function listAnomalies(input: {
   auctionId?: string;
   orgId?: string;
 }): Promise<AnomalyFlag[]> {
-  return repo.listFlags(input);
+  return enrichFlags(await repo.listFlags(input));
 }
 
 export async function getAnomaly(id: string): Promise<AnomalyFlag> {
   const flag = await repo.findFlag(id);
   if (!flag) throw new AppError("Anomaly not found", HttpStatus.NOT_FOUND);
-  return flag;
+  return (await enrichFlags([flag]))[0];
+}
+
+async function enrichFlags(flags: AnomalyFlag[]): Promise<AnomalyFlag[]> {
+  const history = await repo.listRelatedHistory(flags.map((flag) => flag.id));
+  return flags.map((flag) => ({ ...flag, relatedHistory: history.get(flag.id) ?? [] }));
 }
 
 /** Records a compliance decision on a flag. The decision and the audit event
@@ -164,7 +169,7 @@ export async function reviewAnomaly(input: {
       action: "anomaly.reviewed",
       payload: { status: input.status, severity: updated.severity, score: updated.score },
     });
-    return updated;
+    return (await enrichFlags([updated]))[0];
   }, { userId: input.reviewerId });
 }
 

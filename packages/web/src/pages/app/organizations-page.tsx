@@ -5,7 +5,7 @@ import { CreateOrganizationRequest, ORG_TYPES } from "@auction/shared";
 import { Building2, ChevronDown, Trash2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { PageSkeleton } from "@/components/feedback/query-state";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -214,7 +214,11 @@ function Members({ orgId }: { orgId: string }) {
   return (
     <div className="space-y-4 border-t pt-4">
       {members.isLoading ? <PageSkeleton rows={2} /> : null}
-      <ul className="divide-y rounded-md border">
+      {members.isError ? <ErrorState error={members.error} onRetry={() => void members.refetch()} /> : null}
+      {!members.isLoading && !members.isError && (members.data?.items.length ?? 0) === 0 ? (
+        <EmptyState size="inline" icon={Building2} title={t("orgs.noMembers")} />
+      ) : null}
+      {(members.data?.items.length ?? 0) > 0 ? <ul className="divide-y rounded-md border">
         {(members.data?.items ?? []).map((member) => (
           <li key={member.userId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
             <span className="flex min-w-0 items-center gap-3">
@@ -234,6 +238,7 @@ function Members({ orgId }: { orgId: string }) {
               size="icon-sm"
               variant="ghost"
               className="text-destructive hover:bg-destructive/10"
+              disabled={remove.isPending || add.isPending}
               aria-label={t("orgs.remove", { name: member.fullName ?? member.email ?? t("orgs.member") })}
               onClick={() => setRemoving({ userId: member.userId, label: member.fullName ?? member.email ?? member.userId })}
             >
@@ -242,7 +247,7 @@ function Members({ orgId }: { orgId: string }) {
             </span>
           </li>
         ))}
-      </ul>
+      </ul> : null}
       <form
         className="grid gap-3 rounded-md bg-muted/50 p-3 sm:grid-cols-[1fr_200px_auto] sm:items-end"
         onSubmit={(event) => {
@@ -261,12 +266,12 @@ function Members({ orgId }: { orgId: string }) {
       >
         <div className="space-y-1.5">
           <Label htmlFor={`${id}-email`}>{t("orgs.memberEmail")}</Label>
-          <Input id={`${id}-email`} type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+          <Input id={`${id}-email`} type="email" required disabled={add.isPending} value={email} onChange={(event) => setEmail(event.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`${id}-role`}>{t("orgs.role")}</Label>
           <Select value={role} onValueChange={(value) => setRole(value as typeof role)}>
-            <SelectTrigger id={`${id}-role`}>
+            <SelectTrigger id={`${id}-role`} disabled={add.isPending}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -278,7 +283,7 @@ function Members({ orgId }: { orgId: string }) {
             </SelectContent>
           </Select>
         </div>
-        <Button type="submit" loading={add.isPending}>
+        <Button type="submit" loading={add.isPending} disabled={add.isPending}>
           {add.isPending ? null : <UserPlus aria-hidden />} {t("orgs.addMember")}
         </Button>
       </form>

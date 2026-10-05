@@ -89,7 +89,7 @@ function mapAnalytics(row: DbAnalytics): AuctionAnalytics {
 export async function getHistoricalAnalytics(
   categoryId?: string,
   region?: string,
-  limit: number = 12,
+  months: number = 12,
   client?: Queryable,
 ): Promise<AuctionAnalytics[]> {
   const where: string[] = [];
@@ -105,16 +105,15 @@ export async function getHistoricalAnalytics(
     where.push(`region = $${values.length}`);
   }
 
-  values.push(limit);
-  const limitParam = `$${values.length}`;
+  values.push(months - 1);
+  where.push(`period >= DATE_TRUNC('month', NOW()) - ($${values.length}::INT * INTERVAL '1 month')`);
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
 
   const rows = await queryAll<DbAnalytics>(
     `SELECT * FROM auction_analytics
      ${whereSql}
-     ORDER BY period DESC
-     LIMIT ${limitParam}`,
+     ORDER BY period DESC, region, category_id`,
     values,
     client,
   );
@@ -143,6 +142,7 @@ export async function getSimilarHistoricalAuctions(
   const where: string[] = [
     "a.status IN ('awarded', 'closed')",
     "a.reserve_price IS NOT NULL",
+    "a.reserve_price::numeric > 0",
     "a.closed_at IS NOT NULL",
     "a.closed_at >= NOW() - INTERVAL '2 years'", // Only last 2 years
   ];
@@ -163,11 +163,11 @@ export async function getSimilarHistoricalAuctions(
     const lower = estimatedValue * 0.5;
     const upper = estimatedValue * 1.5;
     values.push(lower, upper);
-    where.push(`EXISTS (
-      SELECT 1 FROM auction_items ai 
-      WHERE ai.auction_id = a.id 
-        AND ai.estimated_value::numeric BETWEEN $${values.length - 1} AND $${values.length}
-    )`);
+    where.push(`COALESCE((
+      SELECT SUM(ai.estimated_value::numeric)
+        FROM auction_items ai
+       WHERE ai.auction_id = a.id
+    ), 0) BETWEEN $${values.length - 1} AND $${values.length}`);
   }
 
   values.push(limit);
@@ -188,7 +188,7 @@ export async function getSimilarHistoricalAuctions(
       a.reserve_price,
       a.winning_amount,
       a.bid_count,
-      (SELECT ai.estimated_value FROM auction_items ai WHERE ai.auction_id = a.id LIMIT 1) as estimated_value,
+      (SELECT SUM(ai.estimated_value::numeric) FROM auction_items ai WHERE ai.auction_id = a.id) as estimated_value,
       a.closed_at
      FROM auctions a
      WHERE ${where.join(" AND ")}
@@ -359,9 +359,9 @@ export async function getBidderMetrics(
   }>(
     `SELECT * FROM bidder_participation_metrics
      WHERE bidder_id = $1
-       AND period >= DATE_TRUNC('month', NOW() - INTERVAL '${months} months')
+       AND period >= DATE_TRUNC('month', NOW()) - ($2::INT * INTERVAL '1 month')
      ORDER BY period DESC`,
-    [bidderId],
+    [bidderId, months - 1],
     client,
   );
 
@@ -390,26 +390,54 @@ export async function updateBidderMetrics(period: Date, client?: Queryable): Pro
       auctions_won, total_spent, avg_bid_amount, win_rate,
       categories_active, regions_active
     )
-    SELECT 
-      b.bidder_id,
-      DATE_TRUNC('month', $1) as period,
-      COUNT(DISTINCT b.auction_id) as auctions_participated,
-      COUNT(b.id) as total_bids_placed,
-      COUNT(DISTINCT CASE WHEN a.winner_id = b.bidder_id THEN a.id END) as auctions_won,
-      COALESCE(SUM(CASE WHEN a.winner_id = b.bidder_id THEN a.winning_amount::numeric ELSE 0 END), 0) as total_spent,
-      AVG(b.amount::numeric) as avg_bid_amount,
-      CASE WHEN COUNT(DISTINCT b.auction_id) > 0 
-        THEN (COUNT(DISTINCT CASE WHEN a.winner_id = b.bidder_id THEN a.id END)::numeric / COUNT(DISTINCT b.auction_id)::numeric * 100)
-        ELSE NULL 
-      END as win_rate,
-      ARRAY_AGG(DISTINCT ai.category_id) FILTER (WHERE ai.category_id IS NOT NULL) as categories_active,
-      ARRAY_AGG(DISTINCT a.region) FILTER (WHERE a.region IS NOT NULL) as regions_active
-    FROM bids b
-    JOIN auctions a ON a.id = b.auction_id
-    LEFT JOIN auction_items ai ON ai.auction_id = a.id
-    WHERE b.status = 'active'
-      AND DATE_TRUNC('month', b.placed_at) = DATE_TRUNC('month', $1)
-    GROUP BY b.bidder_id
+    WITH active_bids AS (
+      SELECT b.id, b.bidder_id, b.auction_id, b.amount, a.region, a.winner_id,
+             DATE_TRUNC('month', b.placed_at)::DATE AS period
+        FROM bids b
+        JOIN auctions a ON a.id = b.auction_id
+       WHERE b.status = 'active'
+         AND DATE_TRUNC('month', b.placed_at) = DATE_TRUNC('month', $1)
+    ),
+    participation AS (
+      SELECT bidder_id, period,
+             COUNT(DISTINCT auction_id)::INT AS auctions_participated,
+             COUNT(id)::INT AS total_bids_placed,
+             COUNT(DISTINCT CASE WHEN winner_id = bidder_id THEN auction_id END)::INT AS auctions_won,
+             AVG(amount::numeric) AS avg_bid_amount,
+             CASE WHEN COUNT(DISTINCT auction_id) > 0
+               THEN COUNT(DISTINCT CASE WHEN winner_id = bidder_id THEN auction_id END)::numeric
+                    / COUNT(DISTINCT auction_id)::numeric * 100
+               ELSE NULL
+             END AS win_rate,
+             ARRAY_AGG(DISTINCT region) FILTER (WHERE region IS NOT NULL) AS regions_active
+        FROM active_bids
+       GROUP BY bidder_id, period
+    ),
+    categories AS (
+      SELECT ab.bidder_id, ab.period,
+             ARRAY_AGG(DISTINCT ai.category_id::text) FILTER (WHERE ai.category_id IS NOT NULL) AS categories_active
+        FROM (SELECT DISTINCT bidder_id, auction_id, period FROM active_bids) ab
+        JOIN auction_items ai ON ai.auction_id = ab.auction_id
+       GROUP BY ab.bidder_id, ab.period
+    ),
+    winner_spend AS (
+      SELECT winner_id AS bidder_id, DATE_TRUNC('month', closed_at)::DATE AS period,
+             SUM(winning_amount::numeric) AS total_spent
+        FROM auctions
+       WHERE winner_id IS NOT NULL
+         AND winning_amount IS NOT NULL
+         AND closed_at IS NOT NULL
+         AND DATE_TRUNC('month', closed_at) = DATE_TRUNC('month', $1)
+       GROUP BY winner_id, DATE_TRUNC('month', closed_at)::DATE
+    )
+    SELECT p.bidder_id, p.period, p.auctions_participated, p.total_bids_placed,
+           p.auctions_won, COALESCE(ws.total_spent, 0) AS total_spent,
+           p.avg_bid_amount, p.win_rate,
+           COALESCE(c.categories_active, ARRAY[]::TEXT[]) AS categories_active,
+           COALESCE(p.regions_active, ARRAY[]::TEXT[]) AS regions_active
+      FROM participation p
+      LEFT JOIN categories c ON c.bidder_id = p.bidder_id AND c.period = p.period
+      LEFT JOIN winner_spend ws ON ws.bidder_id = p.bidder_id AND ws.period = p.period
     ON CONFLICT (bidder_id, period) DO UPDATE SET
       auctions_participated = EXCLUDED.auctions_participated,
       total_bids_placed = EXCLUDED.total_bids_placed,

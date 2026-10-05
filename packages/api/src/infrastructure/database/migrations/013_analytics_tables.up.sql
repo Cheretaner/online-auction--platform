@@ -5,33 +5,61 @@
 -- Materialized view for auction statistics aggregated by category, region, and time period
 -- Refreshed periodically to provide fast analytics queries
 CREATE MATERIALIZED VIEW IF NOT EXISTS auction_analytics AS
-SELECT 
-  COALESCE(a.region, 'unknown') as region,
-  COALESCE(ai.category_id, '00000000-0000-0000-0000-000000000000') as category_id,
-  DATE_TRUNC('month', a.closed_at) as period,
-  COUNT(DISTINCT a.id) as auction_count,
-  COUNT(DISTINCT b.bidder_id) as unique_bidders,
-  COUNT(b.id) as total_bids,
-  AVG(b.amount::numeric) as avg_bid_amount,
-  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY b.amount::numeric) as median_bid_amount,
-  AVG(a.winning_amount::numeric) as avg_winning_amount,
-  AVG(a.reserve_price::numeric) as avg_reserve_price,
-  AVG(CASE WHEN a.winning_amount IS NOT NULL AND a.reserve_price IS NOT NULL 
-      THEN (a.winning_amount::numeric / NULLIF(a.reserve_price::numeric, 0)) * 100 
-      END) as avg_reserve_to_winning_ratio,
-  AVG(a.bid_count) as avg_bids_per_auction,
-  COUNT(CASE WHEN a.status = 'awarded' THEN 1 END) as successful_auctions,
-  COUNT(CASE WHEN a.status = 'cancelled' THEN 1 END) as cancelled_auctions
-FROM auctions a
-LEFT JOIN auction_items ai ON ai.auction_id = a.id
-LEFT JOIN bids b ON b.auction_id = a.id AND b.status = 'active'
-WHERE a.status IN ('closed', 'awarded', 'under_review', 'cancelled')
-  AND a.closed_at IS NOT NULL
-GROUP BY COALESCE(a.region, 'unknown'), ai.category_id, DATE_TRUNC('month', a.closed_at);
+WITH auction_categories AS (
+  SELECT DISTINCT auction_id, category_id FROM auction_items
+),
+auction_base AS (
+  SELECT a.id,
+         COALESCE(a.region, 'unknown') AS region,
+         COALESCE(ac.category_id::text, '00000000-0000-0000-0000-000000000000') AS category_id,
+         DATE_TRUNC('month', a.closed_at) AS period,
+         a.winning_amount::numeric AS winning_amount,
+         a.reserve_price::numeric AS reserve_price,
+         a.bid_count,
+         a.status
+    FROM auctions a
+    LEFT JOIN auction_categories ac ON ac.auction_id = a.id
+   WHERE a.status IN ('closed', 'awarded', 'under_review', 'cancelled')
+     AND a.closed_at IS NOT NULL
+),
+auction_metrics AS (
+  SELECT region, category_id, period,
+         COUNT(*) AS auction_count,
+         AVG(winning_amount) AS avg_winning_amount,
+         AVG(reserve_price) AS avg_reserve_price,
+         AVG(CASE WHEN winning_amount IS NOT NULL AND reserve_price IS NOT NULL
+                  THEN winning_amount / NULLIF(reserve_price, 0) * 100 END) AS avg_reserve_to_winning_ratio,
+         AVG(bid_count) AS avg_bids_per_auction,
+         COUNT(*) FILTER (WHERE status = 'awarded') AS successful_auctions,
+         COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_auctions
+    FROM auction_base
+   GROUP BY region, category_id, period
+),
+bid_metrics AS (
+  SELECT ab.region, ab.category_id, ab.period,
+         COUNT(DISTINCT b.bidder_id) AS unique_bidders,
+         COUNT(b.id) AS total_bids,
+         AVG(b.amount::numeric) AS avg_bid_amount,
+         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY b.amount::numeric) AS median_bid_amount
+    FROM auction_base ab
+    LEFT JOIN bids b ON b.auction_id = ab.id AND b.status = 'active'
+   GROUP BY ab.region, ab.category_id, ab.period
+)
+SELECT a.region, a.category_id, a.period, a.auction_count,
+       COALESCE(b.unique_bidders, 0) AS unique_bidders,
+       COALESCE(b.total_bids, 0) AS total_bids,
+       b.avg_bid_amount, b.median_bid_amount,
+       a.avg_winning_amount, a.avg_reserve_price, a.avg_reserve_to_winning_ratio,
+       a.avg_bids_per_auction, a.successful_auctions, a.cancelled_auctions
+  FROM auction_metrics a
+  JOIN bid_metrics b USING (region, category_id, period);
 
 -- Indexes for fast analytics queries
 CREATE INDEX IF NOT EXISTS idx_auction_analytics_region_category 
 ON auction_analytics(region, category_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auction_analytics_unique
+ON auction_analytics(region, category_id, period);
 
 CREATE INDEX IF NOT EXISTS idx_auction_analytics_period 
 ON auction_analytics(period DESC);

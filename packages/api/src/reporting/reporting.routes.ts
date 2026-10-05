@@ -31,6 +31,13 @@ reportingRouter.get(
   asyncHandler(controller.financialReconciliation),
 );
 
+reportingRouter.get(
+  "/historical-insights",
+  requireAuth([...AUTHORS]),
+  validate(AuctionScopedQuery, "query"),
+  asyncHandler(controller.historicalInsights),
+);
+
 // A published report is the public transparency artefact (FR16), so it is
 // readable without authentication; unpublished drafts are not.
 reportingRouter.get("/:id", optionalAuth(), asyncHandler(controller.getById));

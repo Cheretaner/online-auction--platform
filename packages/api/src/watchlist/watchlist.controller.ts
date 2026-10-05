@@ -3,6 +3,47 @@ import { getAuth, routeParam } from "../shared/types/request.js";
 import * as service from "./watchlist.service.js";
 import { HttpStatus } from "../shared/errors/index.js";
 import { logger } from "../shared/utils/logger.js";
+import { NOTIFICATION_CHANNEL } from "@auction/shared";
+import { z } from "zod";
+
+/** GET /api/v1/watchlists */
+export const list: RequestHandler = async (req, res, next) => {
+  try {
+    res.json({ items: await service.listWatchlists(getAuth(req).userId) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** PUT /api/v1/watchlists/:auctionId */
+export const replace: RequestHandler = async (req, res, next) => {
+  try {
+    const auth = getAuth(req);
+    const body = z.object({
+      channels: z.array(z.enum(NOTIFICATION_CHANNEL)).min(1).max(NOTIFICATION_CHANNEL.length),
+      alertOnBids: z.boolean(),
+      alertOnStatus: z.boolean(),
+    }).strict().parse(req.body);
+    await service.setWatchlist({
+      userId: auth.userId,
+      auctionId: routeParam(req.params.auctionId),
+      ...body,
+    });
+    res.status(HttpStatus.NO_CONTENT).end();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** DELETE /api/v1/watchlists/:auctionId */
+export const remove: RequestHandler = async (req, res, next) => {
+  try {
+    await service.removeWatchlist(getAuth(req).userId, routeParam(req.params.auctionId));
+    res.status(HttpStatus.NO_CONTENT).end();
+  } catch (error) {
+    next(error);
+  }
+};
 
 /** POST /api/v1/watchlist */
 export const addToWatchlist: RequestHandler = async (req, res, next) => {
@@ -52,13 +93,12 @@ export const removeFromWatchlist: RequestHandler = async (req, res, next) => {
 export const getWatchlist: RequestHandler = async (req, res, next) => {
   try {
     const auth = getAuth(req);
-    const { limit, offset } = req.query;
+    const { limit, offset } = z.object({
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      offset: z.coerce.number().int().min(0).default(0),
+    }).strict().parse(req.query);
 
-    const result = await service.getUserWatchlist(
-      auth.userId,
-      limit ? Number(limit) : 50,
-      offset ? Number(offset) : 0,
-    );
+    const result = await service.getUserWatchlist(auth.userId, limit, offset);
 
     res.json(result);
   } catch (error) {

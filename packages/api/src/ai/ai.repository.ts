@@ -15,6 +15,19 @@ export interface AnomalyFlag {
   reviewedAt?: string;
   decisionNote?: string;
   createdAt: string;
+  relatedHistory?: RelatedAnomalyRecord[];
+}
+
+export interface RelatedAnomalyRecord {
+  flagId: string;
+  auctionId: string;
+  auctionTitle: string;
+  severity: AnomalySeverity;
+  status: AnomalyStatus;
+  createdAt: string;
+  decisionNote?: string;
+  auctionStatus: string;
+  awardAmount?: string;
 }
 
 interface DbFlag {
@@ -104,6 +117,60 @@ export async function listFlags(filter: { auctionId?: string; orgId?: string } =
 export async function findFlag(id: string): Promise<AnomalyFlag | null> {
   const row = await queryOne<DbFlag>(`SELECT * FROM anomaly_flags WHERE id = $1`, [id]);
   return row ? mapFlag(row) : null;
+}
+
+export async function listRelatedHistory(flagIds: string[]): Promise<Map<string, RelatedAnomalyRecord[]>> {
+  const related = new Map(flagIds.map((id) => [id, [] as RelatedAnomalyRecord[]]));
+  if (!flagIds.length) return related;
+  const rows = await queryAll<{
+    target_id: string;
+    flag_id: string;
+    auction_id: string;
+    auction_title: string;
+    severity: AnomalySeverity;
+    status: AnomalyStatus;
+    created_at: Date;
+    decision_note: string | null;
+    auction_status: string;
+    award_amount: string | null;
+  }>(
+    `SELECT target.id AS target_id, related.id AS flag_id, related.auction_id,
+            related_auction.title AS auction_title, related.severity, related.status,
+            related.created_at, related.decision_note, related_auction.status AS auction_status,
+            CASE WHEN related_auction.status = 'awarded'
+                   AND (related_auction.auction_type <> 'sealed_bid' OR related_auction.sealed_opened_at IS NOT NULL)
+                 THEN related_auction.winning_amount::text ELSE NULL END AS award_amount
+       FROM anomaly_flags target
+       JOIN auctions target_auction ON target_auction.id = target.auction_id
+       JOIN LATERAL (
+         SELECT f.* FROM anomaly_flags f
+         JOIN auctions a ON a.id = f.auction_id
+          WHERE a.org_id = target_auction.org_id
+            AND f.id <> target.id
+            AND f.created_at < target.created_at
+            AND f.subject_accounts && target.subject_accounts
+          ORDER BY f.created_at DESC
+          LIMIT 3
+       ) related ON TRUE
+       JOIN auctions related_auction ON related_auction.id = related.auction_id
+      WHERE target.id = ANY($1::uuid[])
+      ORDER BY target.id, related.created_at DESC`,
+    [flagIds],
+  );
+  for (const row of rows) {
+    related.get(row.target_id)?.push({
+      flagId: row.flag_id,
+      auctionId: row.auction_id,
+      auctionTitle: row.auction_title,
+      severity: row.severity,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+      decisionNote: row.decision_note ?? undefined,
+      auctionStatus: row.auction_status,
+      awardAmount: row.award_amount ?? undefined,
+    });
+  }
+  return related;
 }
 
 export async function reviewFlag(input: {

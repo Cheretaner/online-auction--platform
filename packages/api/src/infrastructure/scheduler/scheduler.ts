@@ -17,6 +17,7 @@ type ScheduledJob = {
 };
 
 const timers = new Map<string, NodeJS.Timeout>();
+const runningJobs = new Set<string>();
 
 interface JobState {
   intervalMs: number;
@@ -61,6 +62,8 @@ export function scheduleJob(job: ScheduledJob): void {
   jobState.set(job.name, { intervalMs: job.intervalMs, registeredAt: Date.now() });
 
   const execute = async (): Promise<void> => {
+    if (runningJobs.has(job.name)) return;
+    runningJobs.add(job.name);
     const started = Date.now();
     const state = jobState.get(job.name);
     try {
@@ -73,6 +76,8 @@ export function scheduleJob(job: ScheduledJob): void {
         state.lastError = error instanceof Error ? error.message : String(error);
       }
       logger.error({ err: error, job: job.name }, "Scheduled job failed");
+    } finally {
+      runningJobs.delete(job.name);
     }
   };
 

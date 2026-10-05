@@ -103,6 +103,7 @@ export async function listEvents(input: {
   auctionId?: string;
   entityType?: string;
   entityId?: string;
+  orgId?: string;
   page: number;
   limit: number;
 }): Promise<{ items: AuditEvent[]; total: number }> {
@@ -111,23 +112,28 @@ export async function listEvents(input: {
 
   if (input.auctionId) {
     params.push(input.auctionId);
-    conditions.push(`auction_id = $${params.length}`);
+    conditions.push(`e.auction_id = $${params.length}`);
   }
   if (input.entityType) {
     params.push(input.entityType);
-    conditions.push(`entity_type = $${params.length}`);
+    conditions.push(`e.entity_type = $${params.length}`);
   }
   if (input.entityId) {
     params.push(input.entityId);
-    conditions.push(`entity_id = $${params.length}`);
+    conditions.push(`e.entity_id = $${params.length}`);
+  }
+  if (input.orgId) {
+    params.push(input.orgId);
+    conditions.push(`a.org_id = $${params.length}`);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const count = await queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM audit_events ${where}`, params);
+  const join = input.orgId ? "JOIN auctions a ON a.id = e.auction_id" : "";
+  const count = await queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM audit_events e ${join} ${where}`, params);
   params.push(input.limit, (input.page - 1) * input.limit);
   const rows = await queryAll<DbAuditEvent>(
-    `SELECT * FROM audit_events ${where}
-      ORDER BY occurred_at DESC, sequence_no DESC
+    `SELECT e.* FROM audit_events e ${join} ${where}
+      ORDER BY e.occurred_at DESC, e.sequence_no DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
@@ -136,4 +142,30 @@ export async function listEvents(input: {
     items: rows.map(mapEvent),
     total: Number(count?.count ?? 0),
   };
+}
+
+export async function listOrganizationAnalytics(orgId: string): Promise<Array<{
+  eventDate: string;
+  actorRole: string;
+  entityType: string;
+  action: string;
+  eventCount: string;
+}>> {
+  return queryAll<{
+    eventDate: string;
+    actorRole: string;
+    entityType: string;
+    action: string;
+    eventCount: string;
+  }>(
+    `SELECT TO_CHAR(DATE_TRUNC('day', e.occurred_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS "eventDate",
+            e.actor_role AS "actorRole", e.entity_type AS "entityType", e.action,
+            COUNT(*)::text AS "eventCount"
+       FROM audit_events e
+       JOIN auctions a ON a.id = e.auction_id
+      WHERE a.org_id = $1 AND e.occurred_at >= NOW() - INTERVAL '90 days'
+      GROUP BY 1, 2, 3, 4
+      ORDER BY 1 DESC, 2, 3, 4`,
+    [orgId],
+  );
 }

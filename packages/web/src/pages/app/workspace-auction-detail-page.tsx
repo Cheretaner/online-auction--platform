@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
-import { EmptyState, QueryState } from "@/components/feedback/query-state";
+import { EmptyState, ErrorState, PageSkeleton, QueryState } from "@/components/feedback/query-state";
 import { ExternalLink, Pencil, ScanSearch, Scale, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReasonDialog } from "@/components/feedback/reason-dialog";
@@ -21,7 +21,9 @@ import { useDisputes } from "@/features/operations/queries";
 import { CompliancePanel } from "@/features/workspace/compliance-panel";
 import { DepositReview } from "@/features/workspace/deposit-review";
 import { LotsManager } from "@/features/workspace/lots-manager";
+import { HistoricalInsights } from "@/features/workspace/historical-insights";
 import { ReportsPanel } from "@/features/workspace/reports-panel";
+import { SealedOpeningCeremony } from "@/features/workspace/sealed-opening-ceremony";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
 import { canApproveAuctions, canManageAuctions, enumLabel, formatDateTime, formatMoney, hasRole, regionLabel } from "@/lib/format";
@@ -88,12 +90,15 @@ function Workspace({ auction }: { auction: Auction }) {
   const openFlags = (anomalies.data?.items ?? []).filter((flag) => flag.status === "open").length;
   const openDisputes = (disputes.data?.items ?? []).filter((d) => d.status === "open" || d.status === "under_review").length;
   const reviewer = hasRole(roles, "compliance_officer", "org_admin", "super_admin");
+  const canViewInsights = hasRole(roles, "auction_officer", "org_admin", "compliance_officer", "super_admin");
   const t = useT("workspace");
 
   return (
     <div className="space-y-6">
       <LifecycleActions auction={auction} />
+      {auction.auctionType === "sealed_bid" ? <SealedOpeningCeremony auction={auction} /> : null}
       <Overview auction={auction} />
+      {canViewInsights ? <HistoricalInsights auctionId={auction.id} /> : null}
       <Tabs defaultValue="lots">
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TabsList>
@@ -103,11 +108,11 @@ function Workspace({ auction }: { auction: Auction }) {
             <TabsTrigger value="compliance">{t("detail.tabs.compliance")}</TabsTrigger>
             <TabsTrigger value="anomalies">
               {t("detail.tabs.anomalies")}
-              {openFlags ? <Badge variant="warning" className="px-1.5">{openFlags}</Badge> : null}
+              {!anomalies.isLoading && openFlags ? <Badge variant="warning" className="px-1.5">{openFlags}</Badge> : null}
             </TabsTrigger>
             <TabsTrigger value="disputes">
               {t("detail.tabs.disputes")}
-              {openDisputes ? <Badge variant="warning" className="px-1.5">{openDisputes}</Badge> : null}
+              {!disputes.isLoading && openDisputes ? <Badge variant="warning" className="px-1.5">{openDisputes}</Badge> : null}
             </TabsTrigger>
             <TabsTrigger value="reports">{t("detail.tabs.reports")}</TabsTrigger>
           </TabsList>
@@ -116,7 +121,7 @@ function Workspace({ auction }: { auction: Auction }) {
           <LotsManager auctionId={auction.id} editable={auction.status === "draft" && canManageAuctions(roles)} />
         </TabsContent>
         <TabsContent value="documents" className="pt-4">
-          <AuctionDocuments auctionId={auction.id} canUpload />
+          <AuctionDocuments auctionId={auction.id} canUpload canReview />
         </TabsContent>
         <TabsContent value="deposits" className="pt-4">
           {Number(auction.depositAmount) > 0 ? (
@@ -129,14 +134,18 @@ function Workspace({ auction }: { auction: Auction }) {
           <CompliancePanel auctionId={auction.id} canRun={reviewer} />
         </TabsContent>
         <TabsContent value="anomalies" className="pt-4">
-          {(anomalies.data?.items ?? []).length === 0 ? (
+          {anomalies.isLoading ? <PageSkeleton rows={2} /> : anomalies.isError ? (
+            <ErrorState error={anomalies.error} onRetry={() => void anomalies.refetch()} />
+          ) : (anomalies.data?.items ?? []).length === 0 ? (
             <EmptyState size="inline" icon={ScanSearch} title={t("detail.noFlags")} />
           ) : (
             <AnomalyList items={anomalies.data?.items ?? []} showAuctionLink={false} />
           )}
         </TabsContent>
         <TabsContent value="disputes" className="pt-4">
-          {(disputes.data?.items ?? []).length === 0 ? (
+          {disputes.isLoading ? <PageSkeleton rows={2} /> : disputes.isError ? (
+            <ErrorState error={disputes.error} onRetry={() => void disputes.refetch()} />
+          ) : (disputes.data?.items ?? []).length === 0 ? (
             <EmptyState size="inline" icon={Scale} title={t("detail.noDisputes")} />
           ) : (
             <DisputeList items={disputes.data?.items ?? []} showAuctionLink={false} />
@@ -220,16 +229,6 @@ function LifecycleActions({ auction }: { auction: Auction }) {
       <p key="two-person" className="self-center text-sm text-muted-foreground">
         {t("detail.twoPerson")}
       </p>
-    ) : null,
-    auction.status === "closed" && auction.auctionType === "sealed_bid" && !auction.sealedOpenedAt ? (
-      <Button
-        key="open-sealed"
-        variant="outline"
-        loading={action.openSealed.isPending}
-        onClick={() => run(() => action.openSealed.mutateAsync(), t("detail.sealedOpened"))}
-      >
-        {t("detail.openSealed")}
-      </Button>
     ) : null,
     AWARDABLE.has(auction.status) && approver ? (
       <Button key="award" onClick={() => setAwarding(true)}>

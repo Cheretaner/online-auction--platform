@@ -74,10 +74,17 @@ export const reviewAnomaly: RequestHandler = async (req, res) => {
   res.json(flag);
 };
 
+export const getAnomaly: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const flag = await anomalyService.getAnomaly(routeParam(req.params.id));
+  await assertAuctionAccess(flag.auctionId, actorOf(auth));
+  res.json(flag);
+};
+
 export const assist: RequestHandler = async (req, res) => {
   const body = req.body as AssistRequest;
   if (body.auctionId) await assertAuctionAccess(body.auctionId, actorOf(getAuth(req)));
-  const result = await assistantService.askAssistant(body.prompt, body.auctionId);
+  const result = await assistantService.askAssistant(body.prompt, body.auctionId, body.language);
   res.json(result);
 };
 

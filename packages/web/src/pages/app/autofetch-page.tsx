@@ -1,11 +1,31 @@
 import { useId, useState, type FormEvent } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Eye, Inbox, Radar, RefreshCw, XCircle } from "lucide-react";
+import type { CreateAuctionItemRequest } from "@auction/shared";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Inbox, Pencil, Radar, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -17,17 +37,64 @@ import {
   useApproveAutofetchItem,
   useAutofetchPending,
   useAutofetchPendingDetail,
+  useAutofetchConflicts,
   useAutofetchSources,
   useAutofetchStats,
   useCreateAutofetchSource,
   useFetchAutofetchSource,
+  useRemoveAutofetchSource,
   useRejectAutofetchItem,
+  useUpdateAutofetchSource,
 } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
-import { useT } from "@/i18n/context";
+import { useLocale, useT } from "@/i18n/context";
 
 type PendingItem = NonNullable<ReturnType<typeof useAutofetchPending>["data"]>["items"][number];
+
+function cleanImportedDescription(value: string | undefined): string {
+  if (!value) return "";
+  // Prefer the browser's HTML parser where available to robustly decode entities
+  // and remove tags. Fall back to a conservative regexp-based approach for
+  // environments without DOMParser.
+  try {
+    // Some runtimes (SSR) may not have DOMParser; guard it.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const globalAny: any = typeof window !== "undefined" ? window : globalThis;
+    if (typeof globalAny.DOMParser === "function") {
+      const parser = new globalAny.DOMParser();
+      const doc = parser.parseFromString(value, "text/html");
+      // textContent normalizes whitespace and strips tags and attributes.
+      const parsed = doc.body?.textContent ?? "";
+      return parsed.replace(/\s+/g, " ").trim();
+    }
+  } catch {
+    // fall through to fallback below
+  }
+
+  // Fallback: decode a few common named and numeric entities and strip tags.
+  let text = value;
+  for (let pass = 0; pass < 5; pass += 1) {
+    const decoded = text.replace(/&(#(?:x[\da-f]+|\d+)|[a-z]+);/gi, (entity, code: string) => {
+      const key = code.toLowerCase();
+      if (!key || key[0] === "#") {
+        const hex = key[1]?.toLowerCase() === "x";
+        const point = Number.parseInt(key.slice(hex ? 2 : 1), hex ? 16 : 10);
+        return Number.isInteger(point) && point >= 0 && point <= 0x10ffff
+          ? String.fromCodePoint(point)
+          : entity;
+      }
+      return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }[key] ?? entity);
+    });
+    if (decoded === text) break;
+    text = decoded;
+  }
+  return text
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export default function AutofetchPage() {
   const [queueOffset, setQueueOffset] = useState(0);
@@ -38,7 +105,6 @@ export default function AutofetchPage() {
   const pending = useAutofetchPending(queueOffset, canReview);
   const stats = useAutofetchStats(canReview);
   const auctions = useOrgAuctions(canReview ? organizationId ?? undefined : undefined);
-  const fetchSource = useFetchAutofetchSource();
   const sourceItems = sources.data ?? [];
   const pendingItems = pending.data?.items ?? [];
   const draftAuctions = auctions.data?.items.filter((auction) => auction.status === "draft") ?? [];
@@ -82,14 +148,14 @@ export default function AutofetchPage() {
             ))}
           </ul>
         )}
-        {canReview && pending.data && pending.data.total > pending.data.limit ? (
+        {canReview && pending.data && pending.data.total > 5 ? (
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">{pending.data.offset + 1}–{Math.min(pending.data.offset + pending.data.items.length, pending.data.total)} of {pending.data.total}</p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={queueOffset === 0 || pending.isFetching} onClick={() => setQueueOffset((offset) => Math.max(0, offset - 50))}>
+              <Button variant="outline" size="sm" disabled={queueOffset === 0 || pending.isFetching} onClick={() => setQueueOffset((offset) => Math.max(0, offset - 5))}>
                 <ChevronLeft aria-hidden /> Previous
               </Button>
-              <Button variant="outline" size="sm" disabled={!pending.data.hasMore || pending.isFetching} onClick={() => setQueueOffset((offset) => offset + 50)}>
+              <Button variant="outline" size="sm" disabled={!pending.data.hasMore || pending.isFetching} onClick={() => setQueueOffset((offset) => offset + 5)}>
                 Next <ChevronRight aria-hidden />
               </Button>
             </div>
@@ -108,34 +174,7 @@ export default function AutofetchPage() {
         ) : (
           <ul className="divide-y rounded-lg border bg-card shadow-xs">
             {sourceItems.map((source) => (
-              <li key={source.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
-                <div className="min-w-0">
-                  <p className="font-medium">{source.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    <span className="font-mono">{source.adapterType}</span> · {source.sourceUrl}
-                  </p>
-                </div>
-                {canManageSources ? <Button
-                  size="sm"
-                  variant="outline"
-                  loading={fetchSource.isPending && fetchSource.variables === source.id}
-                  disabled={fetchSource.isPending}
-                  onClick={() =>
-                    fetchSource.mutate(source.id, {
-                      onSuccess: (result) => toast.success(t("autofetch.fetchSummary", {
-                        name: source.name,
-                        queued: result.queued,
-                        conflicts: result.conflicts,
-                        errors: result.errors,
-                      })),
-                      onError: (error) => toast.error(getErrorMessage(error)),
-                    })
-                  }
-                >
-                  {fetchSource.isPending && fetchSource.variables === source.id ? null : <RefreshCw aria-hidden />}
-                  {t("autofetch.fetch")}
-                </Button> : null}
-              </li>
+              <SourceRow key={source.id} source={source} canManage={canManageSources} />
             ))}
           </ul>
         )}
@@ -145,34 +184,267 @@ export default function AutofetchPage() {
   );
 }
 
+function SourceRow({ source, canManage }: { source: NonNullable<ReturnType<typeof useAutofetchSources>["data"]>[number]; canManage: boolean }) {
+  const fetchSource = useFetchAutofetchSource();
+  const updateSource = useUpdateAutofetchSource();
+  const removeSource = useRemoveAutofetchSource();
+  const [editing, setEditing] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [name, setName] = useState(source.name);
+  const [adapterType, setAdapterType] = useState(source.adapterType);
+  const [sourceUrl, setSourceUrl] = useState(source.sourceUrl ?? "");
+  const [adapterConfig, setAdapterConfig] = useState(JSON.stringify(source.adapterConfig ?? {}, null, 2));
+  const t = useT("tools");
+
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(adapterConfig);
+    } catch {
+      toast.error("Adapter configuration must be valid JSON");
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      toast.error("Adapter configuration must be a JSON object");
+      return;
+    }
+    updateSource.mutate({
+      sourceId: source.id,
+      body: {
+        name: name.trim(),
+        adapterType,
+        sourceUrl: sourceUrl.trim() || undefined,
+        adapterConfig: parsed as Record<string, unknown>,
+        isActive: source.isActive ?? true,
+      },
+    }, {
+      onSuccess: () => {
+        toast.success(t("autofetch.sourceUpdated"));
+        setEditing(false);
+      },
+      onError: (error) => toast.error(getErrorMessage(error)),
+    });
+  };
+
+  return (
+    <>
+      <li className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="font-medium">{source.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    <span className="font-mono">{source.adapterType}</span> · {source.sourceUrl}
+                  </p>
+                  {source.isActive === false ? <Badge variant="secondary">Inactive</Badge> : null}
+                </div>
+                {canManage ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={fetchSource.isPending && fetchSource.variables === source.id}
+                      disabled={fetchSource.isPending || source.isActive === false}
+                      onClick={() =>
+                        fetchSource.mutate(source.id, {
+                          onSuccess: (result) => toast.message(t("autofetch.fetchSummary", {
+                            fetched: result.fetched,
+                            queued: result.queued,
+                            duplicates: result.duplicates,
+                            stale: result.stale,
+                            errors: result.errors,
+                            conflicts: result.conflicts,
+                          })),
+                          onError: (error) => toast.error(getErrorMessage(error)),
+                        })
+                      }
+                    >
+                      {fetchSource.isPending && fetchSource.variables === source.id ? null : <RefreshCw aria-hidden />}
+                      {t("autofetch.fetch")}
+                    </Button>
+                    {source.isActive === false ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={updateSource.isPending}
+                        onClick={() => updateSource.mutate({
+                          sourceId: source.id,
+                          body: {
+                            name: source.name,
+                            adapterType: source.adapterType,
+                            sourceUrl: source.sourceUrl ?? undefined,
+                            adapterConfig: source.adapterConfig ?? {},
+                            isActive: true,
+                          },
+                        }, {
+                          onSuccess: () => toast.success(t("autofetch.sourceEnabled")),
+                          onError: (error) => toast.error(getErrorMessage(error)),
+                        })}
+                      >
+                        Enable
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="outline" aria-label={`Edit ${source.name}`} onClick={() => {
+                      setName(source.name);
+                      setAdapterType(source.adapterType);
+                      setSourceUrl(source.sourceUrl ?? "");
+                      setAdapterConfig(JSON.stringify(source.adapterConfig ?? {}, null, 2));
+                      setEditing(true);
+                    }}>
+                      <Pencil aria-hidden /> {t("autofetch.editSource")}
+                    </Button>
+                    <Button size="sm" variant="destructive" aria-label={`Remove ${source.name}`} onClick={() => setConfirmRemove(true)}>
+                      <Trash2 aria-hidden /> {t("autofetch.removeSource")}
+                    </Button>
+                    <div className="w-full text-xs text-muted-foreground">
+                      {source.lastFetchStatus === "failed" ? (
+                        <>
+                          <p className="text-destructive">{t("autofetch.lastFetchFailure", { error: source.lastFetchError ?? "Unknown error" })}</p>
+                          {source.lastFetchedAt && <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>}
+                        </>
+                      ) : source.lastFetchStatus === "running" ? (
+                        <p>{t("autofetch.fetchRunning")}</p>
+                      ) : source.lastFetchedAt ? (
+                        <p>{t("autofetch.lastFetched", { time: new Date(source.lastFetchedAt).toLocaleString() })}</p>
+                      ) : (
+                        <p>{t("autofetch.neverFetched")}</p>
+                      )}
+                      {source.lastFetchStatus === "success" && source.lastFetchSummary && (
+                        <p>
+                          {t("autofetch.fetchSummary", {
+                            fetched: source.lastFetchSummary.fetched ?? 0,
+                            queued: source.lastFetchSummary.queued ?? 0,
+                            duplicates: source.lastFetchSummary.duplicates ?? 0,
+                            stale: source.lastFetchSummary.stale ?? 0,
+                            errors: source.lastFetchSummary.errors ?? 0,
+                            conflicts: source.lastFetchSummary.conflicts ?? 0,
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                ) : null}
+      </li>
+      <Dialog open={editing} onOpenChange={setEditing}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("autofetch.editSourceTitle")}</DialogTitle>
+            <DialogDescription>{t("autofetch.editSourceDescription")}</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={save}>
+            <div className="space-y-2">
+              <Label htmlFor={`source-name-${source.id}`}>Name</Label>
+              <Input id={`source-name-${source.id}`} value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`source-type-${source.id}`}>{t("autofetch.sourceType")}</Label>
+              <NativeSelect id={`source-type-${source.id}`} value={adapterType} onChange={(event) => setAdapterType(event.target.value)}>
+                <option value="rss-feed">RSS / Atom Feed</option>
+                <option value="json-feed">JSON Feed</option>
+                <option value="web-scraper">Web Scraper</option>
+                <option value="telegram-rss">Telegram Channel (RSS + AI)</option>
+                <option value="csv-upload">CSV Upload</option>
+              </NativeSelect>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`source-url-${source.id}`}>{t("autofetch.sourceUrl")}</Label>
+              <Input id={`source-url-${source.id}`} type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`source-config-${source.id}`}>{t("autofetch.adapterConfiguration")}</Label>
+              <Textarea id={`source-config-${source.id}`} value={adapterConfig} onChange={(event) => setAdapterConfig(event.target.value)} rows={6} className="font-mono text-xs" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(false)}>{t("autofetch.cancel")}</Button>
+              <Button type="submit" loading={updateSource.isPending}>{t("autofetch.saveChanges")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("autofetch.removeSourceTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("autofetch.removeSourceDescription", { name: source.name })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("autofetch.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={removeSource.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                removeSource.mutate(source.id, {
+                  onSuccess: () => {
+                    toast.success(t("autofetch.sourceRemoved"));
+                    setConfirmRemove(false);
+                  },
+                  onError: (error) => toast.error(getErrorMessage(error)),
+                });
+              }}
+            >
+              {t("autofetch.removeSource")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 function AddSourceForm() {
   const id = useId();
   const createSource = useCreateAutofetchSource();
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [adapterType, setAdapterType] = useState("rss-feed");
-  const [adapterConfig, setAdapterConfig] = useState("{}");
+  const [includeKeywordsText, setIncludeKeywordsText] = useState("");
+  const [mappingText, setMappingText] = useState("");
+  const [aiExtraction, setAiExtraction] = useState(true);
+  const [adapterConfigText, setAdapterConfigText] = useState("{}");
   const t = useT("tools");
+  const { locale } = useLocale();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    let parsedConfig: Record<string, unknown>;
+    let adapterConfig: Record<string, unknown>;
     try {
-      const parsed: unknown = JSON.parse(adapterConfig);
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Configuration must be a JSON object");
-      parsedConfig = parsed as Record<string, unknown>;
-    } catch (error) {
-      toast.error(getErrorMessage(error));
+      const parsed: unknown = JSON.parse(adapterConfigText);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Adapter configuration must be a JSON object");
+      }
+      adapterConfig = parsed as Record<string, unknown>;
+    } catch {
+      toast.error(t("autofetch.invalidMappings"));
       return;
     }
+    if (adapterType === "web-scraper") {
+      adapterConfig.aiExtraction = aiExtraction;
+    }
+    if (adapterType === "rss-feed" && includeKeywordsText.trim()) {
+      adapterConfig.includeKeywords = includeKeywordsText.split(",").map((keyword) => keyword.trim()).filter(Boolean);
+    }
+    if (adapterType === "web-scraper" && mappingText.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(mappingText);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object");
+        adapterConfig.mappings = parsed as Record<string, unknown>;
+      } catch {
+        toast.error(t("autofetch.invalidMappings"));
+        return;
+      }
+    }
     createSource.mutate(
-      { name, adapterType, sourceUrl: url, adapterConfig: parsedConfig },
+      { name, adapterType, sourceUrl: url, adapterConfig },
       {
         onSuccess: () => {
           toast.success(t("autofetch.sourceAdded"));
           setName("");
           setUrl("");
-          setAdapterConfig("{}");
+          setIncludeKeywordsText("");
+          setMappingText("");
+          setAiExtraction(true);
+          setAdapterConfigText("{}");
         },
         onError: (error) => toast.error(getErrorMessage(error)),
       },
@@ -207,25 +479,66 @@ function AddSourceForm() {
             <NativeSelect id={`${id}-type`} value={adapterType} onChange={(event) => setAdapterType(event.target.value)}>
               <option value="rss-feed">{t("autofetch.rss")}</option>
               <option value="json-feed">{t("autofetch.json")}</option>
-              <option value="web-scraper">{t("autofetch.website")}</option>
+              <option value="web-scraper">{t("autofetch.webScraper")}</option>
               <option value="telegram-rss">{t("autofetch.telegramFeed")}</option>
             </NativeSelect>
           </div>
-          <div className="space-y-1.5 md:col-span-2">
+          {adapterType === "json-feed" ? <div className="space-y-1.5 md:col-span-2">
             <Label htmlFor={`${id}-config`}>Adapter configuration (JSON)</Label>
             <Textarea
               id={`${id}-config`}
-              value={adapterConfig}
-              onChange={(event) => setAdapterConfig(event.target.value)}
+              value={adapterConfigText}
+              onChange={(event) => setAdapterConfigText(event.target.value)}
               rows={3}
               className="font-mono text-xs"
               placeholder={'{"itemsPath":"data.items","mappings":{"title":"name"}}'}
             />
-            <p className="text-xs text-muted-foreground">Use itemsPath and mappings for JSON feeds. Website and Telegram feed adapters use AI to extract notice fields.</p>
-          </div>
+            <p className="text-xs text-muted-foreground">Use itemsPath and mappings to map fields from the JSON feed.</p>
+          </div> : null}
           <Button type="submit" loading={createSource.isPending} className="md:col-span-2 md:justify-self-end">
             {t("autofetch.add")}
           </Button>
+          {(adapterType === "rss-feed" || adapterType === "telegram-rss") && (
+            <div className="space-y-1.5 md:col-span-4">
+              <Label htmlFor={`${id}-keywords`}>{t("autofetch.requiredKeywords")}</Label>
+              <Input
+                id={`${id}-keywords`}
+                value={includeKeywordsText}
+                onChange={(event) => setIncludeKeywordsText(event.target.value)}
+                placeholder="Ethiopia, tender"
+              />
+              <p className="text-xs text-muted-foreground">{t("autofetch.requiredKeywordsHelp")}</p>
+            </div>
+          )}
+          {adapterType === "web-scraper" && (
+            <div className="space-y-1.5 md:col-span-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`${id}-ai-extraction`}
+                  checked={aiExtraction}
+                  onCheckedChange={(checked) => setAiExtraction(checked === true)}
+                />
+                <Label htmlFor={`${id}-ai-extraction`}>
+                  {locale === "am" ? "ለተዋቀሩ ያልሆኑ ገጾች AI ጥቆማዎችን ፍቀድ" : "Allow AI suggestions for unstructured pages"}
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {locale === "am"
+                  ? "የገጹ ጽሑፍ ወደ የተዋቀረ መረጃ ሲቀየር የተጠቆሙ መስኮችና ትክክለኛ የምንጭ ጥቅሶች ይታያሉ። ውጤቱ የሰው ግምገማ ይፈልጋል፤ በራስ-ሰር አይታተምም።"
+                  : "Visible page text is sent to the configured remote AI provider only when structured metadata is unavailable. Suggestions include source quotes, are capped at 45% confidence, and always require human review; they are never auto-published."}
+              </p>
+              <Label htmlFor={`${id}-mappings`}>{t("autofetch.mappings")}</Label>
+              <Textarea
+                id={`${id}-mappings`}
+                value={mappingText}
+                onChange={(event) => setMappingText(event.target.value)}
+                placeholder={'{"title":"name","estimatedValue":"offers.price","region":"address.addressRegion"}'}
+                spellCheck={false}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">{t("autofetch.mappingsHelp")}</p>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>
@@ -239,10 +552,50 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   const reject = useRejectAutofetchItem();
   const [auctionId, setAuctionId] = useState("");
   const [reason, setReason] = useState("");
-  const [showDetails, setShowDetails] = useState(false);
-  const detail = useAutofetchPendingDetail(item.id, showDetails);
+  const [showConflicts, setShowConflicts] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const cleanDescription = cleanImportedDescription(item.description);
+  const conflictDetails = useAutofetchConflicts(item.id, showConflicts);
+  const pendingDetail = useAutofetchPendingDetail(item.id, showSuggestions);
   const conflicts = item.conflictCount ?? 0;
   const t = useT("tools");
+  const { locale } = useLocale();
+  const normalized = pendingDetail.data?.item.normalizedMetadata;
+  const [reviewedOverrides, setReviewedOverrides] = useState<Partial<{
+    title: string;
+    description: string;
+    quantity: string;
+    unit: string;
+    condition: string;
+    value: string;
+    region: string;
+    city: string;
+  }>>({});
+  const suggestedValues = {
+    title: readInput(normalized?.title) || item.title,
+    description: normalized ? readInput(normalized.description) : cleanDescription,
+    quantity: readInput(normalized?.quantity) || "1",
+    unit: readInput(normalized?.unit),
+    condition: readInput(normalized?.condition),
+    value: typeof normalized?.estimatedValue === "number"
+      ? normalized.estimatedValue.toFixed(2)
+      : readInput(normalized?.estimatedValue),
+    region: readInput(normalized?.region),
+    city: readInput(normalized?.city),
+  };
+  const reviewed = { ...suggestedValues, ...reviewedOverrides };
+  const updateReviewed = (field: keyof typeof suggestedValues, value: string) => {
+    setReviewedOverrides((current) => ({ ...current, [field]: value }));
+  };
+  const sourceMetadata = normalized?.rawMetadata && typeof normalized.rawMetadata === "object"
+    ? normalized.rawMetadata as Record<string, unknown>
+    : undefined;
+  const extraction = sourceMetadata?.aiExtraction && typeof sourceMetadata.aiExtraction === "object"
+    ? sourceMetadata.aiExtraction as { provider?: unknown; evidence?: unknown; requiresHumanReview?: unknown }
+    : undefined;
+  const evidence = extraction?.evidence && typeof extraction.evidence === "object"
+    ? Object.entries(extraction.evidence as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    : [];
 
   return (
     <Card>
@@ -256,33 +609,142 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 score: item.confidenceScore ?? 0,
               })}
             </p>
+            <p className="mt-2 text-sm text-muted-foreground">{cleanDescription || t("autofetch.noDescription")}</p>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="mt-1 h-auto px-0"
+              aria-expanded={showSuggestions}
+              onClick={() => setShowSuggestions((value) => !value)}
+            >
+              <ChevronDown aria-hidden className={showSuggestions ? "rotate-180" : undefined} />
+              {locale === "am" ? "የተጠቆሙ መረጃዎችንና ማስረጃቸውን ይመልከቱ" : "Review suggested fields and evidence"}
+            </Button>
+            {showSuggestions && (
+              <section className="mt-2 space-y-2 rounded-md border bg-muted/30 p-3 text-sm" aria-label={locale === "am" ? "የምንጭ ማስረጃ" : "Source evidence"}>
+                {pendingDetail.isLoading ? <p className="text-muted-foreground">{locale === "am" ? "በመጫን ላይ…" : "Loading source evidence…"}</p> : null}
+                {pendingDetail.isError ? <p className="text-destructive">{getErrorMessage(pendingDetail.error)}</p> : null}
+                {extraction ? (
+                  <>
+                    <p className="font-medium text-warning-foreground">
+                      {locale === "am"
+                        ? `AI ጥቆማ (${typeof extraction.provider === "string" ? extraction.provider : "AI"})። ከምንጩ ጋር ያረጋግጡ፤ ራስ-ሰር አይታተምም።`
+                        : `AI suggestion (${typeof extraction.provider === "string" ? extraction.provider : "AI"}). Verify it against the source; it is never published automatically.`}
+                    </p>
+                    {evidence.length ? (
+                      <dl className="grid gap-2 sm:grid-cols-2">
+                        {evidence.map(([field, quote]) => (
+                          <div className="min-w-0 rounded border bg-background p-2" key={field}>
+                            <dt className="text-xs font-semibold text-muted-foreground">{fieldLabel(field, locale)}</dt>
+                            <dd className="mt-1 font-medium text-foreground">
+                              {locale === "am" ? "የተጠቆመው፦ " : "Suggested value: "}
+                              {normalized && ["string", "number"].includes(typeof normalized[field]) ? String(normalized[field]) : (locale === "am" ? "የለም" : "not provided")}
+                            </dd>
+                            <dd className="mt-1 whitespace-pre-wrap text-muted-foreground">
+                              {locale === "am" ? "ከምንጩ የተወሰደ ጥቅስ፦ " : "Source quote: "}“{quote}”
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="text-muted-foreground">{locale === "am" ? "የተጠቀሰ ማስረጃ የለም።" : "No field evidence was recorded."}</p>
+                    )}
+                    {item.aiSuggested && normalized ? (
+                      <div className="space-y-3 border-t pt-3">
+                        <p className="font-semibold">{locale === "am" ? "ለማተም የተገመገሙ መረጃዎች" : "Reviewed values to publish"}</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1"><Label htmlFor={`${id}-title`}>{fieldLabel("title", locale)}</Label><Input id={`${id}-title`} required maxLength={200} value={reviewed.title} onChange={(event) => updateReviewed("title", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-quantity`}>{fieldLabel("quantity", locale)}</Label><Input id={`${id}-quantity`} type="number" min={1} step={1} required value={reviewed.quantity} onChange={(event) => updateReviewed("quantity", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-unit`}>{fieldLabel("unit", locale)}</Label><Input id={`${id}-unit`} maxLength={30} value={reviewed.unit} onChange={(event) => updateReviewed("unit", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-condition`}>{fieldLabel("condition", locale)}</Label><NativeSelect id={`${id}-condition`} value={reviewed.condition} onChange={(event) => updateReviewed("condition", event.target.value)}><option value="">{locale === "am" ? "አልተገለጸም" : "Not specified"}</option>{["new", "used_good", "used_fair", "salvage", "unknown"].map((condition) => <option key={condition} value={condition}>{condition.replaceAll("_", " ")}</option>)}</NativeSelect></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-value`}>{fieldLabel("estimatedValue", locale)}</Label><Input id={`${id}-value`} inputMode="decimal" placeholder="ETB" value={reviewed.value} onChange={(event) => updateReviewed("value", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-region`}>{fieldLabel("region", locale)}</Label><Input id={`${id}-region`} maxLength={80} value={reviewed.region} onChange={(event) => updateReviewed("region", event.target.value)} /></div>
+                          <div className="space-y-1"><Label htmlFor={`${id}-city`}>{fieldLabel("city", locale)}</Label><Input id={`${id}-city`} maxLength={100} value={reviewed.city} onChange={(event) => updateReviewed("city", event.target.value)} /></div>
+                          <div className="space-y-1 sm:col-span-2"><Label htmlFor={`${id}-description`}>{fieldLabel("description", locale)}</Label><Textarea id={`${id}-description`} maxLength={5000} value={reviewed.description} onChange={(event) => updateReviewed("description", event.target.value)} /></div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : !pendingDetail.isLoading && !pendingDetail.isError ? (
+                  <p className="text-muted-foreground">{locale === "am" ? "ይህ መረጃ በAI አልተጠቆመም።" : "This record was not AI-suggested."}</p>
+                ) : null}
+              </section>
+            )}
+            {(item.estimatedValue != null || item.categoryName) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {item.estimatedValue != null && new Intl.NumberFormat(undefined, { style: "currency", currency: "ETB" }).format(item.estimatedValue)}
+                {item.estimatedValue != null && item.categoryName ? " · " : ""}
+                {item.categoryName}
+              </p>
+            )}
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {safePublicUrl(item.externalId) && (
+                <a className="underline underline-offset-2" href={safePublicUrl(item.externalId)} target="_blank" rel="noopener noreferrer">
+                  {t("autofetch.openSource")}
+                </a>
+              )}
+              {safePublicUrl(item.sourceUrl) && (
+                <a className="underline underline-offset-2 text-muted-foreground" href={safePublicUrl(item.sourceUrl)} target="_blank" rel="noopener noreferrer">
+                  {t("autofetch.sourceEndpoint")}
+                </a>
+              )}
+            </p>
           </div>
           <Badge variant={item.highSeverityConflicts ? "destructive" : conflicts ? "warning" : "muted"}>
             {conflicts === 1 ? t("autofetch.conflictsOne") : t("autofetch.conflictsOther", { count: conflicts })}
           </Badge>
         </div>
 
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={() => setShowDetails((shown) => !shown)}>
-            <Eye aria-hidden /> {showDetails ? "Hide imported details" : "Review imported details"}
-          </Button>
-          {showDetails ? (
-            <div className="mt-3 space-y-3 rounded-md bg-muted/40 p-4 text-sm">
-              {detail.isLoading ? <p className="text-muted-foreground">Loading imported details…</p> : null}
-              {detail.isError ? <p className="text-destructive">{getErrorMessage(detail.error)}</p> : null}
-              {detail.data ? <ImportedDetails item={detail.data.item} conflicts={detail.data.conflicts} /> : null}
-            </div>
-          ) : null}
-        </div>
-
         <div className="grid gap-4 border-t pt-5 lg:grid-cols-2">
+          {conflicts > 0 && (
+            <section className="space-y-2 lg:col-span-2" aria-label={t("autofetch.conflictsDetails")}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-expanded={showConflicts}
+                onClick={() => setShowConflicts((value) => !value)}
+              >
+                <ChevronDown aria-hidden className={showConflicts ? "rotate-180" : undefined} />
+                {t("autofetch.reviewConflicts", { count: conflicts })}
+              </Button>
+              {showConflicts && (
+                conflictDetails.isLoading ? <p className="text-sm text-muted-foreground">{t("autofetch.loadingConflicts")}</p> :
+                conflictDetails.isError ? <p className="text-sm text-destructive">{getErrorMessage(conflictDetails.error)}</p> :
+                <ul className="space-y-2 rounded-md border p-3 text-sm">
+                  {(conflictDetails.data?.conflicts ?? []).map((conflict) => (
+                    <li key={conflict.id}>
+                      <strong>{conflict.severity}</strong> · {conflict.conflictType.replaceAll("_", " ")} · {conflict.confidenceScore}%
+                      {conflict.conflictingAuctionId && <span className="text-muted-foreground"> · {t("autofetch.auctionId", { id: conflict.conflictingAuctionId })}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
           <form
             className="flex flex-col gap-2 sm:flex-row sm:items-end"
             onSubmit={(event) => {
               event.preventDefault();
               if (!auctionId) return;
               approve.mutate(
-                { id: item.id, auctionId },
+                {
+                  id: item.id,
+                  auctionId,
+                  ...(item.aiSuggested ? {
+                    corrections: {
+                      title: reviewed.title.trim(),
+                      description: reviewed.description,
+                      quantity: Number(reviewed.quantity),
+                      unit: reviewed.unit || undefined,
+                      condition: reviewed.condition ? reviewed.condition as CreateAuctionItemRequest["condition"] : undefined,
+                      estimatedValue: reviewed.value || null,
+                      region: reviewed.region || undefined,
+                      city: reviewed.city || undefined,
+                    },
+                  } : {}),
+                },
                 {
                   onSuccess: () => toast.success(t("autofetch.verifiedAdded")),
                   onError: (error) => toast.error(getErrorMessage(error)),
@@ -302,7 +764,7 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
                 ))}
               </NativeSelect>
             </div>
-            <Button type="submit" disabled={!auctionId || reject.isPending || auctions.length === 0} loading={approve.isPending}>
+            <Button type="submit" disabled={!auctionId || reject.isPending || auctions.length === 0 || (item.aiSuggested && (!showSuggestions || pendingDetail.isLoading || pendingDetail.isError || !pendingDetail.data || !reviewed.title.trim() || !Number.isInteger(Number(reviewed.quantity)) || Number(reviewed.quantity) < 1 || Boolean(reviewed.value && !/^\d+(\.\d{2})?$/.test(reviewed.value))))} loading={approve.isPending}>
               {t("autofetch.verifyAdd")}
             </Button>
           </form>
@@ -340,41 +802,33 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
   );
 }
 
-function ImportedDetails({
-  item,
-  conflicts,
-}: {
-  item: { description?: string; normalizedMetadata?: Record<string, unknown> };
-  conflicts: unknown[];
-}) {
-  const metadata = item.normalizedMetadata ?? {};
-  const rawMetadata = (metadata.rawMetadata && typeof metadata.rawMetadata === "object"
-    ? metadata.rawMetadata
-    : {}) as Record<string, unknown>;
-  const link = [rawMetadata.link, rawMetadata.url, metadata.sourceUrl]
-    .find((value): value is string => typeof value === "string" && /^https?:\/\//i.test(value));
-  const value = metadata.estimatedValue;
-  const place = [metadata.city, metadata.region].filter((part): part is string => typeof part === "string" && part.length > 0).join(", ");
+function fieldLabel(field: string, locale: "en" | "am") {
+  if (locale !== "am") return field.replaceAll(/([A-Z])/g, " $1");
+  const labels: Record<string, string> = {
+    title: "ርዕስ",
+    description: "መግለጫ",
+    estimatedValue: "ግምታዊ ዋጋ",
+    categoryName: "ምድብ",
+    region: "ክልል",
+    city: "ከተማ",
+    quantity: "ብዛት",
+    unit: "መለኪያ",
+    condition: "ሁኔታ",
+    externalId: "የምንጭ መለያ",
+  };
+  return labels[field] ?? field;
+}
 
-  return (
-    <div className="space-y-3">
-      {item.description ? <p className="whitespace-pre-wrap">{item.description}</p> : <p className="text-muted-foreground">No description was supplied by the source.</p>}
-      <dl className="grid gap-2 sm:grid-cols-2">
-        {typeof metadata.categoryName === "string" ? <div><dt className="text-muted-foreground">Suggested category</dt><dd>{metadata.categoryName}</dd></div> : null}
-        {place ? <div><dt className="text-muted-foreground">Location</dt><dd>{place}</dd></div> : null}
-        {typeof value === "number" ? <div><dt className="text-muted-foreground">Estimated value</dt><dd>ETB {value.toLocaleString()}</dd></div> : null}
-        {typeof metadata.condition === "string" ? <div><dt className="text-muted-foreground">Condition</dt><dd>{metadata.condition}</dd></div> : null}
-      </dl>
-      {link ? <a className="inline-block text-primary underline" href={link} target="_blank" rel="noreferrer">Open original source</a> : null}
-      {conflicts.length > 0 ? (
-        <div className="space-y-1 border-t pt-3">
-          <p className="font-medium">Potential matches to review</p>
-          {conflicts.map((value, index) => {
-            const conflict = value as { severity?: string; conflictType?: string; confidenceScore?: number };
-            return <p key={`${conflict.conflictType ?? "match"}-${index}`} className="text-muted-foreground">{conflict.severity ?? "Potential"} · {conflict.conflictType ?? "possible duplicate"}{typeof conflict.confidenceScore === "number" ? ` · ${conflict.confidenceScore}% match` : ""}</p>;
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
+function readInput(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function safePublicUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
 }

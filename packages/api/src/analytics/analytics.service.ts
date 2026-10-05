@@ -27,6 +27,14 @@ export interface ReservePriceRecommendationResult {
   };
 }
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
 /**
  * Calculate reserve price recommendation based on historical data
  * Uses statistical analysis of similar past auctions
@@ -111,8 +119,14 @@ export async function getReservePriceRecommendation(
     return {
       recommendedReserve: fallbackReserve,
       confidenceScore: 20,
-      basedOnAuctions: 0,
-      similarAuctions: [],
+      basedOnAuctions: similarAuctions.length,
+      similarAuctions: similarAuctions.slice(0, 5).map((a) => ({
+        id: a.id,
+        title: a.title,
+        reservePrice: a.reservePrice,
+        winningAmount: a.winningAmount,
+        bidCount: a.bidCount,
+      })),
       factors: {
         calculation: "Insufficient historical data. Using 70% of estimated value as fallback.",
         estimatedValue: estimatedValue.toFixed(2),
@@ -128,9 +142,10 @@ export async function getReservePriceRecommendation(
     .filter((p): p is number => p !== null && p > 0);
 
   const avgReserve = reservePrices.reduce((a, b) => a + b, 0) / reservePrices.length;
-  const medianReserve = [...reservePrices].sort((a, b) => a - b)[Math.floor(reservePrices.length / 2)];
+  const medianReserve = median(reservePrices);
   const avgWinning =
     winningAmounts.length > 0 ? winningAmounts.reduce((a, b) => a + b, 0) / winningAmounts.length : null;
+  const medianWinning = winningAmounts.length > 0 ? median(winningAmounts) : null;
 
   // Calculate recommended reserve
   let recommendedReserve: number;
@@ -139,7 +154,7 @@ export async function getReservePriceRecommendation(
 
   if (winningAmounts.length >= 10) {
     // High confidence: use median winning amount * 0.85 (slightly below typical winning)
-    recommendedReserve = (avgWinning ?? avgReserve) * 0.85;
+    recommendedReserve = (medianWinning ?? avgReserve) * 0.85;
     calculationMethod = "median_winning_adjusted";
     confidenceScore = 85;
   } else if (reservePrices.length >= 20) {

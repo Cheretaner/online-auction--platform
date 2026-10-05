@@ -3,7 +3,7 @@ import { z } from "zod";
 export const CreateCategoryRequest = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  parentId: z.string().uuid().optional(),
+  parentId: z.string().uuid().nullable().optional(),
   description: z.string().max(500).optional(),
   isActive: z.boolean().optional(),
 });

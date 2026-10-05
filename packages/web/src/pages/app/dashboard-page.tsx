@@ -1,7 +1,8 @@
-import { ArrowRight, Bell, Building2, CheckCircle2, Gavel, Plus, Wallet } from "lucide-react";
+import { ArrowRight, Bell, Bookmark, Building2, CheckCircle2, CircleAlert, Gavel, Plus, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { ErrorState } from "@/components/feedback/query-state";
 import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,6 +98,19 @@ export default function DashboardPage() {
         />
       </section>
 
+      {auctions.isError || verification.isError || deposits.isError || unread.isError ? (
+        <section className="space-y-3" aria-label={t("dashboard.dataIssues")}>
+          <Alert variant="warning">
+            <CircleAlert aria-hidden />
+            <AlertDescription>{t("dashboard.dataIssuesDescription")}</AlertDescription>
+          </Alert>
+          {auctions.isError ? <ErrorState error={auctions.error} onRetry={() => void auctions.refetch()} /> : null}
+          {verification.isError ? <ErrorState error={verification.error} onRetry={() => void verification.refetch()} /> : null}
+          {deposits.isError ? <ErrorState error={deposits.error} onRetry={() => void deposits.refetch()} /> : null}
+          {unread.isError ? <ErrorState error={unread.error} onRetry={() => void unread.refetch()} /> : null}
+        </section>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="h-full">
           <CardHeader>
@@ -131,6 +145,10 @@ export default function DashboardPage() {
             <QuickLink to="/auctions" label={t("dashboard.browse")} />
             <QuickLink to="/app/kyc" label={t("dashboard.verify")} />
             <QuickLink to="/app/notifications" label={t("dashboard.notifications")} />
+            <QuickLink to="/app/watchlist" label={t("dashboard.watchlist")} icon={Bookmark} />
+            {organizationId && roles.some((role) => ["auction_officer", "org_admin", "compliance_officer", "super_admin"].includes(role)) ? (
+              <QuickLink to="/app/auctions" label={t("dashboard.workspaceAuctions")} icon={Gavel} />
+            ) : null}
           </CardContent>
         </Card>
       </div>
@@ -138,14 +156,14 @@ export default function DashboardPage() {
   );
 }
 
-function QuickLink({ to, label }: { to: string; label: string }) {
+function QuickLink({ to, label, icon: Icon = ArrowRight }: { to: string; label: string; icon?: typeof ArrowRight }) {
   return (
     <Link
       to={to}
       className="flex min-h-11 items-center justify-between rounded-md px-3 text-sm font-medium transition-colors hover:bg-muted"
     >
       <span>{label}</span>
-      <ArrowRight className="size-4 text-muted-foreground" aria-hidden="true" />
+      <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
     </Link>
   );
 }

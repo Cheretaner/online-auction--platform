@@ -13,13 +13,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "prompt",
-      includeAssets: [
-        "favicon.svg",
-        "favicon-192.png",
-        "favicon-512.png",
-        "icons.svg",
-        "cheretanet.png",
-      ],
+      includeAssets: ["cheretanet.png", "apple-touch-icon.png"],
       manifest: {
         name: "Cheretanet Auctions",
         short_name: "Cheretanet",
@@ -32,25 +26,19 @@ export default defineConfig({
         lang: "en",
         icons: [
           {
-            src: "/favicon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
-            purpose: "any",
-          },
-          {
-            src: "/favicon-192.png",
+            src: "/pwa-icon-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any",
           },
           {
-            src: "/favicon-512.png",
+            src: "/pwa-icon-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any maskable",
           },
           {
-            src: "/cheretanet.png",
+            src: "/apple-touch-icon.png",
             sizes: "180x180",
             type: "image/png",
           },

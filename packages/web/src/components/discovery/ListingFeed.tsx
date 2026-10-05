@@ -89,9 +89,9 @@ function PriceSummary({ auction }: { auction: Auction }) {
     amount = formatMoney(auction.startPrice)
   }
   return (
-    <div className="rounded-md bg-muted/70 p-4 md:text-right">
+    <div className="flex flex-col justify-center rounded-lg border bg-primary/[0.04] p-4 md:items-end md:text-right">
       <p className="eyebrow text-muted-foreground">{caption}</p>
-      <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">{amount}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{amount}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         {auction.bidCount === 1 ? tc('bidCountOne') : tc('bidCountOther', { count: auction.bidCount })}
         {auction.auctionType === 'open_ascending'
@@ -116,14 +116,20 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
 
   return (
     <Card
-      className={cn('flex flex-col gap-4 p-5', featured && 'border-primary/50 ring-1 ring-primary/30', finished && 'bg-card/70')}
+      interactive
+      className={cn(
+        'group relative flex flex-col gap-4 overflow-hidden p-4 sm:p-5',
+        featured && 'border-primary/45 shadow-sm',
+        finished && 'bg-card/80',
+      )}
     >
-      <div className="flex flex-col gap-3 border-b pb-4">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-          <span className="rounded-sm bg-secondary px-2 py-0.5 font-mono text-xs text-secondary-foreground">
+      {featured ? <span className="absolute inset-y-0 left-0 w-1 bg-primary" aria-hidden /> : null}
+      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <span className="rounded-md bg-secondary px-2.5 py-1 font-mono text-xs font-medium text-secondary-foreground">
             {reference(auction)}
           </span>
-          <span className="inline-flex min-w-0 items-center gap-1 font-medium">
+          <span className="inline-flex min-w-0 items-center gap-1.5 font-medium">
             <span className="truncate">{issuer}</span>
             <BadgeCheck className="size-4 shrink-0 text-primary" aria-label={t('discovery.verifiedIssuer')} />
           </span>
@@ -137,22 +143,22 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
         <StatusChips auction={auction} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[1fr_minmax(0,15rem)]">
-        <div className="min-w-0 space-y-2">
-          <h2 className="text-xl leading-snug font-semibold">
-            <Link to={`/auctions/${auction.id}`} className="rounded-sm hover:text-primary">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] lg:items-stretch">
+        <div className="min-w-0 space-y-2.5">
+          <h2 className="text-xl leading-snug font-semibold sm:text-2xl">
+            <Link to={`/auctions/${auction.id}`} className="rounded-sm transition-colors hover:text-primary focus-visible:text-primary">
               {auction.title}
             </Link>
           </h2>
           {auction.description ? (
-            <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">{auction.description}</p>
+            <p className="line-clamp-3 max-w-3xl text-sm leading-6 text-muted-foreground">{auction.description}</p>
           ) : null}
-          <dl className="flex flex-wrap gap-x-5 gap-y-1 pt-1 text-xs">
-            <div className="flex gap-1.5">
+          <dl className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-xs">
+            <div className="flex flex-wrap gap-x-1.5">
               <dt className="text-muted-foreground">{t('listing.format')}</dt>
               <dd className="font-medium">{enumLabel(auction.auctionType)}</dd>
             </div>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-x-1.5">
               <dt className="text-muted-foreground">{t('listing.closes')}</dt>
               <dd className="font-medium">{formatDateTime(auction.closesAt)}</dd>
             </div>
@@ -163,7 +169,7 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
 
       <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-          <ShieldCheck className="size-4 shrink-0" aria-hidden />
+          <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
           {Number(auction.depositAmount) > 0 ? (
             <span>
               {t('listing.bidSecurity')}{' '}
@@ -230,14 +236,22 @@ export function ListingFeed({
       />
     )
   } else {
-    body = auctions.map((auction, index) => (
-      <AuctionListing
-        key={auction.id}
-        auction={auction}
-        issuer={issuerName(auction.orgId)}
-        featured={index === 0 && auction.status === 'live'}
-      />
-    ))
+    body = (
+      <div className="grid gap-4">
+        {auctions.map((auction, index) => {
+          const featured = index === 0 && auction.status === 'live'
+          return (
+            <div key={auction.id} >
+              <AuctionListing
+                auction={auction}
+                issuer={issuerName(auction.orgId)}
+                featured={featured}
+              />
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   return (

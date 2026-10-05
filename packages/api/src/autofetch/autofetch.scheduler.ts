@@ -61,7 +61,7 @@ function registerRefetchJob(service: AutoFetchService, repo: AutoFetchRepository
   scheduleJobFn({
     name: jobName,
     intervalMs,
-    runOnStart: false, // Don't fetch on startup, wait for first interval
+    runOnStart: true,
     run: async () => {
       try {
         logger.debug({ event: 'autofetch:refetch_job_started' });
@@ -170,7 +170,7 @@ export async function triggerRefetch(
   pool: Pool,
   sourceId: string,
   organizationId: string
-): Promise<{ queued: number; conflicts: number; errors: number }> {
+): Promise<{ fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }> {
   const service = new AutoFetchService(pool);
   return service.fetchAndQueue(sourceId, organizationId);
 }

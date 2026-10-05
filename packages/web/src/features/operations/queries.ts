@@ -23,12 +23,14 @@ import {
   documentsApi,
   notificationsApi,
   reportsApi,
+  watchlistsApi,
   settlementsApi,
   verificationApi,
   autofetchApi,
 } from "@/lib/api/resources";
 import { organizationsApi } from "@/lib/api/organizations";
 import { queryKeys } from "@/lib/query/keys";
+import type { AutofetchItemCorrections } from "@/lib/api/types";
 
 export function useOrganizations() {
   return useQuery({
@@ -102,6 +104,14 @@ export function useCreateCategory() {
       catalogApi.createCategory(body),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
+  });
+}
+
+export function useUpdateCategory(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Partial<CreateCategoryRequest>) => catalogApi.updateCategory(id, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
   });
 }
 
@@ -366,10 +376,10 @@ export function usePublishReport() {
   });
 }
 
-export function useAuditEvents(enabled = true) {
+export function useAuditEvents(page = 1, limit = 50, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.audit.events,
-    queryFn: () => auditApi.events(),
+    queryKey: queryKeys.audit.events(page, limit),
+    queryFn: () => auditApi.events(page, limit),
     enabled,
   });
 }
@@ -417,7 +427,26 @@ export function useCreateAutofetchSource() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { name: string; adapterType: string; sourceUrl?: string; adapterConfig?: Record<string, unknown> }) => autofetchApi.createSource(body),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
+  });
+}
+
+export function useUpdateAutofetchSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourceId, body }: {
+      sourceId: string;
+      body: { name: string; adapterType: string; sourceUrl?: string; adapterConfig: Record<string, unknown>; isActive: boolean };
+    }) => autofetchApi.updateSource(sourceId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
+  });
+}
+
+export function useRemoveAutofetchSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sourceId: string) => autofetchApi.removeSource(sourceId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.sources }),
   });
 }
 
@@ -436,16 +465,97 @@ export function useFetchAutofetchSource() {
 export function useAutofetchPending(offset = 0, enabled = true) {
   return useQuery({
     queryKey: queryKeys.autofetch.pending({ status: "pending", offset }),
-    queryFn: () => autofetchApi.pending({ status: "pending", limit: 50, offset }),
+    queryFn: () => autofetchApi.pending({ status: "pending", limit: 5, offset }),
     enabled,
+  });
+}
+
+export function useDownloadDisputeEvidenceBundle() {
+  return useMutation({ mutationFn: (id: string) => disputesApi.downloadEvidenceBundle(id) });
+}
+
+export function useHistoricalAuctionInsights(auctionId: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.reports.historicalInsights(auctionId),
+    queryFn: () => reportsApi.historicalInsights(auctionId),
+    enabled: Boolean(auctionId) && enabled,
+    staleTime: QUERY_STALE_TIMES.long,
   });
 }
 
 export function useAutofetchPendingDetail(id: string, enabled = true) {
   return useQuery({
-    queryKey: [...queryKeys.autofetch.pending({ status: "pending" }), id, "detail"],
+    queryKey: queryKeys.autofetch.pendingDetail(id),
     queryFn: () => autofetchApi.getPending(id),
-    enabled: enabled && Boolean(id),
+    enabled: Boolean(id) && enabled,
+  });
+}
+
+export function useWatchlists(enabled = true) {
+  return useQuery({ queryKey: queryKeys.watchlists.mine, queryFn: () => watchlistsApi.list(), enabled });
+}
+
+export function useSaveWatchlist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ auctionId, body }: {
+      auctionId: string;
+      body: { channels: Array<"in_app" | "email" | "telegram">; alertOnBids: boolean; alertOnStatus: boolean };
+    }) => watchlistsApi.save(auctionId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.watchlists.mine }),
+  });
+}
+
+export function useRemoveWatchlist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (auctionId: string) => watchlistsApi.remove(auctionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.watchlists.mine }),
+  });
+}
+
+export function useDocumentOcr(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.documents.ocr(id),
+    queryFn: () => documentsApi.getOcr(id).then((result) => result.item),
+    enabled,
+    refetchInterval: (query) => query.state.data?.status === "processing" ? 2_000 : false,
+  });
+}
+
+export function useSearchReviewedOcr(auctionId: string, q: string) {
+  return useQuery({
+    queryKey: queryKeys.documents.ocrSearch(auctionId, q),
+    queryFn: () => documentsApi.searchOcr(auctionId, q),
+    enabled: q.trim().length >= 2,
+  });
+}
+
+export function useStartDocumentOcr(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => documentsApi.startOcr(id),
+    onSuccess: ({ item }) => queryClient.setQueryData(queryKeys.documents.ocr(id), item),
+  });
+}
+
+export function useReviewDocumentOcr(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reviewedText: string) => documentsApi.reviewOcr(id, reviewedText),
+    onSuccess: ({ item }) => queryClient.setQueryData(queryKeys.documents.ocr(id), item),
+  });
+}
+
+export function useReviewDepositReferenceOcr(documentId: string) {
+  return useMutation({ mutationFn: (candidate: string) => documentsApi.reviewOcrReference(documentId, candidate) });
+}
+
+export function useAutofetchConflicts(id: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.autofetch.conflicts(id),
+    queryFn: () => autofetchApi.conflicts(id),
+    enabled: Boolean(id) && enabled,
   });
 }
 
@@ -460,7 +570,7 @@ export function useAutofetchStats(enabled = true) {
 export function useApproveAutofetchItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, auctionId }: { id: string; auctionId: string }) => autofetchApi.approve(id, auctionId),
+    mutationFn: ({ id, auctionId, corrections }: { id: string; auctionId: string; corrections?: AutofetchItemCorrections }) => autofetchApi.approve(id, auctionId, corrections),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["autofetch", "pending"] });
       void queryClient.invalidateQueries({ queryKey: queryKeys.autofetch.stats });
@@ -479,4 +589,3 @@ export function useRejectAutofetchItem() {
     },
   });
 }
-

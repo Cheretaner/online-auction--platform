@@ -90,7 +90,7 @@ export function TenderSidebar({ auction, issuer }: { auction: Auction | undefine
   const t = useT('auctions')
   const tc = useT('common')
   return (
-    <aside className="flex flex-col gap-4 lg:sticky lg:top-32" aria-label={t('sidebar.label')}>
+    <aside className="flex flex-col gap-4 xl:sticky xl:top-32" aria-label={t('sidebar.label')}>
       {auction ? (
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between border-b bg-muted/60 px-5 py-3">

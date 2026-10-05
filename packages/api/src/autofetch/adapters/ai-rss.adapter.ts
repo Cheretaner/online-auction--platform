@@ -4,15 +4,8 @@
  */
 
 import type { ISourceAdapter } from './adapter.interface.js';
-import {
-  SourceFetch,
-  NormalizedItem,
-  ConfidenceScore,
-  SourceMetadata,
-  FetchOptions,
-  AdapterError,
-  NormalizationError,
-} from '../types/index.js';
+import { AdapterError, NormalizationError } from '../types/index.js';
+import type { ConfidenceScore, FetchOptions, NormalizedItem, SourceFetch, SourceMetadata } from '../types/index.js';
 import { aiProviderAdapter, parseJsonLoose } from '../../infrastructure/ai/provider.adapter.js';
 import { RssFeedAdapter } from './rss-feed.adapter.js';
 
@@ -58,11 +51,14 @@ export class AiRssAdapter implements ISourceAdapter {
     query: string,
     options: FetchOptions
   ): Promise<SourceFetch[]> {
-    const rawItems = await this.rssAdapter.fetchItems(query, options);
+    const rawItems = await this.rssAdapter.fetchItems(query, {
+      ...options,
+      limit: Math.min(options.limit ?? 10, 10),
+    });
     const processedItems: SourceFetch[] = [];
     
     for (const item of rawItems) {
-      const textToAnalyze = item.description || item.title || '';
+      const textToAnalyze = (item.description || item.title || '').slice(0, 12_000);
       if (!textToAnalyze.trim()) {
         continue;
       }
@@ -78,6 +74,7 @@ Return a JSON object with these fields:
 - deadline: string or null (auction date or deadline, ISO format if possible)
 - organizerName: string or null (who posted the auction)
 - organizerContact: string or null (phone, email, or website)
+- evidence: object mapping each suggested field to an exact, short quote from the post
 
 If this post is NOT about an auction, return null.
 Only return valid JSON, no markdown, no explanations.
@@ -87,32 +84,40 @@ Telegram post:
 ${textToAnalyze}
 ---`;
 
-      try {
-        const aiResponse = await aiProviderAdapter.assist(prompt);
-        
-        if (aiResponse.fallback) {
-          throw new AdapterError('AI provider is temporarily unavailable (high demand), cannot extract auction items.', 'AI_UNAVAILABLE');
-        }
-
-        const extractedData = parseJsonLoose<any>(aiResponse.answer);
-        
-        if (extractedData && typeof extractedData === 'object') {
-          processedItems.push({
-            id: `ai-rss:${item.id}`,
-            externalId: item.externalId,
-            title: typeof extractedData.title === 'string' ? extractedData.title : item.title,
-            description: typeof extractedData.description === 'string' ? extractedData.description : item.description,
-            metadata: {
-              ...item.metadata,
-              aiExtracted: extractedData,
-            },
-            source: 'telegram-rss',
-            fetchedAt: item.fetchedAt,
-          });
-        }
-      } catch (error) {
-        // Skip items that AI fails to parse or identify as auctions
+      const aiResponse = await aiProviderAdapter.assist(prompt);
+      if (aiResponse.fallback) {
+        throw new AdapterError('AI provider is unavailable for Telegram post extraction', 'AI_UNAVAILABLE');
       }
+
+      const result = parseJsonLoose<unknown>(aiResponse.answer);
+      if (result === null) continue;
+      if (!result || typeof result !== 'object' || Array.isArray(result)) {
+        throw new AdapterError('AI returned an invalid Telegram extraction response', 'AI_INVALID_RESPONSE');
+      }
+
+      const extractedData = result as Record<string, unknown>;
+      if (typeof extractedData.title !== 'string' || !extractedData.title.trim()) continue;
+      const evidence = extractedData.evidence && typeof extractedData.evidence === 'object' && !Array.isArray(extractedData.evidence)
+        ? Object.fromEntries(Object.entries(extractedData.evidence).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+        : {};
+
+      processedItems.push({
+        id: `telegram-rss:${item.id}`,
+        externalId: item.externalId,
+        title: extractedData.title.trim(),
+        description: typeof extractedData.description === 'string' ? extractedData.description : item.description,
+        metadata: {
+          ...item.metadata,
+          aiExtracted: extractedData,
+          aiExtraction: {
+            provider: aiResponse.provider,
+            evidence,
+            requiresHumanReview: true,
+          },
+        },
+        source: 'telegram-rss',
+        fetchedAt: item.fetchedAt,
+      });
     }
     
     return processedItems;
@@ -125,7 +130,7 @@ ${textToAnalyze}
       const aiData = (metadata.aiExtracted as Record<string, unknown>) || {};
       
       let estimatedValue: number | undefined;
-      if (typeof aiData.estimatedValue === 'number') {
+      if (typeof aiData.estimatedValue === 'number' && Number.isFinite(aiData.estimatedValue) && aiData.estimatedValue > 0) {
         estimatedValue = aiData.estimatedValue;
       } else if (typeof aiData.estimatedValue === 'string') {
         const parsed = parseFloat(aiData.estimatedValue);
@@ -181,7 +186,10 @@ ${textToAnalyze}
     fieldCount++;
     if (!item.region) rationale.push('Location missing from post');
 
-    const overall = Math.round(totalScore / fieldCount);
+    const calculated = Math.round(totalScore / fieldCount);
+    const aiSuggested = Boolean(item.rawMetadata.aiExtraction);
+    if (aiSuggested) rationale.push('AI suggestions are unverified; compare each value against the source');
+    const overall = aiSuggested ? Math.min(calculated, 45) : calculated;
 
     return {
       overall,

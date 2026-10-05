@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatAuctionChannelMessage } from "../src/telegram/telegram-channel.service.js";
-import { processVoiceNote } from "../src/telegram/telegram-voice.service.js";
+import { parseVoiceResponse, processVoiceNote } from "../src/telegram/telegram-voice.service.js";
 import { telegramService } from "../src/telegram/telegram.service.js";
 import type { Auction } from "../src/auction/auction.types.js";
 
@@ -102,6 +102,27 @@ describe("Telegram Voice Processing", () => {
     expect(result).toHaveProperty("intent");
     expect(typeof result.transcription).toBe("string");
   }, 15000);
+
+  it("falls back safely when a provider returns malformed JSON for a voice note", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: "not valid json" }] } }],
+      }),
+    }));
+
+    const result = await processVoiceNote(Buffer.from("fake ogg opus audio data"));
+
+    expect(result.available).toBe(false);
+    expect(result.intent).toBe("help");
+  }, 15000);
+
+  it("parses malformed voice JSON into a safe help response instead of throwing", () => {
+    const result = parseVoiceResponse("not valid json");
+
+    expect(result.available).toBe(false);
+    expect(result.intent).toBe("help");
+  });
 });
 
 describe("Telegram Webhook Security", () => {

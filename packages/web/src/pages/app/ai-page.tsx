@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ScanSearch, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import { AnomalyList } from "@/features/anomalies/anomaly-list";
-import { useAiAnomalies, useAiScan, useAiScanResult } from "@/features/ai/queries";
+import { useAiAnomalies, useAiAnomaly, useAiScan, useAiScanResult } from "@/features/ai/queries";
 import { useOrgAuctions } from "@/features/auctions/queries";
 import { useAuth } from "@/features/auth/auth-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +22,8 @@ import { useT } from "@/i18n/context";
 const NO_AUCTION = "none";
 
 export default function AiPage() {
+  const [searchParams] = useSearchParams();
+  const focusedFlag = useAiAnomaly(searchParams.get("flagId") ?? undefined);
   const { session } = useAuth();
   const orgId = session?.organizationId ?? undefined;
   const auctions = useOrgAuctions(orgId);
@@ -32,7 +35,8 @@ export default function AiPage() {
 
   const scan = useAiScan();
   const cachedScan = useAiScanResult(selectedId);
-  const scanResult: AiAnomalyScanResult | undefined = scan.data ?? cachedScan.data;
+  const scanResult: AiAnomalyScanResult | undefined =
+    scan.variables === selectedId ? scan.data : cachedScan.data;
 
   const anomalies = useAiAnomalies();
   const items = anomalies.data?.items ?? [];
@@ -68,10 +72,11 @@ export default function AiPage() {
                 ))}
               </SelectContent>
             </Select>
+            {auctions.isLoading ? <p role="status" className="text-xs text-muted-foreground">{t("anomaly.loadingAuctions")}</p> : null}
           </div>
           <Button
             type="button"
-            disabled={!selectedId}
+            disabled={!selectedId || scan.isPending || auctions.isLoading || auctions.isError}
             loading={scan.isPending}
             onClick={() =>
               selectedId &&
@@ -85,13 +90,27 @@ export default function AiPage() {
             {scan.isPending ? null : <ShieldCheck aria-hidden />}
             {scan.isPending ? t("anomaly.scanning") : t("anomaly.scan")}
           </Button>
+          {auctions.isError ? (
+            <div className="w-full">
+              <ErrorState error={auctions.error} onRetry={() => void auctions.refetch()} />
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      {scan.isPending ? <PageSkeleton rows={2} /> : null}
-      {scan.isError ? <ErrorState error={scan.error} /> : null}
+      {scan.isPending && scan.variables === selectedId ? <PageSkeleton rows={2} /> : null}
+      {scan.isError && scan.variables === selectedId ? <ErrorState error={scan.error} /> : null}
       {scanResult && selectedId ? (
         <ScanResult result={scanResult} auctionTitle={selectedTitle ?? t("anomaly.thisAuction")} />
+      ) : null}
+
+      {searchParams.get("flagId") ? (
+        <section className="space-y-3">
+          <SectionHeader title={t("anomaly.relatedRecord")} description={t("anomaly.relatedRecordDescription")} />
+          {focusedFlag.isLoading ? <PageSkeleton rows={1} /> : null}
+          {focusedFlag.isError ? <ErrorState error={focusedFlag.error} /> : null}
+          {focusedFlag.data ? <AnomalyList items={[focusedFlag.data]} /> : null}
+        </section>
       ) : null}
 
       <section className="space-y-4">
@@ -176,4 +195,3 @@ function ScanResult({ result, auctionTitle }: { result: AiAnomalyScanResult; auc
     </Card>
   );
 }
-

@@ -19,6 +19,7 @@ interface DbProfile {
   national_id_hash: string | null;
   tin_number_hash: string | null;
   region: string | null;
+  preferred_language: "en" | "am" | null;
   verification_status: Profile["verificationStatus"];
   platform_role: string | null;
   is_active: boolean;
@@ -38,6 +39,7 @@ function mapProfile(row: DbProfile): Profile {
     nationalId: decryptSensitive(row.national_id),
     tinNumber: decryptSensitive(row.tin_number),
     region: row.region,
+    preferredLanguage: row.preferred_language,
     verificationStatus: row.verification_status,
     platformRole: row.platform_role ? mapDbRole(row.platform_role) : null,
     isActive: row.is_active,
@@ -106,7 +108,7 @@ export class IdentityRepository {
 
   async updateProfile(
     id: string,
-    data: { fullName?: string; phone?: string; region?: string },
+    data: { fullName?: string; phone?: string; region?: string; preferredLanguage?: "en" | "am" },
   ): Promise<Profile | null> {
     return withTransaction(async (client) => {
       const row = await queryOne<DbProfile>(
@@ -114,10 +116,11 @@ export class IdentityRepository {
            full_name = COALESCE($2, full_name),
            phone     = COALESCE($3, phone),
            region    = COALESCE($4, region),
+           preferred_language = COALESCE($5, preferred_language),
            updated_at = NOW()
          WHERE id = $1 AND is_active = TRUE
          RETURNING *`,
-        [id, data.fullName ?? null, data.phone ?? null, data.region ?? null],
+        [id, data.fullName ?? null, data.phone ?? null, data.region ?? null, data.preferredLanguage ?? null],
         client,
       );
       return row ? mapProfile(row) : null;

@@ -1,5 +1,4 @@
 import * as repo from "./document-search.repository.js";
-import * as documentService from "./document.service.js";
 import type { DocumentSearchResult, DocumentSearchFilters } from "./document-search.repository.js";
 import type { Role } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
@@ -36,45 +35,13 @@ export async function searchDocuments(input: SearchDocumentsInput): Promise<{
     auctionId: input.auctionId,
     documentType: input.documentType,
     language: input.language ?? 'both',
-    limit: Math.min(input.limit ?? 50, 100), // Max 100 results per page
-    offset: input.offset ?? 0,
+    limit: Math.max(1, Math.min(input.limit ?? 50, 100)),
+    offset: Math.max(0, input.offset ?? 0),
+    viewer: input.viewer,
   };
-
-  // If not super_admin or compliance_officer, only search own documents
-  const isAdmin = input.viewer.roles.includes("super_admin");
-  const isCompliance = input.viewer.roles.includes("compliance_officer");
-  
-  if (!isAdmin && !isCompliance) {
-    // Officers can see documents in their org's auctions
-    // Regular users can only see their own uploads or public documents
-    const isOfficer = input.viewer.roles.some((role) =>
-      ["org_admin", "auction_officer"].includes(role),
-    );
-
-    if (!isOfficer) {
-      filters.uploadedBy = input.viewer.userId;
-    }
-  }
 
   const result = await repo.searchDocuments(filters);
-
-  // Additional access control: filter out documents the viewer can't read
-  const accessibleItems: DocumentSearchResult[] = [];
-  for (const doc of result.items) {
-    const fullDoc = await documentService.getDocument(doc.id);
-    if (fullDoc) {
-      const canRead = await documentService.canReadDocument(fullDoc, input.viewer);
-      if (canRead) {
-        accessibleItems.push(doc);
-      }
-    }
-  }
-
-  return {
-    items: accessibleItems,
-    total: result.total,
-    query: input.query,
-  };
+  return { ...result, query: input.query };
 }
 
 /**

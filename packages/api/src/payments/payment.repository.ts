@@ -208,7 +208,14 @@ export async function createOrGetRefund(input: {
      SELECT $1, d.id, $3, $4, $5, d.bidder_id, d.auction_id, pt.tx_ref
        FROM deposits d JOIN provider_transactions pt ON pt.deposit_id = d.id
       WHERE d.id = $2 AND pt.id = $1
-     ON CONFLICT (provider_transaction_id) DO UPDATE SET provider_transaction_id = EXCLUDED.provider_transaction_id
+     ON CONFLICT (provider_transaction_id) DO UPDATE SET
+       deposit_id = EXCLUDED.deposit_id,
+       merchant_reference = EXCLUDED.merchant_reference,
+       amount = EXCLUDED.amount,
+       reason = EXCLUDED.reason,
+       bidder_id = EXCLUDED.bidder_id,
+       auction_id = EXCLUDED.auction_id,
+       tx_ref = EXCLUDED.tx_ref
      RETURNING *`,
     [input.transactionId, input.depositId, input.merchantReference, input.amount, input.reason],
   );

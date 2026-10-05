@@ -575,11 +575,15 @@ export function verifyChapaWebhookSignature(
   signature: string | undefined,
   secret = env.CHAPA_WEBHOOK_SECRET,
 ): boolean {
-  if (!signature || !secret || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+  if (!signature || !secret) return false;
+
+  const normalized = signature.trim().replace(/^sha256\s*=/i, "").trim();
+  if (!/^[a-f0-9]{64}$/i.test(normalized)) return false;
+
   const signedExpected = createHmac("sha256", secret)
     .update(JSON.stringify(payload))
     .digest("hex");
-  const left = Buffer.from(signature, "hex");
+  const left = Buffer.from(normalized, "hex");
   const right = Buffer.from(signedExpected, "hex");
   return left.length === right.length && timingSafeEqual(left, right);
 }

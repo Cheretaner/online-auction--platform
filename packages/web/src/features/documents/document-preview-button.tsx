@@ -86,7 +86,6 @@ export function DocumentPreviewButton({
         {loading ? <LoaderCircle className="size-4 animate-spin" aria-hidden /> : <Eye className="size-4" aria-hidden />}
         {size === "icon" ? <span className="sr-only">{t("preview")}</span> : t("preview")}
       </Button>
-      {error ? <span role="alert" className="sr-only">{error}</span> : null}
       <Dialog open={open} onOpenChange={closePreview}>
         <DialogContent className="w-[calc(100%-1rem)] max-w-5xl gap-3 p-3 sm:w-[calc(100%-2rem)] sm:p-5">
           <DialogHeader>

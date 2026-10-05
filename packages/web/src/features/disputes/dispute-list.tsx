@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/feedback/status-badge";
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { FieldHint, Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useAssignDispute, useResolveDispute } from "@/features/operations/queries";
+import { useAssignDispute, useDownloadDisputeEvidenceBundle, useResolveDispute } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DisputeRecord } from "@/lib/api/types";
 import { formatDateTime, hasRole } from "@/lib/format";
@@ -38,6 +39,7 @@ export function DisputeList({ items, showAuctionLink = true }: { items: DisputeR
 function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; showAuctionLink: boolean }) {
   const { session, roles } = useAuth();
   const assign = useAssignDispute();
+  const downloadBundle = useDownloadDisputeEvidenceBundle();
   const [resolving, setResolving] = useState(false);
   const me = session?.user.id;
   const reviewer = hasRole(roles, "compliance_officer", "org_admin", "auction_officer", "super_admin");
@@ -78,6 +80,25 @@ function DisputeCard({ dispute, showAuctionLink }: { dispute: DisputeRecord; sho
 
         {reviewer && !mine ? (
           <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              loading={downloadBundle.isPending}
+              onClick={() => downloadBundle.mutate(dispute.id, {
+                onSuccess: (blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement("a");
+                  anchor.href = url;
+                  anchor.download = `dispute-${dispute.id}-evidence.json`;
+                  anchor.click();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                  toast.success(t("disputes.bundleDownloaded"));
+                },
+                onError: (error) => toast.error(getErrorMessage(error)),
+              })}
+            >
+              <Download aria-hidden /> {t("disputes.downloadBundle")}
+            </Button>
             {dispute.status === "open" && me ? (
               <Button
                 size="sm"
@@ -150,14 +171,18 @@ function ResolveDialog({
               id={`${id}-decision`}
               placeholder={t("disputes.decisionPlaceholder")}
               value={decision}
+              maxLength={200}
+              aria-describedby={`${id}-decision-hint`}
               onChange={(event) => setDecision(event.target.value)}
             />
+            <FieldHint id={`${id}-decision-hint`}>{t("disputes.decisionHint", { count: decision.length })}</FieldHint>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-reason`}>{t("disputes.reasoning")}</Label>
             <Textarea
               id={`${id}-reason`}
               rows={4}
+              maxLength={4000}
               aria-describedby={`${id}-reason-hint`}
               value={reason}
               onChange={(event) => setReason(event.target.value)}

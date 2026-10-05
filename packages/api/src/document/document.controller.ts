@@ -1,4 +1,5 @@
 import type { RequestHandler } from "express";
+import { z } from "zod";
 import { DOCUMENT_TYPES } from "@auction/shared";
 import type { AuctionScopedQuery, DocumentType } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
@@ -108,4 +109,39 @@ export const listByAuction: RequestHandler = async (req, res) => {
 export const listMine: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
   res.json({ items: await service.listByUploader(auth.userId) });
+};
+
+export const getOcr: RequestHandler = async (req, res) => {
+  const result = await service.getDocumentOcr(routeParam(req.params.id), getAuth(req));
+  res.json({ item: result });
+};
+
+export const startOcr: RequestHandler = async (req, res) => {
+  const result = await service.startDocumentOcr(routeParam(req.params.id), getAuth(req));
+  res.status(202).json({ item: result });
+};
+
+export const reviewOcr: RequestHandler = async (req, res) => {
+  const body = z.object({ reviewedText: z.string().trim().min(1).max(500_000) }).parse(req.body);
+  const result = await service.reviewDocumentOcr(routeParam(req.params.id), getAuth(req), body.reviewedText);
+  res.json({ item: result });
+};
+
+export const searchReviewedOcr: RequestHandler = async (req, res) => {
+  const query = z.object({
+    auctionId: z.string().uuid(),
+    q: z.string().trim().min(2).max(120),
+  }).parse(req.query);
+  const items = await service.searchReviewedOcr(query.auctionId, query.q, getAuth(req));
+  res.json({ items });
+};
+
+export const reviewOcrReference: RequestHandler = async (req, res) => {
+  const body = z.object({ candidate: z.string().trim().min(3).max(40) }).parse(req.body);
+  const result = await service.reviewDepositReferenceSuggestion(
+    routeParam(req.params.id),
+    body.candidate,
+    getAuth(req),
+  );
+  res.json({ item: result });
 };

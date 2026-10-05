@@ -54,6 +54,7 @@ export const layout = defineMessages(
       notifications: "Notifications",
       kyc: "Identity (KYC)",
       deposits: "Deposits",
+      watchlist: "Watchlist",
       documents: "Documents",
       disputes: "Disputes",
       workspaceAuctions: "Workspace auctions",
@@ -74,6 +75,10 @@ export const layout = defineMessages(
       openNavigation: "Open navigation",
       notificationsUnread: "Notifications, {count} unread",
       chooseOrg: "Choose an organization to manage auctions",
+    },
+    pwa: {
+      installApp: "Install app",
+      installFailed: "Could not start app installation. Try your browser's install menu.",
     },
     user: {
       accountMenu: "Account menu for {name}",
@@ -160,6 +165,7 @@ export const layout = defineMessages(
       notifications: "ማሳወቂያዎች",
       kyc: "የማንነት ማረጋገጫ (KYC)",
       deposits: "የጨረታ ማስከበሪያዎች",
+      watchlist: "የጨረታ መከታተያ",
       documents: "ሰነዶች",
       disputes: "ቅሬታዎች",
       workspaceAuctions: "የተቋሙ ጨረታዎች",
@@ -180,6 +186,10 @@ export const layout = defineMessages(
       openNavigation: "ማሰሻውን ክፈት",
       notificationsUnread: "ማሳወቂያዎች፣ {count} ያልተነበቡ",
       chooseOrg: "ጨረታዎችን ለማስተዳደር ተቋም ይምረጡ",
+    },
+    pwa: {
+      installApp: "መተግበሪያውን ይጫኑ",
+      installFailed: "መተግበሪያውን መጫን አልተጀመረም። የአሳሽዎን የመጫኛ ምናሌ ይጠቀሙ።",
     },
     user: {
       accountMenu: "የ{name} መለያ ምናሌ",

@@ -2,6 +2,7 @@ import type {
   AccountType,
   AuctionStatus,
   AuctionType,
+  CreateAuctionItemRequest,
   DocumentType,
   Role,
   VerificationStatus,
@@ -15,6 +16,7 @@ export interface PublicProfile {
   accountType: AccountType;
   businessName: string | null;
   region: string | null;
+  preferredLanguage: "en" | "am" | null;
   verificationStatus: VerificationStatus;
   platformRole: Role | null;
   isActive: boolean;
@@ -291,12 +293,28 @@ export interface AuditEvent {
   id: string;
   auctionId: string | null;
   actorId: string | null;
+  actorRole: string;
   action: string;
   entityType: string;
   entityId: string;
   sequenceNo: number;
+  payload: Record<string, unknown>;
+  prevHash: string;
   hash: string;
-  createdAt: string;
+  occurredAt: string;
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[];
+  total: number;
+}
+
+export interface AuditChainVerification {
+  intact: boolean;
+  eventCount: number;
+  headHash: string | null;
+  brokenAtSequence?: number;
+  error?: string;
 }
 
 /** Mirrors telegramService.getTelegramLinkStatus (GET /telegram/status). */
@@ -337,10 +355,62 @@ export interface AutofetchSource {
   name: string;
   adapterType: string;
   sourceUrl?: string | null;
+  adapterConfig?: Record<string, unknown>;
   isActive?: boolean;
   lastFetchedAt?: string | null;
+  lastFetchAttemptAt?: string;
+  lastFetchStatus?: "running" | "success" | "failed";
+  lastFetchSummary?: { fetched?: number; queued?: number; duplicates?: number; stale?: number; conflicts?: number; errors?: number };
+  lastFetchError?: string;
   nextFetchAt?: string | null;
   createdAt?: string;
+}
+
+export interface HistoricalAuctionInsights {
+  auctionCount: number;
+  awardedCount: number;
+  medianWinningPrice: string | null;
+  medianBidCount: number | null;
+  awardRate: number | null;
+  months: number;
+  criteria: { auctionType: string; region: string | null; categories: string[] };
+}
+
+export interface DocumentOcrResult {
+  documentId: string;
+  status: "processing" | "completed" | "failed";
+  extractedText: string | null;
+  extractionMethod: "embedded_text" | "tesseract" | null;
+  confidence: number | null;
+  referenceCandidates: string[];
+  errorMessage: string | null;
+  reviewedText: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  updatedAt: string;
+}
+
+export interface DocumentOcrSearchHit {
+  documentId: string;
+  fileName: string;
+  mimeType: string;
+  excerpt: string;
+  reviewedAt: string;
+}
+
+export interface DepositReferenceOcrReview {
+  candidate: string;
+  matchesSubmittedReference: boolean;
+}
+
+export interface WatchlistRecord {
+  auctionId: string;
+  auctionTitle: string;
+  auctionStatus: string;
+  channel: "in_app" | "email" | "telegram";
+  alertOnBids: boolean;
+  alertOnStatus: boolean;
+  createdAt: string;
 }
 
 export interface AutofetchPendingItem {
@@ -349,9 +419,13 @@ export interface AutofetchPendingItem {
   source?: string;
   status: string;
   title: string;
+  description?: string;
+  externalId?: string;
+  sourceUrl?: string;
   estimatedValue?: number;
   categoryName?: string;
   confidenceScore?: number;
+  aiSuggested?: boolean;
   conflictCount?: number;
   highSeverityConflicts?: number;
   createdAt?: string;
@@ -363,9 +437,22 @@ export interface AutofetchPendingResult extends ItemList<AutofetchPendingItem> {
   offset: number;
   hasMore: boolean;
 }
-export interface AutofetchFetchResult { queued: number; conflicts: number; errors: number }
+export interface AutofetchFetchResult { fetched: number; queued: number; duplicates: number; stale: number; conflicts: number; errors: number }
 export interface AutofetchPendingDetail { item: AutofetchPendingItem & { description?: string; normalizedMetadata?: Record<string, unknown> }; conflicts: unknown[] }
-export interface AutofetchConflictSummary { conflicts: unknown[]; count: number; critical: number; high: number; medium: number; low: number }
+export interface AutofetchConflictFlag {
+  id: string;
+  conflictType: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
+  confidenceScore: number;
+  conflictingAuctionId: string | null;
+  matchDetails: Record<string, unknown>;
+  createdAt: string;
+}
+
+export type AutofetchItemCorrections = Partial<Omit<CreateAuctionItemRequest, "categorySource" | "estimatedValue">> & {
+  estimatedValue?: string | null;
+};
+export interface AutofetchConflictSummary { conflicts: AutofetchConflictFlag[]; count: number; critical: number; high: number; medium: number; low: number }
 export interface AutofetchStats {
   total: number;
   pending: number;
@@ -389,6 +476,19 @@ export interface AnomalyFlagRecord {
   reviewedAt: string | null;
   decisionNote: string | null;
   createdAt: string;
+  relatedHistory?: RelatedAnomalyRecord[];
+}
+
+export interface RelatedAnomalyRecord {
+  flagId: string;
+  auctionId: string;
+  auctionTitle: string;
+  severity: "low" | "medium" | "high";
+  status: "open" | "reviewed" | "dismissed" | "escalated";
+  createdAt: string;
+  decisionNote: string | null;
+  auctionStatus: string;
+  awardAmount?: string;
 }
 
 /** Mirrors CategorizationResult in packages/api/src/ai/ai.types.ts (POST /ai/categorize). */

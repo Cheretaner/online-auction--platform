@@ -3,7 +3,101 @@ import * as auctionRepo from "../auction/auction.repository.js";
 import * as notifications from "../notification/notification.service.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { logger } from "../shared/utils/logger.js";
-import type { Role } from "@auction/shared";
+import { withTransaction } from "../infrastructure/database/tx.js";
+import { queryOne } from "../infrastructure/database/query.js";
+import type { NotificationChannel, Role } from "@auction/shared";
+
+const WATCHLIST_CHANNELS = new Set<NotificationChannel>(["in_app", "email", "telegram"]);
+const STATUS_ALERTS = new Map<string, { title: string; message: (auction: string) => string }>([
+  ["auction.approved", { title: "Auction scheduled", message: (name) => `"${name}" is scheduled and available to follow.` }],
+  ["auction.opened", { title: "Auction is open", message: (name) => `Bidding is now open on "${name}".` }],
+  ["auction.closed", { title: "Auction bidding closed", message: (name) => `Bidding has closed on "${name}". The outcome may still be under review.` }],
+  ["auction.under_review", { title: "Auction under review", message: (name) => `The outcome for "${name}" is under review.` }],
+  ["auction.awarded", { title: "Auction awarded", message: (name) => `The outcome for "${name}" has been awarded.` }],
+  ["auction.cancelled", { title: "Auction cancelled", message: (name) => `"${name}" was cancelled.` }],
+]);
+
+export async function listWatchlists(userId: string): Promise<repo.WatchlistRecord[]> {
+  return repo.listByUser(userId);
+}
+
+export async function setWatchlist(input: {
+  userId: string;
+  auctionId: string;
+  channels: NotificationChannel[];
+  alertOnBids: boolean;
+  alertOnStatus: boolean;
+}): Promise<void> {
+  const channels = [...new Set(input.channels)];
+  if (!channels.length || channels.some((channel) => !WATCHLIST_CHANNELS.has(channel))) {
+    throw AppError.badRequest("Select at least one available notification channel");
+  }
+  if (!input.alertOnBids && !input.alertOnStatus) {
+    throw AppError.badRequest("Select at least one alert type");
+  }
+
+  await withTransaction(async () => {
+    await queryOne("SELECT pg_advisory_xact_lock(hashtext('watchlist-user:' || $1))", [input.userId]);
+    await queryOne("SELECT pg_advisory_xact_lock(hashtext('watchlist-auction:' || $1))", [input.auctionId]);
+
+    const auction = await repo.findAuction(input.auctionId);
+    if (!auction) throw AppError.notFound("Auction not found");
+    if (!["scheduled", "live"].includes(auction.status)) {
+      throw AppError.unprocessable("You can follow auctions after they are scheduled and before bidding closes");
+    }
+    if (channels.includes("telegram") && !(await repo.isTelegramLinked(input.userId))) {
+      throw AppError.unprocessable("Link Telegram in your account settings before selecting Telegram alerts");
+    }
+    const existing = (await repo.listByUser(input.userId)).some((item) => item.auctionId === input.auctionId);
+    if (!existing && await repo.countUserAuctions(input.userId) >= 100) {
+      throw AppError.unprocessable("A watchlist can contain at most 100 auctions");
+    }
+    if (!existing && await repo.countAuctionUsers(input.auctionId) >= 500) {
+      throw AppError.unprocessable("This auction has reached its watchlist capacity");
+    }
+
+    await repo.replaceForAuction(input.userId, input.auctionId, channels, input.alertOnBids, input.alertOnStatus);
+  }, { userId: input.userId });
+}
+
+export async function removeWatchlist(userId: string, auctionId: string): Promise<void> {
+  await repo.removeForAuction(userId, auctionId);
+}
+
+/** Called by the outbox after the associated bid/status transaction commits. */
+export async function notifyWatchers(eventType: string, payload: Record<string, unknown>, outboxId: string): Promise<void> {
+  const auctionId = typeof payload.auctionId === "string" ? payload.auctionId : undefined;
+  if (!auctionId) return;
+  const isBid = eventType === "bid.placed";
+  const statusAlert = STATUS_ALERTS.get(eventType);
+  if (!isBid && !statusAlert) return;
+
+  await withTransaction(async () => {
+    const auction = await repo.findAuction(auctionId);
+    if (!auction) return;
+    const watchers = isBid
+      ? await repo.claimBidWatchers(auctionId, typeof payload.bidderId === "string" ? payload.bidderId : "")
+      : await repo.listStatusWatchers(auctionId);
+    const deliveries: repo.Watcher[] = [];
+    for (const watcher of watchers) {
+      if (await repo.claimDelivery(outboxId, watcher)) deliveries.push(watcher);
+    }
+
+    const message = isBid
+      ? `New bid activity was recorded on "${auction.title}". Open the auction to review eligible activity.`
+      : statusAlert!.message(auction.title);
+    const title = isBid ? "New bid activity" : statusAlert!.title;
+    await notifications.notifyMany(deliveries.map((watcher) => ({
+      userId: watcher.userId,
+      channel: watcher.channel,
+      type: `watchlist.${eventType}`,
+      title,
+      message,
+      relatedEntityType: "auction",
+      relatedEntityId: auctionId,
+    })));
+  });
+}
 
 export interface AddToWatchlistInput {
   userId: string;
@@ -75,12 +169,14 @@ export async function getUserWatchlist(
   limit: number = 50,
   offset: number = 0,
 ): Promise<{ items: repo.WatchlistItem[]; total: number }> {
-  const items = await repo.getUserWatchlist(userId, limit, offset);
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(Math.trunc(limit), 100)) : 50;
+  const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.trunc(offset)) : 0;
+  const [items, total] = await Promise.all([
+    repo.getUserWatchlist(userId, safeLimit, safeOffset),
+    repo.countUserWatchlist(userId),
+  ]);
 
-  return {
-    items,
-    total: items.length, // TODO: Add count query if needed for pagination
-  };
+  return { items, total };
 }
 
 /**
@@ -189,19 +285,11 @@ export async function getUserPreferences(userId: string): Promise<repo.Notificat
  * Check if auction matches saved search criteria
  */
 function matchesSavedSearch(
-  auction: any,
+  auction: Awaited<ReturnType<typeof auctionRepo.listPublicAuctions>>["items"][number],
   criteria: repo.SavedSearch['searchCriteria'],
 ): boolean {
-  if (criteria.categoryId && !auction.categoryId) return false;
-  if (criteria.region && auction.region !== criteria.region) return false;
+  if (criteria.region && auction.region?.toLocaleLowerCase() !== criteria.region.toLocaleLowerCase()) return false;
   if (criteria.auctionType && auction.auctionType !== criteria.auctionType) return false;
-
-  // Value range check
-  if (criteria.minValue || criteria.maxValue) {
-    const estimatedValue = Number(auction.estimatedValue || 0);
-    if (criteria.minValue && estimatedValue < criteria.minValue) return false;
-    if (criteria.maxValue && estimatedValue > criteria.maxValue) return false;
-  }
 
   // Keyword match
   if (criteria.keywords) {
@@ -236,27 +324,39 @@ export async function processSavedSearchAlerts(): Promise<{
       // Get auctions created since last check (or last 24 hours if never checked)
       const since = search.lastCheckedAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      const filters: any = {
+      const filters: Parameters<typeof auctionRepo.listPublicAuctions>[0] = {
         limit: 100,
         offset: 0,
+        createdAfter: since,
       };
 
-      // Apply search criteria to auction query
       if (search.searchCriteria.categoryId) {
         filters.categoryId = search.searchCriteria.categoryId;
       }
       if (search.searchCriteria.region) {
         filters.region = search.searchCriteria.region;
       }
+      if (search.searchCriteria.auctionType) {
+        filters.auctionType = search.searchCriteria.auctionType as Parameters<typeof auctionRepo.listPublicAuctions>[0]["auctionType"];
+      }
+      if (search.searchCriteria.minValue !== undefined) {
+        filters.minEstimatedValue = search.searchCriteria.minValue;
+      }
+      if (search.searchCriteria.maxValue !== undefined) {
+        filters.maxEstimatedValue = search.searchCriteria.maxValue;
+      }
+      if (search.searchCriteria.keywords) filters.q = search.searchCriteria.keywords;
 
-      const { items: auctions } = await auctionRepo.listPublicAuctions(filters);
-
-      // Filter by additional criteria
-      const matches = auctions.filter((auction) => {
-        // Only new auctions
-        if (new Date(auction.createdAt) <= since) return false;
-        return matchesSavedSearch(auction, search.searchCriteria);
-      });
+      const matches: Awaited<ReturnType<typeof auctionRepo.listPublicAuctions>>["items"] = [];
+      let offset = 0;
+      let total = Number.POSITIVE_INFINITY;
+      while (offset < total) {
+        const page = await auctionRepo.listPublicAuctions({ ...filters, offset });
+        total = page.total;
+        matches.push(...page.items.filter((auction) => matchesSavedSearch(auction, search.searchCriteria)));
+        offset += page.items.length;
+        if (page.items.length === 0) break;
+      }
 
       if (matches.length > 0) {
         // Get preferred notification channels
@@ -335,8 +435,61 @@ export async function processWatchlistClosingAlerts(): Promise<{
   itemsChecked: number;
   alertsTriggered: number;
 }> {
-  // This would need a query to get all watchlist items with auctions closing in ~24h
-  // For now, return placeholder
-  logger.debug({ event: "watchlist:closing_alerts_processed" });
-  return { itemsChecked: 0, alertsTriggered: 0 };
+  const watchers = await repo.getClosingSoonWatchers();
+  const groups = new Map<string, repo.ClosingSoonWatcher[]>();
+  for (const watcher of watchers) {
+    const key = `${watcher.userId}:${watcher.auctionId}`;
+    groups.set(key, [...(groups.get(key) ?? []), watcher]);
+  }
+
+  let alertsTriggered = 0;
+  for (const group of groups.values()) {
+    const first = group[0];
+    let groupAlertsTriggered = 0;
+    try {
+      await withTransaction(async () => {
+        await queryOne(
+          "SELECT pg_advisory_xact_lock(hashtext('watchlist-closing:' || $1 || ':' || $2))",
+          [first.userId, first.auctionId],
+        );
+        if (await repo.checkDuplicateAlert(first.userId, "watchlist_closing_soon", first.auctionId, 24)) return;
+
+        const closesAt = first.closesAt instanceof Date ? first.closesAt : new Date(first.closesAt);
+        for (const watcher of group) {
+          const notification = await notifications.enqueueNotification({
+            userId: watcher.userId,
+            channel: watcher.channel,
+            type: "watchlist.auction.closing_soon",
+            title: "Auction closing soon",
+            message: `"${watcher.auctionTitle}" is scheduled to close at ${closesAt.toISOString()}.`,
+            relatedEntityType: "auction",
+            relatedEntityId: watcher.auctionId,
+          });
+          await repo.createAlertTrigger({
+            userId: watcher.userId,
+            triggerType: "watchlist_closing_soon",
+            auctionId: watcher.auctionId,
+            notificationId: notification.id,
+            triggerData: { closesAt: closesAt.toISOString() },
+          });
+          groupAlertsTriggered += 1;
+        }
+      });
+      alertsTriggered += groupAlertsTriggered;
+    } catch (error) {
+      logger.error({
+        event: "watchlist:closing_alert_error",
+        userId: first.userId,
+        auctionId: first.auctionId,
+        error,
+      });
+    }
+  }
+
+  logger.info({
+    event: "watchlist:closing_alerts_processed",
+    itemsChecked: watchers.length,
+    alertsTriggered,
+  });
+  return { itemsChecked: watchers.length, alertsTriggered };
 }

@@ -48,12 +48,28 @@ start in production** without the first three:
 - `DATABASE_URL` — the managed PostgreSQL connection string
 - `BOOTSTRAP_SUPER_ADMIN_EMAIL` — whoever will run the platform
 - `CORS_ORIGIN` — the real web origin (`*` is refused in production)
+- `FILE_SCAN_ENABLED=true` — set the literal string `true`. Production refuses
+  to start unless uploads are configured for malware scanning.
+- `CLAMAV_HOST` and `CLAMAV_PORT` — the address of a reachable ClamAV daemon
+  using the `clamd` TCP protocol (default port `3310`). The default host,
+  `127.0.0.1`, works only when ClamAV runs in the same container as the API.
+  With EthioDeploy, set `CLAMAV_HOST` to the internal hostname of a separately
+  provisioned ClamAV service. Uploads fail closed with 503 when the scanner
+  cannot be reached.
+- `STORAGE_DRIVER=filesystem` and `STORAGE_DIR` - set `STORAGE_DIR` to the
+  absolute path of a persistent volume mounted into the API container. The
+  default relative directory is for local development; files in a container's
+  writable layer disappear when it is replaced. Lost blobs cannot be restored
+  from document metadata, so affected files need to be uploaded again.
 - `JWT_SECRET` — a random value of 32+ characters (the default is rejected)
 - `RUN_MIGRATIONS_ON_BOOT=true` — applies pending migrations on boot. The
   runner holds a Postgres advisory lock, so a rolling deploy queues instead of
   colliding.
 - `WEB_BASE_URL` — used in password-reset links
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — production requires a working SMTP host and verifies connectivity at startup. Authentication fields must be set together. Use port 587 with STARTTLS (`SMTP_SECURE=false`) or port 465 with TLS (`SMTP_SECURE=true`). Local development can omit SMTP and receive reset links in the API console.
+- Telegram voice notes use Gemini audio understanding or OpenRouter speech-to-text (`OPENROUTER_TRANSCRIPTION_MODEL`, default `openai/whisper-1`). Configure and acceptance-check the model/languages; OpenRouter transcription may incur separate usage charges. Voice bid intents always require a button confirmation and pass the regular bidding rules. See [Telegram voice processing](../../docs/telegram-voice.md).
+- Auction document OCR runs locally with PDF.js and Tesseract (`eng+amh`). Its first run downloads language data into the writable `STORAGE_DIR/.ocr-cache`; see [document OCR setup and review flow](../../docs/document-ocr.md).
+- Auction watchlist events fan out through the transactional outbox with in-app, email, and linked Telegram channels; see [watchlist alert behavior](../../docs/watchlist-alerts.md).
 
 The web app is a separate static build; publish `packages/web/dist` as static
 assets / point the platform's CDN at it rather than serving it from the API.
@@ -83,8 +99,11 @@ Then edit `/etc/auction/api.env` and set at minimum:
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — production requires a working SMTP host and verifies connectivity at startup. Authentication fields must be set together. Use port 587 with STARTTLS (`SMTP_SECURE=false`) or port 465 with TLS (`SMTP_SECURE=true`). Local development can omit SMTP and receive reset links in the API console.
 
 It also installs a nightly backup (`deploy/backup.sh`: `pg_dump` plus the
-uploaded-documents directory, 14 days kept under `/var/backups/auction`).
-Copy those backups off the machine, and test a restore once before launch.
+uploaded-documents directory, 14 days kept under `/var/backups/auction`). The
+script validates both archives and writes restrictive, checksummed files.
+Copy them to encrypted off-host storage and test a restore once before launch.
+Follow the [production operator runbook](../../docs/production-runbook.md) for
+the controlled-pilot acceptance, restore, monitoring, and incident steps.
 
 Back that file up. Rotating `JWT_SECRET` signs out every existing session.
 
@@ -146,6 +165,11 @@ application bugs.
 is still deterministic, but never rename a migration that has been applied
 anywhere, because `schema_migrations` keys on the filename. The runner holds
 a Postgres advisory lock, so concurrent boots cannot apply one twice.
+
+Migrations `017_autofetch_source_fetch_state` and
+`018_telegram_user_rate_limits` add persisted source fetch summaries/failures
+and per-Telegram-account bid/voice throttles. EthioDeploy must apply them before
+the updated AutoFetch and Telegram flows run.
 
 **`tsc` does not emit `.sql`.** `pnpm build` copies the migration files into
 `dist` (`scripts/copy-migrations.mjs`).
@@ -289,9 +313,9 @@ Set `ADMIN_EMAIL` to the API's `BOOTSTRAP_SUPER_ADMIN_EMAIL`.
 hash chain for a closed or awarded auction. It returns chain integrity, event
 count, head hash, and check time without exposing the underlying audit events.
 
-`GET /api/v1/open-data/auctions?limit=100&offset=0` provides paginated JSON
-for published auctions. It includes public auction facts and organization
-names, never bidder names, profile IDs, or account data. `GET
-/api/v1/open-data/weekly.csv` downloads the previous completed Monday-to-Monday
-UTC window of closed and awarded auctions. The CSV excludes bidder identity
-fields and protects spreadsheet users from formula injection.
+`GET /api/v1/open-data/auctions?limit=100&offset=0` provides public, paginated
+JSON for published auctions. It includes public auction facts and organization
+names, never bidder names, profile IDs, or account data. The route does not
+require authentication. It validates `limit` (1–100) and `offset` (0–1,000,000),
+applies a route-specific 60 requests/minute limit, and uses a five-minute public
+cache. See the [open-data API contract](../../docs/open-data-api.md).

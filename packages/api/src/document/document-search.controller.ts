@@ -1,8 +1,8 @@
 import type { RequestHandler } from "express";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import * as service from "./document-search.service.js";
-import { HttpStatus } from "../shared/errors/index.js";
 import { logger } from "../shared/utils/logger.js";
+import { z } from "zod";
 
 /**
  * GET /api/v1/documents/search
@@ -19,26 +19,22 @@ import { logger } from "../shared/utils/logger.js";
 export const searchDocuments: RequestHandler = async (req, res, next) => {
   try {
     const auth = getAuth(req);
-    const { q, auctionId, documentType, language, limit, offset } = req.query;
-
-    if (!q || typeof q !== "string") {
-      res.status(HttpStatus.BAD_REQUEST).json({
-        error: "BAD_REQUEST",
-        message: "Query parameter 'q' is required",
-      });
-      return;
-    }
+    const { q, auctionId, documentType, language, limit, offset } = z.object({
+      q: z.string().trim().min(2).max(120),
+      auctionId: z.string().uuid().optional(),
+      documentType: z.string().trim().min(1).max(64).optional(),
+      language: z.enum(["english", "amharic", "both"]).default("both"),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+      offset: z.coerce.number().int().min(0).default(0),
+    }).strict().parse(req.query);
 
     const result = await service.searchDocuments({
       query: q,
-      auctionId: typeof auctionId === "string" ? auctionId : undefined,
-      documentType: typeof documentType === "string" ? documentType : undefined,
-      language:
-        language === "english" || language === "amharic" || language === "both"
-          ? language
-          : "both",
-      limit: limit ? Number(limit) : 50,
-      offset: offset ? Number(offset) : 0,
+      auctionId,
+      documentType,
+      language,
+      limit,
+      offset,
       viewer: {
         userId: auth.userId,
         roles: auth.roles,
@@ -68,15 +64,7 @@ export const searchAuctionDocuments: RequestHandler = async (req, res, next) => 
   try {
     const auth = getAuth(req);
     const auctionId = routeParam(req.params.auctionId);
-    const { q } = req.query;
-
-    if (!q || typeof q !== "string") {
-      res.status(HttpStatus.BAD_REQUEST).json({
-        error: "BAD_REQUEST",
-        message: "Query parameter 'q' is required",
-      });
-      return;
-    }
+    const { q } = z.object({ q: z.string().trim().min(2).max(120) }).strict().parse(req.query);
 
     const results = await service.searchAuctionDocuments(auctionId, q, {
       userId: auth.userId,

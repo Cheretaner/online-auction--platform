@@ -193,6 +193,10 @@ export interface PublicAuctionFilters {
   categoryId?: string;
   orgId?: string;
   region?: string;
+  auctionType?: CreateAuctionRequest["auctionType"];
+  minEstimatedValue?: number;
+  maxEstimatedValue?: number;
+  createdAfter?: Date;
   limit: number;
   offset: number;
   /** Also search OCR-extracted document text when q is present */
@@ -215,6 +219,14 @@ export async function listPublicAuctions(
   if (filters.status) where.push(`a.status = ${param(filters.status)}`);
   if (filters.orgId) where.push(`a.org_id = ${param(filters.orgId)}`);
   if (filters.region) where.push(`a.region ILIKE ${param(filters.region)}`);
+  if (filters.auctionType) where.push(`a.auction_type = ${param(filters.auctionType)}`);
+  if (filters.createdAfter) where.push(`a.created_at > ${param(filters.createdAfter)}`);
+  if (filters.minEstimatedValue !== undefined) {
+    where.push(`COALESCE((SELECT SUM(i.estimated_value::numeric) FROM auction_items i WHERE i.auction_id = a.id), 0) >= ${param(filters.minEstimatedValue)}`);
+  }
+  if (filters.maxEstimatedValue !== undefined) {
+    where.push(`COALESCE((SELECT SUM(i.estimated_value::numeric) FROM auction_items i WHERE i.auction_id = a.id), 0) <= ${param(filters.maxEstimatedValue)}`);
+  }
   if (filters.q) {
     const q = filters.q;
     // Escape LIKE special chars for the ILIKE path

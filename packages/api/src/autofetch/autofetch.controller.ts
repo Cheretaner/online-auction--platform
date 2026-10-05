@@ -27,7 +27,7 @@ export function createAutofetchController(pool: Pool) {
 
     res.json({
       success: true,
-      data: sources,
+      data: { items: sources },
     });
   };
 
@@ -57,6 +57,20 @@ export function createAutofetchController(pool: Pool) {
       success: true,
       data: source,
     });
+  };
+
+  const updateSource: RequestHandler = async (req, res) => {
+    const organizationId = getAuth(req).organizationId!;
+    const sourceId = routeParam(req.params.sourceId);
+    const source = await service.updateSource(organizationId, sourceId, req.body);
+    res.json({ success: true, data: source });
+  };
+
+  const removeSource: RequestHandler = async (req, res) => {
+    const organizationId = getAuth(req).organizationId!;
+    const sourceId = routeParam(req.params.sourceId);
+    await service.removeSource(organizationId, sourceId);
+    res.status(204).end();
   };
 
   /**
@@ -164,7 +178,7 @@ export function createAutofetchController(pool: Pool) {
   const approvePendingItem: RequestHandler = async (req, res) => {
     const actor = getAuth(req);
     const pendingItemId = routeParam(req.params.pendingItemId);
-    const { auctionId } = req.body;
+    const { auctionId, corrections } = req.body;
 
     if (!auctionId) {
       res.status(400).json({
@@ -174,7 +188,7 @@ export function createAutofetchController(pool: Pool) {
       return;
     }
 
-    const item = await service.approveAndPublish(pendingItemId, actor, auctionId);
+    const item = await service.approveAndPublish(pendingItemId, actor, auctionId, corrections);
 
     res.json({
       success: true,
@@ -234,6 +248,8 @@ export function createAutofetchController(pool: Pool) {
   return {
     listSources,
     createSource,
+    updateSource,
+    removeSource,
     manualFetch,
     getPendingQueue,
     getPendingItem,

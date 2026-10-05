@@ -2,6 +2,7 @@ import type { RequestHandler } from "express";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import * as service from "./analytics.service.js";
 import { logger } from "../shared/utils/logger.js";
+import { z } from "zod";
 
 /**
  * GET /api/v1/analytics/auctions/:auctionId/reserve-recommendation
@@ -43,13 +44,15 @@ export const getReserveRecommendation: RequestHandler = async (req, res, next) =
 export const getHistoricalAnalytics: RequestHandler = async (req, res, next) => {
   try {
     const auth = getAuth(req);
-    const { categoryId, region, months } = req.query;
-
-    const monthsNum = months ? Math.min(Number(months), 24) : 12;
+    const { categoryId, region, months: monthsNum } = z.object({
+      categoryId: z.string().uuid().optional(),
+      region: z.string().trim().min(1).max(100).optional(),
+      months: z.coerce.number().int().min(1).max(24).default(12),
+    }).strict().parse(req.query);
 
     const analytics = await service.getHistoricalAnalytics(
-      typeof categoryId === "string" ? categoryId : undefined,
-      typeof region === "string" ? region : undefined,
+      categoryId,
+      region,
       monthsNum,
       { roles: auth.roles },
     );

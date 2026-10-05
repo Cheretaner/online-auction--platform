@@ -27,7 +27,7 @@ export class ConflictRepository {
         SELECT a.*
         FROM auctions a
         WHERE a.org_id = $1
-          AND a.status IN ('published', 'active', 'upcoming')
+          AND a.status IN ('scheduled', 'live')
           AND a.closes_at > NOW()
       `;
 

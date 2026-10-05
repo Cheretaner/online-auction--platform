@@ -30,6 +30,12 @@ disputeRouter.get(
   asyncHandler(controller.list),
 );
 
+disputeRouter.get(
+  "/:id/evidence-bundle",
+  requireAuth([...REVIEWERS]),
+  asyncHandler(controller.downloadEvidenceBundle),
+);
+
 disputeRouter.get("/:id", requireAuth(), asyncHandler(controller.getById));
 
 // These two handlers existed but were never routed, so disputes could be

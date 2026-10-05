@@ -11,23 +11,23 @@
  * destructive) are used only for state, never for decoration.
  */
 :root {
-  --background: oklch(0.975 0.008 90);
-  --foreground: oklch(0.22 0.03 155);
-  --card: oklch(0.995 0.003 90);
-  --card-foreground: oklch(0.22 0.03 155);
-  --popover: oklch(0.995 0.003 90);
-  --popover-foreground: oklch(0.22 0.03 155);
-  --primary: oklch(0.4 0.09 155);
+  --background: oklch(0.975 0.012 94);
+  --foreground: oklch(0.22 0.035 158);
+  --card: oklch(0.995 0.004 96);
+  --card-foreground: oklch(0.22 0.035 158);
+  --popover: oklch(0.995 0.004 96);
+  --popover-foreground: oklch(0.22 0.035 158);
+  --primary: oklch(0.39 0.095 158);
   --primary-foreground: oklch(0.98 0.01 90);
-  --secondary: oklch(0.935 0.018 90);
-  --secondary-foreground: oklch(0.28 0.04 155);
-  --muted: oklch(0.945 0.013 90);
-  --muted-foreground: oklch(0.47 0.03 155);
-  --accent: oklch(0.92 0.035 85);
+  --secondary: oklch(0.935 0.022 94);
+  --secondary-foreground: oklch(0.28 0.045 158);
+  --muted: oklch(0.95 0.016 94);
+  --muted-foreground: oklch(0.46 0.03 158);
+  --accent: oklch(0.92 0.04 88);
   --accent-foreground: oklch(0.3 0.05 70);
-  --border: oklch(0.885 0.018 90);
-  --input: oklch(0.8 0.02 90);
-  --ring: oklch(0.45 0.09 155);
+  --border: oklch(0.89 0.022 94);
+  --input: oklch(0.82 0.022 94);
+  --ring: oklch(0.45 0.095 158);
 
   --destructive: oklch(0.53 0.19 27);
   --destructive-foreground: oklch(0.98 0.01 90);
@@ -39,38 +39,38 @@
   --info-foreground: oklch(0.98 0.01 90);
 
   /* Dark brand band (hero, process band, footer, workspace sidebar). Dark in both themes. */
-  --inverse: oklch(0.27 0.045 160);
+  --inverse: oklch(0.27 0.05 160);
   --inverse-foreground: oklch(0.97 0.01 90);
   --highlight: oklch(0.82 0.1 88);
   --highlight-strong: oklch(0.89 0.08 92);
 
   --sidebar: var(--inverse);
   --sidebar-foreground: var(--inverse-foreground);
-  --sidebar-accent: oklch(0.34 0.05 158);
+  --sidebar-accent: oklch(0.34 0.055 160);
   --sidebar-accent-foreground: oklch(0.98 0.01 90);
-  --sidebar-border: oklch(0.35 0.03 158);
+  --sidebar-border: oklch(0.35 0.035 160);
 
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 }
 
 .dark {
-  --background: oklch(0.27 0.03 246.6);
-  --foreground: oklch(0.95 0.01 90);
-  --card: oklch(0.21 0.00 0.0);
-  --card-foreground: oklch(0.95 0.01 90);
-  --popover: oklch(0.24 0.02 158);
-  --popover-foreground: oklch(0.95 0.01 90);
-  --primary: oklch(0.78 0.09 155);
-  --primary-foreground: oklch(0.18 0.03 155);
-  --secondary: oklch(0.29 0.02 158);
-  --secondary-foreground: oklch(0.95 0.01 90);
-  --muted: oklch(0.27 0.018 158);
-  --muted-foreground: oklch(0.74 0.02 90);
-  --accent: oklch(0.32 0.04 80);
-  --accent-foreground: oklch(0.95 0.02 90);
-  --border: oklch(0.32 0.02 158);
-  --input: oklch(0.4 0.02 158);
-  --ring: oklch(0.78 0.09 155);
+  --background: oklch(0.19 0.025 158);
+  --foreground: oklch(0.95 0.012 95);
+  --card: oklch(0.235 0.025 158);
+  --card-foreground: oklch(0.95 0.012 95);
+  --popover: oklch(0.255 0.028 158);
+  --popover-foreground: oklch(0.95 0.012 95);
+  --primary: oklch(0.78 0.105 155);
+  --primary-foreground: oklch(0.17 0.035 158);
+  --secondary: oklch(0.29 0.032 158);
+  --secondary-foreground: oklch(0.95 0.012 95);
+  --muted: oklch(0.275 0.026 158);
+  --muted-foreground: oklch(0.74 0.022 95);
+  --accent: oklch(0.34 0.052 82);
+  --accent-foreground: oklch(0.96 0.02 90);
+  --border: oklch(0.34 0.028 158);
+  --input: oklch(0.39 0.03 158);
+  --ring: oklch(0.78 0.105 155);
 
   --destructive: oklch(0.7 0.16 25);
   --destructive-foreground: oklch(0.18 0.03 25);
@@ -81,10 +81,53 @@
   --info: oklch(0.75 0.1 245);
   --info-foreground: oklch(0.18 0.03 245);
 
-  --inverse: oklch(0.23 0.03 247.3);
-  --inverse-foreground: oklch(0.95 0.01 90);
-  --sidebar-accent: oklch(0.25 0.03 158);
-  --sidebar-border: oklch(0.27 0.02 158);
+  --inverse: oklch(0.16 0.03 158);
+  --inverse-foreground: oklch(0.95 0.012 95);
+  --sidebar-accent: oklch(0.25 0.035 158);
+  --sidebar-border: oklch(0.29 0.025 158);
+}
+
+/*
+ * Product surfaces use a layered ink/navy system, with teal actions and a gold
+ * keyboard-focus color. The homepage keeps its established forest palette.
+ */
+.dark.product-theme {
+  --background: oklch(0.1831 0.0309 263.4);
+  --foreground: oklch(0.9683 0.0069 247.9);
+  --card: oklch(0.2232 0.0401 262.5);
+  --card-foreground: oklch(0.9683 0.0069 247.9);
+  --popover: oklch(0.2602 0.0454 260.5);
+  --popover-foreground: oklch(0.9683 0.0069 247.9);
+
+  --primary: oklch(0.8549 0.1251 181.1);
+  --primary-foreground: oklch(0.1831 0.0309 263.4);
+  --secondary: oklch(0.2602 0.0454 260.5);
+  --secondary-foreground: oklch(0.9683 0.0069 247.9);
+  --muted: oklch(0.245 0.037 260);
+  --muted-foreground: oklch(0.8098 0.0262 255.6);
+  --accent: oklch(0.36 0.075 78);
+  --accent-foreground: oklch(0.97 0.025 90);
+
+  --border: oklch(0.38 0.036 260);
+  --input: oklch(0.6057 0.0444 258.8);
+  --ring: oklch(0.8987 0.1857 97.9);
+
+  --success: oklch(0.75 0.14 155);
+  --success-foreground: oklch(0.1831 0.0309 263.4);
+  --warning: oklch(0.82 0.13 78);
+  --warning-foreground: oklch(0.2 0.035 75);
+  --destructive: oklch(0.79 0.16 25);
+  --destructive-foreground: oklch(0.18 0.03 25);
+  --info: oklch(0.76 0.11 235);
+  --info-foreground: oklch(0.16 0.025 245);
+
+  --inverse: oklch(0.1831 0.0309 263.4);
+  --inverse-foreground: oklch(0.9683 0.0069 247.9);
+  --sidebar: oklch(0.2232 0.0401 262.5);
+  --sidebar-foreground: oklch(0.9683 0.0069 247.9);
+  --sidebar-accent: oklch(0.2602 0.0454 260.5);
+  --sidebar-accent-foreground: oklch(0.9683 0.0069 247.9);
+  --sidebar-border: oklch(0.38 0.036 260);
 }
 
 @theme inline {
@@ -156,8 +199,8 @@
   }
 
   #root {
-    width: 100vw;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 100%;
     min-height: 100svh;
   }
 
@@ -190,7 +233,7 @@
 
 /* Page-width container shared by the public header, pages and footer, so their edges line up. */
 @utility page-container {
-  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  @apply mx-auto w-full max-w-[84rem] px-4 sm:px-6 lg:px-8;
 }
 
 /* Small uppercase label for metadata, eyebrows and table headings. */

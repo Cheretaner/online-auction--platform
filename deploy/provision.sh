@@ -130,7 +130,7 @@ cat <<NEXT
 
 Provisioning done. Next:
   1. Edit $ENV_FILE: set BOOTSTRAP_SUPER_ADMIN_EMAIL, CORS_ORIGIN, WEB_BASE_URL, SMTP_*,
-     and Gemini/OpenRouter API keys if AI assistance should be enabled.
+     a verified SMTP sender, and at least one Gemini/OpenRouter API key (required by production startup).
      Back the file up somewhere safe.
   2. sudo bash deploy/deploy.sh
   3. Configure nginx + TLS (packages/api/README.md, "TLS").

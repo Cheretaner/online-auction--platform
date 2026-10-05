@@ -12,6 +12,14 @@ export function useAiAnomalies(auctionId?: string, enabled = true) {
   });
 }
 
+export function useAiAnomaly(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.ai.anomaly(id ?? ""),
+    queryFn: () => aiApi.getAnomaly(id ?? ""),
+    enabled: Boolean(id),
+  });
+}
+
 export function useReviewAnomaly() {
   const queryClient = useQueryClient();
   return useMutation({

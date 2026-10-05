@@ -1,14 +1,26 @@
 import { Router } from "express";
+import { z } from "zod";
 import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
+import { validate } from "../shared/middleware/validate.middleware.js";
 import * as controller from "./watchlist.controller.js";
 
 export const watchlistRouter = Router();
 
-// Watchlist endpoints
+watchlistRouter.get("/", requireAuth(), asyncHandler(controller.list));
+watchlistRouter.put(
+  "/:auctionId",
+  requireAuth(),
+  validate(z.object({ auctionId: z.string().uuid() }).strict(), "params"),
+  asyncHandler(controller.replace),
+);
+watchlistRouter.delete(
+  "/:auctionId",
+  requireAuth(),
+  validate(z.object({ auctionId: z.string().uuid() }).strict(), "params"),
+  asyncHandler(controller.remove),
+);
 watchlistRouter.post("/", requireAuth(), asyncHandler(controller.addToWatchlist));
-watchlistRouter.get("/", requireAuth(), asyncHandler(controller.getWatchlist));
-watchlistRouter.delete("/:auctionId", requireAuth(), asyncHandler(controller.removeFromWatchlist));
 
 export const savedSearchRouter = Router();
 

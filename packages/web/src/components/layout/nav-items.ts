@@ -1,6 +1,7 @@
 import type { Role } from "@auction/shared";
 import {
   Bell,
+  Bookmark,
   Building2,
   FileText,
   Gavel,
@@ -29,6 +30,7 @@ export type NavLabel =
   | "notifications"
   | "kyc"
   | "deposits"
+  | "watchlist"
   | "documents"
   | "disputes"
   | "workspaceAuctions"
@@ -61,6 +63,7 @@ export function getAppNav(roles: Role[]): NavItem[] {
     { to: "/app/notifications", label: "notifications", icon: Bell, group: "Overview" },
     { to: "/app/kyc", label: "kyc", icon: Shield, group: "Participation", match: "exact" },
     { to: "/app/deposits", label: "deposits", icon: Wallet, group: "Participation" },
+    { to: "/app/watchlist", label: "watchlist", icon: Bookmark, group: "Participation" },
     { to: "/app/documents", label: "documents", icon: FolderOpen, group: "Participation" },
     { to: "/app/disputes", label: "disputes", icon: Scale, group: "Participation" },
     { to: "/app/auctions", label: "workspaceAuctions", icon: Gavel, group: "Manage", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },

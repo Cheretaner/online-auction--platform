@@ -42,7 +42,13 @@ export default function LoginPage() {
               onSubmit={form.handleSubmit(async (values) => {
                 try {
                   await login.mutateAsync(values);
-                  const to = (location.state as { from?: string } | null)?.from ?? "/app";
+                  const requested = (location.state as { from?: unknown } | null)?.from;
+                  const to = typeof requested === "string" &&
+                    requested.startsWith("/") &&
+                    !requested.startsWith("//") &&
+                    !requested.includes("\\")
+                    ? requested
+                    : "/app";
                   navigate(to, { replace: true });
                 } catch (error) {
                   if (!applyApiFieldErrors(error, form.setError)) {

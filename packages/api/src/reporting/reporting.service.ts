@@ -134,6 +134,10 @@ export async function financialReconciliation(input: {
   return { ...snapshot, generatedAt, snapshotSha256 };
 }
 
+export async function historicalInsights(auctionId: string): Promise<repo.HistoricalAuctionInsights> {
+  return repo.historicalInsights(auctionId);
+}
+
 export async function publishReport(input: {
   id: string;
   actorId: string;

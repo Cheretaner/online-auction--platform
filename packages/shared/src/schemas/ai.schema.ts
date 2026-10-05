@@ -15,6 +15,7 @@ export type CategorizeRequest = z.infer<typeof CategorizeRequest>;
 export const AssistRequest = z.object({
   prompt: z.string().min(3).max(4000),
   auctionId: z.string().uuid().optional(),
+  language: z.enum(["en", "am"]).optional(),
 });
 export type AssistRequest = z.infer<typeof AssistRequest>;
 

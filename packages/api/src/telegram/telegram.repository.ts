@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { env } from "../config/env.js";
 import { query, queryOne } from "../infrastructure/database/query.js";
 import type { Queryable } from "../infrastructure/database/query.js";
 import type { TelegramChannelPost, TelegramLinkToken, TelegramUserProfile } from "./telegram.types.js";
@@ -12,6 +13,7 @@ interface DbProfileRow {
   telegram_username: string | null;
   telegram_chat_id: string | null;
   telegram_linked_at: Date | null;
+  telegram_language: "en" | "am" | null;
 }
 
 function mapProfileRow(row: DbProfileRow): TelegramUserProfile {
@@ -24,6 +26,7 @@ function mapProfileRow(row: DbProfileRow): TelegramUserProfile {
     telegramUsername: row.telegram_username,
     telegramChatId: row.telegram_chat_id ? String(row.telegram_chat_id) : null,
     telegramLinkedAt: row.telegram_linked_at ? row.telegram_linked_at.toISOString() : null,
+    telegramLanguage: row.telegram_language === "am" ? "am" : "en",
   };
 }
 
@@ -104,7 +107,7 @@ export async function findProfileByTelegramId(
   client?: Queryable,
 ): Promise<TelegramUserProfile | null> {
   const row = await queryOne<DbProfileRow>(
-    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at
+    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at, telegram_language
        FROM profiles
       WHERE telegram_id = $1 AND is_active = TRUE`,
     [telegramId],
@@ -118,7 +121,7 @@ export async function findProfileByUserId(
   client?: Queryable,
 ): Promise<TelegramUserProfile | null> {
   const row = await queryOne<DbProfileRow>(
-    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at
+    `SELECT id, email, full_name, verification_status, telegram_id, telegram_username, telegram_chat_id, telegram_linked_at, telegram_language
        FROM profiles
       WHERE id = $1 AND is_active = TRUE`,
     [userId],
@@ -150,6 +153,42 @@ export async function findChannelPost(auctionId: string, client?: Queryable): Pr
     postedAt: new Date(row.posted_at),
     updatedAt: new Date(row.updated_at),
   };
+}
+
+export async function setTelegramLanguage(userId: string, language: "en" | "am"): Promise<void> {
+  await query(
+    `UPDATE profiles
+        SET telegram_language = $2, preferred_language = $2, updated_at = NOW()
+      WHERE id = $1 AND is_active = TRUE`,
+    [userId, language],
+  );
+}
+
+/** Atomically applies a per-Telegram-account fixed-window action limit. */
+export async function consumeActionRateLimit(
+  telegramId: number | string,
+  action: "bid" | "voice",
+  windowMs: number,
+  maxHits: number,
+): Promise<boolean> {
+  const accountHash = crypto.createHmac("sha256", env.IP_HASH_PEPPER ?? env.JWT_SECRET).update(String(telegramId)).digest("hex");
+  const row = await queryOne<{ allowed: boolean }>(
+    `INSERT INTO telegram_user_rate_limits (telegram_account_hash, action, window_started_at, hit_count)
+     VALUES ($1, $2, NOW(), 1)
+     ON CONFLICT (telegram_account_hash, action) DO UPDATE SET
+       window_started_at = CASE
+         WHEN telegram_user_rate_limits.window_started_at <= NOW() - ($3 * INTERVAL '1 millisecond') THEN NOW()
+         ELSE telegram_user_rate_limits.window_started_at
+       END,
+       hit_count = CASE
+         WHEN telegram_user_rate_limits.window_started_at <= NOW() - ($3 * INTERVAL '1 millisecond') THEN 1
+         ELSE telegram_user_rate_limits.hit_count + 1
+       END,
+       updated_at = NOW()
+     RETURNING hit_count <= $4 AS allowed`,
+    [accountHash, action, windowMs, maxHits],
+  );
+  return row?.allowed ?? false;
 }
 
 export async function getChannelAuctionDetails(auctionId: string): Promise<{
