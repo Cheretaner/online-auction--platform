@@ -53,7 +53,7 @@ function WatchlistEditor({ auction }: { auction: Auction }) {
         {watchlists.isLoading ? <p role="status" className="text-sm text-muted-foreground">{t("detail.watchlist.loading")}</p> : null}
         {watchlists.isError ? null : (
           <>
-            <fieldset disabled={watchlists.isLoading || save.isPending || remove.isPending} className="space-y-2 disabled:opacity-60">
+            <fieldset disabled={watchlists.isLoading || save.isPending || remove.isPending} className="disabled:opacity-60 flex items-center gap-3">
               <legend className="mb-2 text-sm font-medium">{t("detail.watchlist.channels")}</legend>
               {CHANNELS.map(({ value, key }) => (
                 <div key={value} className="flex min-h-8 items-center gap-2">
@@ -69,7 +69,7 @@ function WatchlistEditor({ auction }: { auction: Auction }) {
                 </div>
               ))}
             </fieldset>
-            <fieldset disabled={watchlists.isLoading || save.isPending || remove.isPending} className="space-y-2 disabled:opacity-60">
+            <fieldset disabled={watchlists.isLoading || save.isPending || remove.isPending} className="flex items-center gap-3 disabled:opacity-60">
               <legend className="mb-2 text-sm font-medium">{t("detail.watchlist.alertTypes")}</legend>
               <div className="flex min-h-8 items-center gap-2">
                 <Checkbox id={`watchlist-bids-${auction.id}`} checked={alertOnBids} onCheckedChange={(checked) => setBidAlertSelection(checked === true)} />

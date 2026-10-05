@@ -76,6 +76,10 @@ export const layout = defineMessages(
       notificationsUnread: "Notifications, {count} unread",
       chooseOrg: "Choose an organization to manage auctions",
     },
+    pwa: {
+      installApp: "Install app",
+      installFailed: "Could not start app installation. Try your browser's install menu.",
+    },
     user: {
       accountMenu: "Account menu for {name}",
       workspace: "Workspace",
@@ -182,6 +186,10 @@ export const layout = defineMessages(
       openNavigation: "ማሰሻውን ክፈት",
       notificationsUnread: "ማሳወቂያዎች፣ {count} ያልተነበቡ",
       chooseOrg: "ጨረታዎችን ለማስተዳደር ተቋም ይምረጡ",
+    },
+    pwa: {
+      installApp: "መተግበሪያውን ይጫኑ",
+      installFailed: "መተግበሪያውን መጫን አልተጀመረም። የአሳሽዎን የመጫኛ ምናሌ ይጠቀሙ።",
     },
     user: {
       accountMenu: "የ{name} መለያ ምናሌ",

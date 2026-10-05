@@ -35,7 +35,8 @@ export default function AiPage() {
 
   const scan = useAiScan();
   const cachedScan = useAiScanResult(selectedId);
-  const scanResult: AiAnomalyScanResult | undefined = scan.data ?? cachedScan.data;
+  const scanResult: AiAnomalyScanResult | undefined =
+    scan.variables === selectedId ? scan.data : cachedScan.data;
 
   const anomalies = useAiAnomalies();
   const items = anomalies.data?.items ?? [];
@@ -71,10 +72,11 @@ export default function AiPage() {
                 ))}
               </SelectContent>
             </Select>
+            {auctions.isLoading ? <p role="status" className="text-xs text-muted-foreground">{t("anomaly.loadingAuctions")}</p> : null}
           </div>
           <Button
             type="button"
-            disabled={!selectedId}
+            disabled={!selectedId || scan.isPending || auctions.isLoading || auctions.isError}
             loading={scan.isPending}
             onClick={() =>
               selectedId &&
@@ -88,11 +90,16 @@ export default function AiPage() {
             {scan.isPending ? null : <ShieldCheck aria-hidden />}
             {scan.isPending ? t("anomaly.scanning") : t("anomaly.scan")}
           </Button>
+          {auctions.isError ? (
+            <div className="w-full">
+              <ErrorState error={auctions.error} onRetry={() => void auctions.refetch()} />
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
-      {scan.isPending ? <PageSkeleton rows={2} /> : null}
-      {scan.isError ? <ErrorState error={scan.error} /> : null}
+      {scan.isPending && scan.variables === selectedId ? <PageSkeleton rows={2} /> : null}
+      {scan.isError && scan.variables === selectedId ? <ErrorState error={scan.error} /> : null}
       {scanResult && selectedId ? (
         <ScanResult result={scanResult} auctionTitle={selectedTitle ?? t("anomaly.thisAuction")} />
       ) : null}
@@ -188,4 +195,3 @@ function ScanResult({ result, auctionTitle }: { result: AiAnomalyScanResult; auc
     </Card>
   );
 }
-

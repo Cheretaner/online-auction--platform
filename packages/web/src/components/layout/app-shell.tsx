@@ -15,6 +15,7 @@ import { useUnreadCount } from "@/features/operations/queries";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { useT } from "@/i18n/context";
+import { PwaInstallButton } from "@/components/pwa/pwa-install-button";
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { roles } = useAuth();
@@ -184,6 +185,7 @@ export function AppShell() {
             </Badge>
           ) : null}
           <div className="ml-auto flex items-center gap-1">
+            <PwaInstallButton />
             <LanguageSwitcher />
             <ThemeToggle />
             <NotificationsButton />

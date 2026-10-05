@@ -107,6 +107,14 @@ export function useCreateCategory() {
   });
 }
 
+export function useUpdateCategory(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Partial<CreateCategoryRequest>) => catalogApi.updateCategory(id, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
+  });
+}
+
 export function useMyVerification() {
   return useQuery({
     queryKey: queryKeys.verification.mine,

@@ -233,7 +233,7 @@
 
 /* Page-width container shared by the public header, pages and footer, so their edges line up. */
 @utility page-container {
-  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  @apply mx-auto w-full max-w-[84rem] px-4 sm:px-6 lg:px-8;
 }
 
 /* Small uppercase label for metadata, eyebrows and table headings. */

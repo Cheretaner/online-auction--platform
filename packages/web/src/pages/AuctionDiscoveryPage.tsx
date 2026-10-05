@@ -27,6 +27,7 @@ export default function AuctionDiscoveryPage() {
   const total = auctions.data?.total
   const pages = total ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1
   const hasFilters = Boolean(filters.q || filters.status || filters.categoryId || filters.orgId || filters.region)
+  const featured = items[0]
 
   useEffect(() => {
     if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView()
@@ -40,30 +41,37 @@ export default function AuctionDiscoveryPage() {
       />
       <div className="flex flex-col gap-6">
         <SearchFilterBar total={total} />
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:gap-8">
-          <ListingFeed
-            auctions={items}
-            issuerName={issuerName}
-            loading={auctions.isLoading}
-            error={auctions.isError ? auctions.error : null}
-            onRetry={() => void auctions.refetch()}
-            onClearFilters={
-              hasFilters ? () => update({ q: '', status: '', categoryId: '', orgId: '', region: '' }) : undefined
-            }
-            footer={
-              <Pagination
-                page={filters.page}
-                pages={pages}
-                total={total}
-                noun={t('discovery.noun')}
-                onChange={(page) => {
-                  update({ page })
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-              />
-            }
-          />
-          <TenderSidebar auction={items[0]} issuer={items[0] ? issuerName(items[0].orgId) : ''} />
+        {/* The sidebar column exists only when there is something to show in it, so the feed never sits beside a blank half. */}
+        <div className={`grid items-start gap-6 ${featured ? 'xl:grid-cols-[minmax(0,1fr)_22rem]' : ''}`}>
+          <div className="min-w-0">
+            <ListingFeed
+              auctions={items}
+              issuerName={issuerName}
+              loading={auctions.isLoading}
+              error={auctions.isError ? auctions.error : null}
+              onRetry={() => void auctions.refetch()}
+              onClearFilters={
+                hasFilters ? () => update({ q: '', status: '', categoryId: '', orgId: '', region: '' }) : undefined
+              }
+              footer={
+                <Pagination
+                  page={filters.page}
+                  pages={pages}
+                  total={total}
+                  noun={t('discovery.noun')}
+                  onChange={(page) => {
+                    update({ page })
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                />
+              }
+            />
+          </div>
+          {featured ? (
+            <div className="min-w-0 xl:sticky xl:top-32">
+              <TenderSidebar auction={featured} issuer={issuerName(featured.orgId)} />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

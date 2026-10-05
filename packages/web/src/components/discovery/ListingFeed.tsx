@@ -237,11 +237,11 @@ export function ListingFeed({
     )
   } else {
     body = (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4">
         {auctions.map((auction, index) => {
           const featured = index === 0 && auction.status === 'live'
           return (
-            <div key={auction.id} className={featured ? 'lg:col-span-2' : undefined}>
+            <div key={auction.id} >
               <AuctionListing
                 auction={auction}
                 issuer={issuerName(auction.orgId)}

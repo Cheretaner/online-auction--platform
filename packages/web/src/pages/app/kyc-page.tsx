@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { VERIFICATION_DOCUMENT_TYPES, VerificationDocumentFields } from "@auction/shared";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
+import { ErrorState } from "@/components/feedback/query-state";
 import { StatusBadge } from "@/components/feedback/status-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,11 @@ export default function KycPage() {
   const { session, roles } = useAuth();
   const verification = useMyVerification();
   const record = verification.data;
-  const status = session?.user.verificationStatus === "verified" ? "verified" : (record?.status ?? "unverified");
+  const status = session?.user.verificationStatus === "verified"
+    ? "verified"
+    : verification.isSuccess
+      ? record?.status ?? "unverified"
+      : null;
   const canSubmit = status === "unverified" || status === "rejected";
   const t = useT("account");
 
@@ -48,12 +53,14 @@ export default function KycPage() {
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>{t("kyc.yourStatus")}</CardTitle>
-            <StatusBadge status={status} />
+            {status ? <StatusBadge status={status} /> : <Skeleton className="h-6 w-24" />}
           </div>
         </CardHeader>
         <CardContent className="text-sm">
           {verification.isLoading ? (
             <Skeleton className="h-12 w-full" />
+          ) : verification.isError && status !== "verified" ? (
+            <ErrorState error={verification.error} onRetry={() => void verification.refetch()} />
           ) : status === "verified" ? (
             <Alert variant="success">
               <CircleCheck aria-hidden />
@@ -96,6 +103,7 @@ function SubmitForm() {
   const submit = useSubmitVerification();
   const upload = useUploadDocument();
   const [evidence, setEvidence] = useState<File | null>(null);
+  const [evidenceDocumentId, setEvidenceDocumentId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const t = useT("account");
@@ -124,14 +132,23 @@ function SubmitForm() {
                 setFormError(t("kyc.evidenceRequired"));
                 return;
               }
+              if (!evidenceDocumentId && evidence.size > 10 * 1024 * 1024) {
+                setFormError(t("kyc.evidenceTooLarge"));
+                return;
+              }
               setSubmitting(true);
               try {
-                const body = new FormData();
-                body.set("file", evidence);
-                body.set("docType", "identity_document");
-                body.set("isPrivate", "true");
-                const document = await upload.mutateAsync(body);
-                await submit.mutateAsync({ ...values, documentId: document.id });
+                let documentId = evidenceDocumentId;
+                if (!documentId) {
+                  const body = new FormData();
+                  body.set("file", evidence);
+                  body.set("docType", "identity_document");
+                  body.set("isPrivate", "true");
+                  const document = await upload.mutateAsync(body);
+                  documentId = document.id;
+                  setEvidenceDocumentId(documentId);
+                }
+                await submit.mutateAsync({ ...values, documentId });
                 toast.success(t("kyc.submitted"));
               } catch (error) {
                 if (!applyApiFieldErrors(error, form.setError)) setFormError(getErrorMessage(error));
@@ -183,14 +200,20 @@ function SubmitForm() {
                 id="kyc-evidence"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,application/pdf"
-                onChange={(event) => setEvidence(event.target.files?.[0] ?? null)}
+                aria-describedby="kyc-evidence-hint"
+                disabled={submitting}
+                onChange={(event) => {
+                  setEvidence(event.target.files?.[0] ?? null);
+                  setEvidenceDocumentId(null);
+                  setFormError(null);
+                }}
                 required
               />
-              <p className="text-xs text-muted-foreground">{t("kyc.evidenceHint")}</p>
+              <p id="kyc-evidence-hint" className="text-xs text-muted-foreground">{t("kyc.evidenceHint")}</p>
             </div>
             {formError ? <p className="text-sm text-destructive sm:col-span-2" role="alert">{formError}</p> : null}
             <div className="sm:col-span-2">
-              <Button type="submit" loading={submitting || submit.isPending || upload.isPending}>
+              <Button type="submit" loading={submitting || submit.isPending || upload.isPending} disabled={submitting || submit.isPending || upload.isPending}>
                 {submitting ? t("kyc.submitting") : t("kyc.submit")}
               </Button>
             </div>
