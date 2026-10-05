@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Building2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OptionalHint } from "@/components/ui/label";
-import { EmptyState } from "@/components/feedback/query-state";
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
 import {
   Form,
   FormControl,
@@ -109,6 +109,12 @@ export default function AuctionFormPage() {
           title={t("list.chooseOrgTitle")}
           description={t("list.chooseOrgBody")}
         />
+      ) : isEdit && existing.isLoading ? (
+        <PageSkeleton rows={4} />
+      ) : isEdit && existing.isError ? (
+        <ErrorState error={existing.error} onRetry={() => void existing.refetch()} />
+      ) : isEdit && !existing.data ? (
+        <ErrorState error={new Error(t("form.auctionUnavailable"))} onRetry={() => void existing.refetch()} />
       ) : (
         <Form {...form}>
           <form
@@ -329,7 +335,7 @@ export default function AuctionFormPage() {
               <Button type="button" variant="outline" onClick={() => navigate(isEdit && id ? `/app/auctions/${id}` : "/app/auctions")}>
                 {tc("cancel")}
               </Button>
-              <Button type="submit" size="lg" loading={create.isPending || update.isPending}>
+              <Button type="submit" size="lg" loading={create.isPending || update.isPending} disabled={create.isPending || update.isPending}>
                 {isEdit ? t("form.save") : t("form.create")}
               </Button>
             </div>

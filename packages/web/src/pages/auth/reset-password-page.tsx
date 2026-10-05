@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
                 </Link>
               </p>
             ) : null}
-            <Button type="submit" size="lg" className="w-full" loading={reset.isPending} disabled={mismatch || password.length < 8}>
+            <Button type="submit" size="lg" className="w-full" loading={reset.isPending} disabled={mismatch || !confirm || password.length < 8}>
               {reset.isPending ? t("reset.submitting") : t("reset.submit")}
             </Button>
           </form>

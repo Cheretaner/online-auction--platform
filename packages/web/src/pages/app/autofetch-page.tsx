@@ -54,17 +54,37 @@ type PendingItem = NonNullable<ReturnType<typeof useAutofetchPending>["data"]>["
 
 function cleanImportedDescription(value: string | undefined): string {
   if (!value) return "";
+  // Prefer the browser's HTML parser where available to robustly decode entities
+  // and remove tags. Fall back to a conservative regexp-based approach for
+  // environments without DOMParser.
+  try {
+    // Some runtimes (SSR) may not have DOMParser; guard it.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const globalAny: any = typeof window !== "undefined" ? window : globalThis;
+    if (typeof globalAny.DOMParser === "function") {
+      const parser = new globalAny.DOMParser();
+      const doc = parser.parseFromString(value, "text/html");
+      // textContent normalizes whitespace and strips tags and attributes.
+      const parsed = doc.body?.textContent ?? "";
+      return parsed.replace(/\s+/g, " ").trim();
+    }
+  } catch {
+    // fall through to fallback below
+  }
+
+  // Fallback: decode a few common named and numeric entities and strip tags.
   let text = value;
-  for (let pass = 0; pass < 3; pass += 1) {
-    const decoded = text.replace(/&(#(?:x[\da-f]+|\d+)|amp|lt|gt|quot|apos|nbsp);/gi, (entity, code: string) => {
-      if (code[0] !== "#") {
-        return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }[code.toLowerCase()] ?? entity);
+  for (let pass = 0; pass < 5; pass += 1) {
+    const decoded = text.replace(/&(#(?:x[\da-f]+|\d+)|[a-z]+);/gi, (entity, code: string) => {
+      const key = code.toLowerCase();
+      if (!key || key[0] === "#") {
+        const hex = key[1]?.toLowerCase() === "x";
+        const point = Number.parseInt(key.slice(hex ? 2 : 1), hex ? 16 : 10);
+        return Number.isInteger(point) && point >= 0 && point <= 0x10ffff
+          ? String.fromCodePoint(point)
+          : entity;
       }
-      const hex = code[1]?.toLowerCase() === "x";
-      const point = Number.parseInt(code.slice(hex ? 2 : 1), hex ? 16 : 10);
-      return Number.isInteger(point) && point >= 0 && point <= 0x10ffff
-        ? String.fromCodePoint(point)
-        : "\uFFFD";
+      return ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " }[key] ?? entity);
     });
     if (decoded === text) break;
     text = decoded;

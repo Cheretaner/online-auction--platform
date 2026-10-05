@@ -29,7 +29,7 @@ const OCR_DOCUMENT_TYPES = new Set<DocumentType>(["specification", "inspection_r
 export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; canReview?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
-  const [reviewedText, setReviewedText] = useState("");
+  const [reviewedText, setReviewedText] = useState<string | null>(null);
   const t = useT("auctions");
   const tc = useT("common");
   const ocr = useDocumentOcr(doc.id, canReview && showOcr);
@@ -37,34 +37,54 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
   const reviewOcr = useReviewDocumentOcr(doc.id);
   const supportsOcr = OCR_DOCUMENT_TYPES.has(doc.documentType) &&
     (doc.mimeType === "application/pdf" || doc.mimeType.startsWith("image/"));
+  const openExtraction = async () => {
+    setShowOcr(true);
+    const cached = ocr.data;
+    if (cached && cached.status !== "failed") {
+      setReviewedText(cached.reviewedText ?? cached.extractedText ?? "");
+      return;
+    }
+    try {
+      if (!cached) {
+        const result = await ocr.refetch();
+        if (result.isError) {
+          toast.error(getErrorMessage(result.error, t("documents.ocrFailed")));
+          return;
+        }
+        if (result.data && result.data.status !== "failed") {
+          setReviewedText(result.data.reviewedText ?? result.data.extractedText ?? "");
+          return;
+        }
+      }
+      const { item } = await startOcr.mutateAsync();
+      setReviewedText(item.reviewedText ?? item.extractedText ?? "");
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("documents.ocrFailed")));
+    }
+  };
   return (
     <li className="border-b py-3 first:pt-0 last:border-0 last:pb-0">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="min-w-0">
-        <p className="flex items-center gap-1.5 truncate text-sm font-medium">
-          <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("documents.private")} /> : null}
-          {doc.fileName}
-        </p>
-        <p className="text-xs text-muted-foreground capitalize">
-          {enumLabel(doc.documentType)} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
-        </p>
-      </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-sm font-medium">
+            <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            {doc.isPrivate ? <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-label={t("documents.private")} /> : null}
+            <span className="min-w-0 break-words">{doc.fileName}</span>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground capitalize">
+            {enumLabel(doc.documentType)} · {formatSize(doc.fileSizeBytes)} · {formatDateTime(doc.createdAt)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:shrink-0">
         {canReview && supportsOcr ? (
           <Button
             size="sm"
             variant="outline"
-            onClick={() => {
-              if (showOcr) setShowOcr(false);
-              else {
-                setShowOcr(true);
-                startOcr.mutate(undefined, {
-                  onSuccess: ({ item }) => setReviewedText(item.reviewedText ?? item.extractedText ?? ""),
-                  onError: (error) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))),
-                });
-              }
-            }}
+            aria-expanded={showOcr}
+            aria-controls={`ocr-panel-${doc.id}`}
+            loading={startOcr.isPending || (!showOcr && ocr.isFetching)}
+            disabled={startOcr.isPending || (!showOcr && ocr.isFetching)}
+            onClick={() => showOcr ? setShowOcr(false) : void openExtraction()}
           >{showOcr ? t("documents.hideOcr") : ocr.data ? t("documents.viewOcr") : t("documents.extractText")}</Button>
         ) : null}
         <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} />
@@ -82,15 +102,41 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
           {busy ? null : <Download aria-hidden />}
           {busy ? tc("downloading") : tc("download")}
         </Button>
-      </div>
+        </div>
       </div>
       {showOcr ? (
-        <div className="mt-3 space-y-3 rounded-md border bg-muted/20 p-3">
+        <div
+          id={`ocr-panel-${doc.id}`}
+          className="mt-3 space-y-3 rounded-md border bg-muted/20 p-3"
+          aria-busy={ocr.isFetching || startOcr.isPending || reviewOcr.isPending}
+        >
+          {ocr.isLoading || startOcr.isPending ? <p role="status" className="text-sm text-muted-foreground">{t("documents.ocrChecking")}</p> : null}
+          {ocr.isError ? <ErrorState error={ocr.error} onRetry={() => void ocr.refetch()} /> : null}
           {ocr.data?.status === "processing" ? <p role="status" className="text-sm">{t("documents.ocrProcessing")}</p> : null}
+          {ocr.data === null && !ocr.isFetching ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t("documents.noExtraction")}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                loading={startOcr.isPending}
+                onClick={() => void startOcr.mutateAsync().then(({ item }) => {
+                  setReviewedText(item.reviewedText ?? item.extractedText ?? "");
+                }).catch((error: unknown) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))))}
+              >{t("documents.extractText")}</Button>
+            </div>
+          ) : null}
           {ocr.data?.status === "failed" ? (
             <div className="space-y-2">
               <p role="alert" className="text-sm text-destructive">{ocr.data.errorMessage ?? t("documents.ocrFailed")}</p>
-              <Button size="sm" variant="outline" onClick={() => startOcr.mutate()} loading={startOcr.isPending}>{t("documents.retryOcr")}</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                loading={startOcr.isPending}
+                onClick={() => void startOcr.mutateAsync().then(({ item }) => {
+                  setReviewedText(item.reviewedText ?? item.extractedText ?? "");
+                }).catch((error: unknown) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))))}
+              >{t("documents.retryOcr")}</Button>
             </div>
           ) : null}
           {ocr.data?.status === "completed" ? (
@@ -98,9 +144,10 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
               <p className="text-xs text-muted-foreground">
                 {ocr.data.reviewedAt ? t("documents.humanReviewed") : t("documents.verifyNotice")}
                 {ocr.data.confidence !== null ? ` · ${t("documents.confidence", { value: Math.round(ocr.data.confidence) })}` : ""}
+                {ocr.data.extractionMethod ? ` · ${t(ocr.data.extractionMethod === "embedded_text" ? "documents.embeddedText" : "documents.ocrMethod")}` : ""}
               </p>
               <Textarea
-                value={reviewedText || ocr.data.reviewedText || ocr.data.extractedText || ""}
+                value={reviewedText ?? ocr.data.reviewedText ?? ocr.data.extractedText ?? ""}
                 onChange={(event) => setReviewedText(event.target.value)}
                 rows={10}
                 maxLength={500_000}
@@ -111,10 +158,13 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
                 <Button
                   size="sm"
                   loading={reviewOcr.isPending}
-                  onClick={() => reviewOcr.mutate(reviewedText || ocr.data?.extractedText || "", {
-                    onSuccess: ({ item }) => setReviewedText(item.reviewedText ?? ""),
-                    onError: (error) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))),
-                  })}
+                  disabled={!(reviewedText ?? ocr.data.extractedText ?? "").trim()}
+                  onClick={() => void reviewOcr.mutateAsync(reviewedText ?? ocr.data?.extractedText ?? "")
+                    .then(({ item }) => {
+                      setReviewedText(item.reviewedText ?? "");
+                      toast.success(t("documents.ocrReviewed"));
+                    })
+                    .catch((error: unknown) => toast.error(getErrorMessage(error, t("documents.ocrFailed"))))}
                 >{t("documents.confirmOcr")}</Button>
               ) : null}
             </>
@@ -165,12 +215,17 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
           }}>
             <div className="min-w-56 flex-1 space-y-1.5">
               <Label htmlFor={`ocr-search-${auctionId}`}>{t("documents.searchOcr")}</Label>
-              <Input id={`ocr-search-${auctionId}`} value={ocrQuery} onChange={(event) => setOcrQuery(event.target.value)} minLength={2} maxLength={120} />
+              <Input id={`ocr-search-${auctionId}`} type="search" value={ocrQuery} onChange={(event) => setOcrQuery(event.target.value)} minLength={2} maxLength={120} />
             </div>
-            <Button type="submit" variant="outline" disabled={ocrQuery.trim().length < 2}><Search aria-hidden />{t("documents.search")}</Button>
+            <Button type="submit" variant="outline" disabled={ocrQuery.trim().length < 2} loading={ocrResults.isFetching}>
+              {!ocrResults.isFetching ? <Search aria-hidden /> : null}
+              {t("documents.search")}
+            </Button>
           </form>
           {ocrSearch ? (
-            ocrResults.isLoading ? <p className="text-sm text-muted-foreground">{tc("loading")}</p> :
+            <div aria-busy={ocrResults.isFetching}>
+            {ocrResults.isError ? <ErrorState error={ocrResults.error} onRetry={() => void ocrResults.refetch()} /> :
+            ocrResults.isLoading ? <p role="status" className="text-sm text-muted-foreground">{tc("loading")}</p> :
             ocrResults.data?.items.length ? (
               <ul className="space-y-2 text-sm">
                 {ocrResults.data.items.map((hit) => (
@@ -184,7 +239,8 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
                   </li>
                 ))}
               </ul>
-            ) : <p className="text-sm text-muted-foreground">{t("documents.noOcrMatches")}</p>
+            ) : <p className="text-sm text-muted-foreground">{t("documents.noOcrMatches")}</p>}
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -197,6 +253,10 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
             const file = fileRef.current?.files?.[0];
             if (!file) {
               toast.error(t("documents.chooseFile"));
+              return;
+            }
+            if (file.size > 20 * 1024 * 1024) {
+              toast.error(t("documents.uploadLimit"));
               return;
             }
             const form = new FormData();
@@ -215,7 +275,15 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
         >
           <div className="space-y-1.5">
             <Label htmlFor={`doc-file-${auctionId}`}>{t("documents.file")}</Label>
-            <Input id={`doc-file-${auctionId}`} ref={fileRef} type="file" />
+            <Input
+              id={`doc-file-${auctionId}`}
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+              aria-describedby={`doc-file-hint-${auctionId}`}
+              disabled={upload.isPending}
+            />
+            <FieldHint id={`doc-file-hint-${auctionId}`}>{t("documents.uploadHint")}</FieldHint>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor={`doc-type-${auctionId}`}>{t("documents.type")}</Label>
@@ -232,7 +300,7 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" loading={upload.isPending}>
+          <Button type="submit" loading={upload.isPending} disabled={upload.isPending}>
             {upload.isPending ? t("documents.uploading") : t("documents.upload")}
           </Button>
           <div className="flex items-start gap-3 sm:col-span-3">

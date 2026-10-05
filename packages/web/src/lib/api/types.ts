@@ -293,12 +293,28 @@ export interface AuditEvent {
   id: string;
   auctionId: string | null;
   actorId: string | null;
+  actorRole: string;
   action: string;
   entityType: string;
   entityId: string;
   sequenceNo: number;
+  payload: Record<string, unknown>;
+  prevHash: string;
   hash: string;
-  createdAt: string;
+  occurredAt: string;
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[];
+  total: number;
+}
+
+export interface AuditChainVerification {
+  intact: boolean;
+  eventCount: number;
+  headHash: string | null;
+  brokenAtSequence?: number;
+  error?: string;
 }
 
 /** Mirrors telegramService.getTelegramLinkStatus (GET /telegram/status). */

@@ -271,7 +271,7 @@ function AccountLink({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs text-muted-foreground">
-                      One-time code — expires {formatDateTime(link.expiresAt)}
+                      {t("telegram.codeExpires", { date: formatDateTime(link.expiresAt) })}
                     </p>
                     <p className="mt-1 font-mono text-xl font-semibold tracking-[0.2em]">{link.token}</p>
                   </div>
@@ -279,12 +279,16 @@ function AccountLink({
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() =>
+                    onClick={() => {
+                      if (!navigator.clipboard?.writeText) {
+                        toast.error(t("telegram.copyFailed"));
+                        return;
+                      }
                       void navigator.clipboard
                         .writeText(link.token)
                         .then(() => toast.success(t("telegram.codeCopied")))
-                        .catch(() => toast.error(t("telegram.copyFailed")))
-                    }
+                        .catch(() => toast.error(t("telegram.copyFailed")));
+                    }}
                   >
                     {t("telegram.copyCode")}
                   </Button>
@@ -388,4 +392,3 @@ function ChannelPosting({ canPost }: { canPost: boolean }) {
     </Card>
   );
 }
-

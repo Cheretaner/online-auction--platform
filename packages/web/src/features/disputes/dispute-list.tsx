@@ -171,14 +171,18 @@ function ResolveDialog({
               id={`${id}-decision`}
               placeholder={t("disputes.decisionPlaceholder")}
               value={decision}
+              maxLength={200}
+              aria-describedby={`${id}-decision-hint`}
               onChange={(event) => setDecision(event.target.value)}
             />
+            <FieldHint id={`${id}-decision-hint`}>{t("disputes.decisionHint", { count: decision.length })}</FieldHint>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-reason`}>{t("disputes.reasoning")}</Label>
             <Textarea
               id={`${id}-reason`}
               rows={4}
+              maxLength={4000}
               aria-describedby={`${id}-reason-hint`}
               value={reason}
               onChange={(event) => setReason(event.target.value)}

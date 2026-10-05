@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { CheckCheck, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,9 +14,11 @@ import {
 import type { NotificationRecord } from "@/lib/api/types";
 import { useLocale, useT } from "@/i18n/context";
 import { intlLocale } from "@/i18n/core";
+import { getErrorMessage } from "@/lib/api/errors";
 
 export default function NotificationsPage() {
-  const query = useNotifications();
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const query = useNotifications(unreadOnly ? true : undefined);
   const markAll = useMarkAllNotificationsRead();
   const markRead = useMarkNotificationRead();
   const t = useT("account");
@@ -25,16 +28,33 @@ export default function NotificationsPage() {
   return (
     <div>
       <PageHeader title={t("lists.notificationsTitle")} description={t("lists.notificationsDescription")} />
-      <div className="mb-5 flex justify-end">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-2" role="group" aria-label={t("lists.notificationsTitle")}>
+          <Button
+            type="button"
+            size="sm"
+            variant={unreadOnly ? "outline" : "secondary"}
+            aria-pressed={!unreadOnly}
+            onClick={() => setUnreadOnly(false)}
+          >{t("lists.allNotifications")}</Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={unreadOnly ? "secondary" : "outline"}
+            aria-pressed={unreadOnly}
+            onClick={() => setUnreadOnly(true)}
+          >{t("lists.unreadNotifications")}</Button>
+        </div>
         <Button
+          type="button"
           variant="outline"
           size="sm"
           loading={markAll.isPending}
-          disabled={!items.some((item) => !item.readAt)}
+          disabled={markAll.isPending || markRead.isPending || !items.some((item) => !item.readAt)}
           onClick={() =>
             markAll.mutate(undefined, {
               onSuccess: () => toast.success(t("lists.markedAll")),
-              onError: (error) => toast.error(error.message),
+              onError: (error) => toast.error(getErrorMessage(error)),
             })
           }
         >
@@ -47,7 +67,7 @@ export default function NotificationsPage() {
         error={query.error}
         isEmpty={items.length === 0}
         emptyTitle={t("lists.notificationsTitle")}
-        emptyDescription={t("lists.notificationsEmpty")}
+        emptyDescription={unreadOnly ? t("lists.notificationsEmptyUnread") : t("lists.notificationsEmpty")}
         onRetry={() => void query.refetch()}
       >
         <div className="space-y-3">
@@ -60,7 +80,7 @@ export default function NotificationsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="font-semibold">{text.title}</h2>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {item.readAt ? (locale === "am" ? "ተነብቧል" : "Read") : (locale === "am" ? "አልተነበበም" : "Unread")}
+                        {item.readAt ? t("lists.read") : t("lists.unread")}
                       </span>
                     </div>
                     <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{text.message}</p>
@@ -72,7 +92,7 @@ export default function NotificationsPage() {
                     {item.relatedEntityType === "auction" && item.relatedEntityId ? (
                       <Button asChild size="sm" variant="outline">
                         <Link to={`/auctions/${item.relatedEntityId}`}>
-                          <ExternalLink aria-hidden /> {locale === "am" ? "ጨረታውን ይመልከቱ" : "View auction"}
+                          <ExternalLink aria-hidden /> {t("lists.viewAuction")}
                         </Link>
                       </Button>
                     ) : null}
@@ -81,11 +101,12 @@ export default function NotificationsPage() {
                         size="sm"
                         variant="ghost"
                         loading={markRead.isPending && markRead.variables === item.id}
+                        disabled={markRead.isPending || markAll.isPending}
                         onClick={() => markRead.mutate(item.id, {
-                          onError: (error) => toast.error(error.message),
+                          onError: (error) => toast.error(getErrorMessage(error)),
                         })}
                       >
-                        {locale === "am" ? "እንደተነበበ ምልክት አድርግ" : "Mark as read"}
+                        {t("lists.markRead")}
                       </Button>
                     ) : null}
                   </div>
