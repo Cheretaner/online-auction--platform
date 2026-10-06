@@ -7,6 +7,7 @@ import { submissionRateLimiter } from "../shared/middleware/rateLimit.middleware
 import { createVerificationController } from "./verification.controller.js";
 import { VerificationService } from "./verification.service.js";
 import type { IdentityVerificationProvider } from "./identity-provider.js";
+import { requireDocumentUploads } from "../document/document-availability.middleware.js";
 
 // KYC reviewers. Previously every one of these routes used the un-invoked
 // `requireAuth` factory, which both hung the request AND — had it resolved —
@@ -20,6 +21,7 @@ export function createVerificationRouter(identityProvider?: IdentityVerification
   router.post(
     "/submit",
     requireAuth(),
+    requireDocumentUploads,
     submissionRateLimiter,
     validate(SubmitVerificationRequest),
     asyncHandler(controller.submitVerification),

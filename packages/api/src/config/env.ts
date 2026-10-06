@@ -3,12 +3,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-// Resolve the .env files by walking outward from this module rather than
-// trusting `process.cwd()`, which is only `packages/api` when the dev script
-// runs and the repository root when `node packages/api/dist/server.js` is
-// started directly. This file sits at `src/config/env.ts` before the build and
-// `dist/config/env.js` after it, so two levels up is always the api package
-// root in both cases.
+
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 const apiPackageDir = resolve(moduleDir, "../..");
 const monorepoRoot = resolve(apiPackageDir, "../..");
@@ -74,6 +69,7 @@ const envSchema = z
       .transform((value) => value === "true"),
     STORAGE_DRIVER: z.enum(["memory", "filesystem"]).default("filesystem"),
     STORAGE_DIR: z.string().default("./data/storage"),
+    DOCUMENT_UPLOADS_ENABLED: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
     FILE_SCAN_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
     CLAMAV_HOST: z.string().default("127.0.0.1"),
     CLAMAV_PORT: z.coerce.number().int().positive().max(65535).default(3310),

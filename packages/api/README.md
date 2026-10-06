@@ -61,6 +61,11 @@ start in production** without the first three:
   default relative directory is for local development; files in a container's
   writable layer disappear when it is replaced. Lost blobs cannot be restored
   from document metadata, so affected files need to be uploaded again.
+- `DOCUMENT_UPLOADS_ENABLED=false` disables document uploads and new identity
+  verification submissions when durable storage or a reachable malware scanner
+  is unavailable. Existing documents remain listed, but files on ephemeral
+  storage may already be unavailable. Keep the default `true` only when both
+  storage and scanning are configured.
 - `JWT_SECRET` — a random value of 32+ characters (the default is rejected)
 - `RUN_MIGRATIONS_ON_BOOT=true` — applies pending migrations on boot. The
   runner holds a Postgres advisory lock, so a rolling deploy queues instead of

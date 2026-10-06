@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth-provider";
-import { useMyVerification, useSubmitVerification, useUploadDocument } from "@/features/operations/queries";
+import { useMyVerification, usePlatformCapabilities, useSubmitVerification, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { canReviewKyc, enumLabel, formatDateTime } from "@/lib/format";
@@ -33,7 +33,9 @@ export default function KycPage() {
       ? record?.status ?? "unverified"
       : null;
   const canSubmit = status === "unverified" || status === "rejected";
+  const uploads = usePlatformCapabilities(canSubmit);
   const t = useT("account");
+  const tc = useT("common");
 
   return (
     <div className="space-y-6">
@@ -94,7 +96,28 @@ export default function KycPage() {
         </CardContent>
       </Card>
 
-      {canSubmit ? <SubmitForm /> : null}
+      {canSubmit ? (
+        uploads.isPending ? (
+          <p className="text-sm text-muted-foreground" role="status">{tc("checkingDocumentUploads")}</p>
+        ) : uploads.isError ? (
+          <Alert variant="warning">
+            <ShieldAlert aria-hidden />
+            <AlertTitle>{tc("documentUploadsStatusUnknown")}</AlertTitle>
+            <AlertDescription>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => void uploads.refetch()}>
+                {tc("tryAgain")}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : uploads.data?.documentUploadsEnabled ? (
+          <SubmitForm />
+        ) : (
+          <Alert variant="warning">
+            <ShieldAlert aria-hidden />
+            <AlertTitle>{tc("documentUploadsUnavailable")}</AlertTitle>
+          </Alert>
+        )
+      ) : null}
     </div>
   );
 }
