@@ -40,6 +40,8 @@ import { watchlistRouter, savedSearchRouter, notificationPreferencesRouter } fro
 import path from "node:path";
 import { chapaWebhook } from "./payments/chapa.controller.js";
 import { openDataRouter } from "./open-data/open-data.routes.js";
+import { auctionFormRouter } from "./auction/auction-form.routes.js";
+import { refundLetterRouter } from "./settlement/refund-letter.routes.js";
 
 export function createApp(dependencies: { identityVerificationProvider?: IdentityVerificationProvider } = {}): express.Express {
   const app = express();
@@ -94,11 +96,13 @@ export function createApp(dependencies: { identityVerificationProvider?: Identit
   app.use("/api/v1/organizations", organizationRouter);
   app.use("/api/v1/auctions", auctionRouter);
   app.use("/api/v1/auctions/:auctionId/bids", biddingRouter);
+  app.use("/api/v1/auctions/:auctionId/form-fields", auctionFormRouter);
   app.use("/api/v1/auctions/:auctionId/items", auctionItemRouter);
   app.use("/api/v1/organizations/:orgId/auctions", orgAuctionRouter);
   app.use("/api/v1/categories", categoryRouter);
   app.use("/api/v1/deposits", depositRouter);
   app.use("/api/v1/settlements", settlementRouter);
+  app.use("/api/v1/refund-letters", refundLetterRouter);
   app.use("/api/v1/documents", documentRouter);
   app.use("/api/v1/verifications", createVerificationRouter(dependencies.identityVerificationProvider));
   app.use("/api/v1/audit", auditRouter);

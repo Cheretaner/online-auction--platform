@@ -226,14 +226,6 @@ export function useMySettlements(enabled = true) {
   });
 }
 
-export function useInitiateChapaSettlement() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (auctionId: string) => settlementsApi.initiateChapa(auctionId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["settlements"] }),
-  });
-}
-
 export function useReviewDeposit() {
   const queryClient = useQueryClient();
   return useMutation({

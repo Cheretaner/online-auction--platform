@@ -157,6 +157,7 @@ export interface DocumentRecord {
   fileSizeBytes: number;
   checksumSha256: string;
   isPrivate: boolean;
+  requiresPayment: boolean;
   summary: string | null;
   extractedText: string | null;
   ocrStatus: string;
@@ -204,11 +205,19 @@ export interface SettlementRecord {
   updatedAt: string;
 }
 
-export interface ChapaSettlementInitiation {
-  settlementId: string;
-  txRef: string;
-  checkoutUrl: string | null;
+export interface DocumentAccessInitiation {
   status: string;
+  checkoutUrl: string | null;
+  txRef: string;
+}
+
+export interface RefundLetter {
+  id: string;
+  auctionId: string;
+  letterNumber: string;
+  body: string;
+  officialStamp: string;
+  createdAt: string;
 }
 
 export interface FinancialReconciliationSnapshot {

@@ -16,6 +16,7 @@ import type { SettlementObligation } from "../settlement/settlement.types.js";
 import { logger } from "../shared/utils/logger.js";
 import { ChapaAdapter, type ChapaVerification } from "./chapa.adapter.js";
 import * as paymentRepo from "./payment.repository.js";
+import { processDocumentAccessPayment } from "../document/document-access.service.js";
 
 interface Actor {
   userId: string;
@@ -160,87 +161,6 @@ export async function initiateChapaDeposit(
   }
 }
 
-export async function initiateChapaSettlement(
-  actor: Actor,
-  auctionId: string,
-): Promise<{ settlementId: string; txRef: string; checkoutUrl: string | null; status: string }> {
-  if (!env.CHAPA_SECRET_KEY || !env.CHAPA_WEBHOOK_SECRET) {
-    throw new AppError("Chapa payments are not configured", HttpStatus.SERVICE_UNAVAILABLE);
-  }
-
-  const profile = await identityRepo.findProfileById(actor.userId);
-  if (!profile) throw AppError.notFound("Profile not found");
-  const fullName = profile.fullName.trim().split(/\s+/);
-  const firstName = fullName.shift() ?? "Bidder";
-  const lastName = fullName.join(" ") || firstName;
-
-  const prepared = await withTransaction(async (client) => {
-    const obligation = await settlementRepo.lockByAuctionAndWinner(auctionId, actor.userId, client);
-    if (!obligation) throw AppError.notFound("Settlement obligation not found");
-    if (obligation.status === "paid") {
-      return { obligation, transaction: null, checkoutUrl: null };
-    }
-    if (obligation.status === "cancelled" || obligation.status === "reconciliation_required") {
-      throw AppError.conflict("This settlement cannot currently accept payment");
-    }
-
-    let transaction = await paymentRepo.findLatestForSettlement(obligation.id, client);
-    if (transaction?.status === "reconciliation_required") {
-      throw AppError.conflict("This settlement requires manual reconciliation before retrying");
-    }
-    if (transaction?.status === "pending" && transaction.checkoutUrl) {
-      return { obligation, transaction, checkoutUrl: transaction.checkoutUrl };
-    }
-    if (!transaction || transaction.status !== "initializing") {
-      transaction = await paymentRepo.create({
-        settlementId: obligation.id,
-        txRef: `settle-${randomUUID()}`,
-        amount: obligation.amount,
-      }, client);
-      await settlementRepo.markPaymentPending(obligation.id, client);
-      await audit.appendAuditEvent({
-        auctionId,
-        actorId: actor.userId,
-        actorRole: audit.actorRoleOf(actor.roles),
-        entityType: "settlement",
-        entityId: obligation.id,
-        action: "settlement.payment_initiated",
-        payload: { amount: obligation.amount, currency: obligation.currency, txRef: transaction.txRef },
-      });
-    }
-    return { obligation, transaction, checkoutUrl: null };
-  }, { userId: actor.userId });
-
-  if (prepared.checkoutUrl || !prepared.transaction) {
-    return {
-      settlementId: prepared.obligation.id,
-      txRef: prepared.transaction?.txRef ?? "",
-      checkoutUrl: prepared.checkoutUrl,
-      status: prepared.obligation.status,
-    };
-  }
-
-  try {
-    const checkoutUrl = await chapa.initialize({
-      txRef: prepared.transaction.txRef,
-      amount: prepared.transaction.amount,
-      email: profile.email,
-      firstName,
-      lastName,
-      returnUrl: `${env.WEB_BASE_URL.replace(/\/$/, "")}/auctions/${auctionId}`,
-    });
-    await paymentRepo.saveCheckoutUrl(prepared.transaction.id, checkoutUrl);
-    return {
-      settlementId: prepared.obligation.id,
-      txRef: prepared.transaction.txRef,
-      checkoutUrl,
-      status: "payment_pending",
-    };
-  } catch {
-    throw new AppError("Could not start Chapa checkout. Retry shortly.", HttpStatus.SERVICE_UNAVAILABLE);
-  }
-}
-
 export async function listMySettlements(winnerId: string): Promise<SettlementObligation[]> {
   return settlementRepo.findByWinner(winnerId);
 }
@@ -377,6 +297,9 @@ export async function processChapaWebhook(
   txRef: string,
   eventHash: string,
 ): Promise<"processed" | "duplicate" | "pending"> {
+  if (await processDocumentAccessPayment(txRef, eventHash)) {
+    return "processed";
+  }
   const owner = await paymentRepo.findPaymentOwnerByTxRef(txRef);
   if (!owner) throw AppError.notFound("Payment reference not found");
   const verified = await chapa.verify(txRef);

@@ -14,8 +14,6 @@ import {
   useCreateDeposit,
   useDepositPaymentProviders,
   useInitiateChapaDeposit,
-  useInitiateChapaSettlement,
-  useMySettlements,
   usePlatformCapabilities,
   useUploadDocument,
 } from "@/features/operations/queries";
@@ -23,7 +21,7 @@ import type { BidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { Auction } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
-import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
+import { enumLabel, formatMoney } from "@/lib/format";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useT } from "@/i18n/context";
 import { Alert, AlertTitle } from "@/components/ui/alert";
@@ -54,8 +52,6 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
   const { kycStatus, depositRequired, deposit } = readiness;
   const { session } = useAuth();
   const isWinner = auction.status === "awarded" && auction.winnerId === session?.user.id;
-  const settlements = useMySettlements(isWinner);
-  const settlement = settlements.data?.items.find((item) => item.auctionId === auction.id);
   const acceptsDeposits = auction.status === "scheduled" || auction.status === "live";
 
   const kycState = kycStatus === "verified" ? "done" : kycStatus === "pending" ? "waiting" : kycStatus === "rejected" ? "failed" : "todo";
@@ -111,48 +107,14 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
           ) : null}
         </Step>
       ) : null}
-      {isWinner ? <SettlementStep auction={auction} settlement={settlement} /> : null}
-    </ol>
-  );
-}
-
-function SettlementStep({ auction, settlement }: { auction: Auction; settlement: import("@/lib/api/types").SettlementRecord | undefined }) {
-  const providers = useDepositPaymentProviders();
-  const initiate = useInitiateChapaSettlement();
-  const t = useT("auctions");
-  const state = settlement?.status === "paid" ? "done" : settlement?.status === "reconciliation_required" ? "failed" : "waiting";
-  return (
-    <Step state={state} title={t("readiness.finalPayment")}>
-      {!settlement ? <p className="text-sm text-muted-foreground">{t("readiness.loadingSettlement")}</p> : null}
-      {settlement?.status === "paid" ? (
-        <p className="text-sm text-muted-foreground">{t("readiness.paymentReceived", { amount: formatMoney(settlement.amount) })}</p>
-      ) : null}
-      {settlement?.status === "reconciliation_required" ? (
-        <p className="text-sm text-destructive">{t("readiness.reconciliation")}</p>
-      ) : null}
-      {settlement && ["due", "payment_pending"].includes(settlement.status) ? (
-        <div className="space-y-2">
+      {isWinner ? (
+        <Step state="waiting" title={t("readiness.finalPayment")}>
           <p className="text-sm text-muted-foreground">
-            {t("readiness.due", { amount: formatMoney(settlement.amount), date: formatDateTime(settlement.dueAt) })}
+            Proceed with final settlement and branch processing through the issuing bank using the official CPO documentation.
           </p>
-          {providers.data?.chapa ? (
-            <Button
-              size="sm"
-              disabled={initiate.isPending}
-              onClick={() => initiate.mutate(auction.id, {
-                onSuccess: (result) => result.checkoutUrl
-                  ? window.location.assign(result.checkoutUrl)
-                  : toast.success(t("readiness.finalComplete")),
-                onError: (error) => toast.error(getErrorMessage(error)),
-              })}
-            >
-              <CreditCard className="size-4" aria-hidden />
-              {initiate.isPending ? t("readiness.openingCheckout") : t("readiness.payFinalChapa")}
-            </Button>
-          ) : <p className="text-sm text-muted-foreground">{t("readiness.contactForFinal")}</p>}
-        </div>
+        </Step>
       ) : null}
-    </Step>
+    </ol>
   );
 }
 
