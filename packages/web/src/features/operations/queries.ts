@@ -27,6 +27,7 @@ import {
   settlementsApi,
   verificationApi,
   autofetchApi,
+  platformApi,
 } from "@/lib/api/resources";
 import { organizationsApi } from "@/lib/api/organizations";
 import { queryKeys } from "@/lib/query/keys";
@@ -37,6 +38,15 @@ export function useOrganizations() {
     queryKey: queryKeys.organizations.list(),
     queryFn: () => organizationsApi.list(),
     staleTime: QUERY_STALE_TIMES.catalog,
+  });
+}
+
+export function usePlatformCapabilities(enabled = true) {
+  return useQuery({
+    queryKey: ["platform", "capabilities"],
+    queryFn: () => platformApi.capabilities(),
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 

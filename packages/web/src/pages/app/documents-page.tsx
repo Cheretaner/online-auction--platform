@@ -5,16 +5,19 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DocumentRow } from "@/features/documents/auction-documents";
-import { useMyDocuments } from "@/features/operations/queries";
+import { useMyDocuments, usePlatformCapabilities } from "@/features/operations/queries";
 import { useT } from "@/i18n/context";
 
 export default function DocumentsPage() {
   const query = useMyDocuments();
+  const uploads = usePlatformCapabilities();
   const [search, setSearch] = useState("");
   const t = useT("account");
+  const tc = useT("common");
   const items = query.data?.items ?? [];
   const normalizedSearch = search.trim().toLowerCase();
   const filtered = normalizedSearch
@@ -32,6 +35,15 @@ export default function DocumentsPage() {
           ) : undefined
         }
       />
+      {uploads.isPending ? (
+        <p className="mb-4 text-sm text-muted-foreground" role="status">{tc("checkingDocumentUploads")}</p>
+      ) : uploads.isError || !uploads.data?.documentUploadsEnabled ? (
+        <Alert variant="warning" className="mb-4">
+          <AlertTitle>
+            {uploads.isError ? tc("documentUploadsStatusUnknown") : tc("documentUploadsUnavailable")}
+          </AlertTitle>
+        </Alert>
+      ) : null}
       <QueryState
         isLoading={query.isLoading}
         isError={query.isError}

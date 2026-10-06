@@ -6,12 +6,14 @@ import { validate } from "../shared/middleware/validate.middleware.js";
 import * as controller from "./document.controller.js";
 import * as searchController from "./document-search.controller.js";
 import { documentUpload } from "./upload.middleware.js";
+import { requireDocumentUploads } from "./document-availability.middleware.js";
 
 export const documentRouter = Router();
 
 documentRouter.post(
   "/",
   requireAuth(["auction_officer", "org_admin", "compliance_officer", "bidder", "super_admin"]),
+  requireDocumentUploads,
   documentUpload.single("file"),
   asyncHandler(controller.upload),
 );

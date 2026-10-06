@@ -85,6 +85,9 @@ export function createApp(dependencies: { identityVerificationProvider?: Identit
   app.use(apiRateLimiter);
 
   app.post("/api/v1/webhooks/chapa", chapaWebhook);
+  app.get("/api/v1/capabilities", (_req, res) => {
+    res.json({ documentUploadsEnabled: env.DOCUMENT_UPLOADS_ENABLED });
+  });
 
   app.use("/health", healthRouter);
   app.use("/api/v1/auth", identityRouter);

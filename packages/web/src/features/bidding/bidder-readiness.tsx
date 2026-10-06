@@ -16,6 +16,7 @@ import {
   useInitiateChapaDeposit,
   useInitiateChapaSettlement,
   useMySettlements,
+  usePlatformCapabilities,
   useUploadDocument,
 } from "@/features/operations/queries";
 import type { BidderReadiness } from "@/features/bidding/use-bidder-readiness";
@@ -25,6 +26,7 @@ import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useT } from "@/i18n/context";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 
 function Step({ state, title, children }: { state: "done" | "waiting" | "todo" | "failed"; title: string; children?: React.ReactNode }) {
   const Icon = state === "done" ? CheckCircle2 : state === "waiting" ? Clock : state === "failed" ? XCircle : Circle;
@@ -157,6 +159,7 @@ function SettlementStep({ auction, settlement }: { auction: Auction; settlement:
 function DepositForm({ auction }: { auction: Auction }) {
   const create = useCreateDeposit();
   const upload = useUploadDocument();
+  const uploads = usePlatformCapabilities();
   const [proof, setProof] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const t = useT("auctions");
@@ -283,9 +286,18 @@ function DepositForm({ auction }: { auction: Auction }) {
             id={`deposit-proof-${auction.id}`}
             type="file"
             accept="image/*,application/pdf"
+            disabled={!uploads.isSuccess || !uploads.data.documentUploadsEnabled}
             onChange={(event) => setProof(event.target.files?.[0] ?? null)}
           />
-          <FieldHint>{t("readiness.proofHint")}</FieldHint>
+          {uploads.isPending ? (
+            <p className="text-xs text-muted-foreground" role="status">{tc("checkingDocumentUploads")}</p>
+          ) : !uploads.isSuccess || !uploads.data.documentUploadsEnabled ? (
+            <Alert variant="warning" className="mt-2">
+              <AlertTitle>
+                {uploads.isError ? tc("documentUploadsStatusUnknown") : tc("documentUploadsUnavailable")}
+              </AlertTitle>
+            </Alert>
+          ) : <FieldHint>{t("readiness.proofHint")}</FieldHint>}
         </div>
         <div className="@md:col-span-2">
           <Button type="submit" loading={submitting}>

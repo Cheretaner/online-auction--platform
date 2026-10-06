@@ -14,9 +14,16 @@ import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
 import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { enumLabel, formatDateTime } from "@/lib/format";
 import { useT } from "@/i18n/context";
-import { useDocumentOcr, useReviewDocumentOcr, useSearchReviewedOcr, useStartDocumentOcr } from "@/features/operations/queries";
+import {
+  useDocumentOcr,
+  usePlatformCapabilities,
+  useReviewDocumentOcr,
+  useSearchReviewedOcr,
+  useStartDocumentOcr,
+} from "@/features/operations/queries";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -180,6 +187,7 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
 export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionId: string; canUpload?: boolean; canReview?: boolean }) {
   const docs = useAuctionDocuments(auctionId);
   const upload = useUploadDocument();
+  const uploads = usePlatformCapabilities(Boolean(canUpload));
   const fileRef = useRef<HTMLInputElement>(null);
   const [docType, setDocType] = useState<DocumentType>("specification");
   const [publicDoc, setPublicDoc] = useState(true);
@@ -245,7 +253,25 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
         </section>
       ) : null}
 
-      {canUpload ? (
+      {canUpload && uploads.isError ? (
+        <Alert variant="warning">
+          <AlertTitle>{tc("documentUploadsStatusUnknown")}</AlertTitle>
+          <AlertDescription>
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => void uploads.refetch()}>
+              {tc("tryAgain")}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {canUpload && uploads.isPending ? (
+        <p className="text-sm text-muted-foreground" role="status">{tc("checkingDocumentUploads")}</p>
+      ) : null}
+      {canUpload && uploads.isSuccess && !uploads.data.documentUploadsEnabled ? (
+        <Alert variant="warning">
+          <AlertTitle>{tc("documentUploadsUnavailable")}</AlertTitle>
+        </Alert>
+      ) : null}
+      {canUpload && uploads.isSuccess && uploads.data.documentUploadsEnabled ? (
         <form
           className="grid gap-4 rounded-lg border bg-card p-4 sm:grid-cols-[1fr_200px_auto] sm:items-end"
           onSubmit={(event) => {

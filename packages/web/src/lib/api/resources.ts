@@ -115,6 +115,10 @@ export const documentsApi = {
   download: (id: string) => apiRequest<Blob>(v1(`/documents/${id}/content`), { parse: "blob" }),
 };
 
+export const platformApi = {
+  capabilities: () => apiRequest<{ documentUploadsEnabled: boolean }>(v1("/capabilities")),
+};
+
 export const verificationApi = {
   submit: (body: SubmitVerificationRequest) =>
     apiRequest<VerificationRecord>(v1("/verifications/submit"), { method: "POST", body }),

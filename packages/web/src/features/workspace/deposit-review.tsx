@@ -16,6 +16,7 @@ import {
   useReviewDeposit,
   useReviewDepositReferenceOcr,
   useStartDocumentOcr,
+  usePlatformCapabilities,
   useUploadDocument,
 } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -24,6 +25,7 @@ import { downloadDocument } from "@/lib/download";
 import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
 import { enumLabel, formatDateTime, formatMoney } from "@/lib/format";
 import { useT } from "@/i18n/context";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 
 const RELEASABLE = new Set(["closed", "awarded", "cancelled"]);
 
@@ -94,6 +96,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const review = useReviewDeposit();
   const release = useReleaseDeposit();
   const upload = useUploadDocument();
+  const uploads = usePlatformCapabilities();
   const [rejecting, setRejecting] = useState<DepositRecord | null>(null);
   const [releasing, setReleasing] = useState<DepositRecord | null>(null);
   const [releaseReferenceNumber, setReleaseReferenceNumber] = useState("");
@@ -101,6 +104,12 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [submittingRelease, setSubmittingRelease] = useState(false);
   const items = deposits.data?.items ?? [];
+  const hasReleasableDeposit = items.some(
+    (deposit) =>
+      deposit.status === "verified" &&
+      RELEASABLE.has(auction.status) &&
+      (deposit.bidderId !== auction.winnerId || auction.status === "awarded"),
+  );
   const t = useT("workspace");
   const tc = useT("common");
 
@@ -124,6 +133,15 @@ export function DepositReview({ auction }: { auction: Auction }) {
 
   return (
     <div>
+      {hasReleasableDeposit && uploads.isPending ? (
+        <p className="mb-4 text-sm text-muted-foreground" role="status">{tc("checkingDocumentUploads")}</p>
+      ) : hasReleasableDeposit && (!uploads.isSuccess || !uploads.data.documentUploadsEnabled) ? (
+        <Alert variant="warning" className="mb-4">
+          <AlertTitle>
+            {uploads.isError ? tc("documentUploadsStatusUnknown") : tc("documentUploadsUnavailable")}
+          </AlertTitle>
+        </Alert>
+      ) : null}
       <Table>
         <TableHeader>
           <TableRow>
@@ -195,7 +213,7 @@ export function DepositReview({ auction }: { auction: Auction }) {
                         </Button>
                       </>
                     ) : null}
-                    {deposit.status === "verified" && RELEASABLE.has(auction.status) && (
+                    {uploads.isSuccess && uploads.data.documentUploadsEnabled && deposit.status === "verified" && RELEASABLE.has(auction.status) && (
                       deposit.bidderId !== auction.winnerId || auction.status === "awarded"
                     ) ? (
                       <Button
