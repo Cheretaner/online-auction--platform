@@ -36,7 +36,7 @@ import type {
   CategoryRecord,
   CountResponse,
   ChapaDepositInitiation,
-  ChapaSettlementInitiation,
+  DocumentAccessInitiation,
   DepositRecord,
   FinancialReconciliationSnapshot,
   DisputeRecord,
@@ -54,6 +54,7 @@ import type {
   TelegramStatus,
   VerificationRecord,
   WatchlistRecord,
+  RefundLetter,
 } from "@/lib/api/types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -93,11 +94,16 @@ export const depositsApi = {
 
 export const settlementsApi = {
   listMine: () => apiRequest<ItemList<SettlementRecord>>(v1("/settlements/me")),
-  initiateChapa: (auctionId: string) =>
-    apiRequest<ChapaSettlementInitiation>(v1(`/settlements/${auctionId}/initiate`), { method: "POST" }),
+};
+
+export const refundLettersApi = {
+  listMine: () => apiRequest<ItemList<RefundLetter>>(v1("/refund-letters/me")),
+  download: (id: string) => apiRequest<Blob>(v1(`/refund-letters/${id}`), { parse: "blob" }),
 };
 
 export const documentsApi = {
+  initiateAccess: (auctionId: string) =>
+    apiRequest<DocumentAccessInitiation>(v1(`/documents/access/${auctionId}/initiate`), { method: "POST" }),
   upload: (form: FormData) =>
     apiRequest<DocumentRecord>(v1("/documents"), { method: "POST", body: form }),
   listMine: () => apiRequest<ItemList<DocumentRecord>>(v1("/documents/me")),

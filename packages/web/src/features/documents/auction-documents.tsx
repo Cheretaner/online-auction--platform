@@ -12,6 +12,7 @@ import { useAuctionDocuments, useUploadDocument } from "@/features/operations/qu
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
+import { documentsApi } from "@/lib/api/resources";
 import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -35,6 +36,7 @@ const OCR_DOCUMENT_TYPES = new Set<DocumentType>(["specification", "inspection_r
 
 export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; canReview?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [paymentBusy, setPaymentBusy] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
   const [reviewedText, setReviewedText] = useState<string | null>(null);
   const t = useT("auctions");
@@ -83,6 +85,23 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
           </p>
         </div>
         <div className="flex flex-wrap gap-2 sm:shrink-0">
+        {doc.requiresPayment && doc.auctionId ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={paymentBusy}
+            onClick={() => {
+              setPaymentBusy(true);
+              void documentsApi.initiateAccess(doc.auctionId!).then((result) => {
+                if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
+                else toast.success("Document access is active.");
+              }).catch((error: unknown) => toast.error(getErrorMessage(error, "Could not start document payment.")))
+                .finally(() => setPaymentBusy(false));
+            }}
+          >
+            {paymentBusy ? "Opening payment..." : "Pay to access"}
+          </Button>
+        ) : null}
         {canReview && supportsOcr ? (
           <Button
             size="sm"

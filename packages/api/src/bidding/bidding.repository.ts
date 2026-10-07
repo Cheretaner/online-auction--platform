@@ -177,6 +177,26 @@ export async function insertBid(input: {
   return mapBid(result.rows[0]);
 }
 
+export async function listFormFields(auctionId: string): Promise<Array<{
+  id: string; fieldType: string; required: boolean; options: string[]; minValue: string | null; maxValue: string | null;
+}>> {
+  const rows = await queryAll<{
+    id: string; field_type: string; required: boolean; options: string[]; min_value: string | null; max_value: string | null;
+  }>(
+    "SELECT id, field_type, required, options, min_value, max_value FROM auction_form_fields WHERE auction_id = $1 ORDER BY position",
+    [auctionId],
+  );
+  return rows.map((row) => ({ id: row.id, fieldType: row.field_type, required: row.required, options: row.options ?? [], minValue: row.min_value, maxValue: row.max_value }));
+}
+
+export async function saveFormResponses(bidId: string, responses: Record<string, string>): Promise<void> {
+  await query(
+    `INSERT INTO bid_form_responses (bid_id, responses) VALUES ($1, $2)
+     ON CONFLICT (bid_id) DO UPDATE SET responses = EXCLUDED.responses`,
+    [bidId, JSON.stringify(responses)],
+  );
+}
+
 export async function applyAuctionBidState(input: {
   auctionId: string;
   highestBid: string;

@@ -6,6 +6,7 @@ export const CreateDocumentRequest = z.object({
   docType: z.enum(DOCUMENT_TYPES),
   fileName: z.string().min(1).max(200),
   mimeType: z.string().min(1).max(80),
+  requiresPayment: z.boolean().optional(),
 });
 export type CreateDocumentRequest = z.infer<typeof CreateDocumentRequest>;
 
@@ -20,6 +21,7 @@ export const Document = z.object({
   sizeBytes: z.number().int().positive(), 
   checksum: z.string().length(64),       
   isPrivate: z.boolean(),
+  requiresPayment: z.boolean(),
   createdAt: z.string().datetime(),
 });
 export type Document = z.infer<typeof Document>;

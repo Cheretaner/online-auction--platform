@@ -78,6 +78,7 @@ export const DOCUMENT_TYPES = [
   "image",
   "identity_document",
   "deposit_release_evidence",
+  "cpo_proof",
   "other",
 ] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];

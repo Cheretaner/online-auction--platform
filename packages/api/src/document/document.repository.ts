@@ -13,6 +13,7 @@ interface DbDocument {
   file_size_bytes: string; // BIGINT comes as string from pg
   checksum_sha256: string;
   is_private: boolean;
+  requires_payment: boolean;
   summary: string | null;
   extracted_text: string | null;
   ocr_status: string;
@@ -32,6 +33,7 @@ function mapDocument(row: DbDocument): DocumentRecord {
     fileSizeBytes: Number(row.file_size_bytes),
     checksumSha256: row.checksum_sha256,
     isPrivate: row.is_private,
+    requiresPayment: row.requires_payment,
     summary: row.summary,
     extractedText: row.extracted_text,
     ocrStatus: row.ocr_status,
@@ -50,10 +52,11 @@ export async function createDocument(input: {
   fileSizeBytes: number;
   checksumSha256: string;
   isPrivate: boolean;
+  requiresPayment?: boolean;
 }): Promise<DocumentRecord> {
   const result = await query<DbDocument>(
-    `INSERT INTO documents (auction_id, uploaded_by, document_type, file_name, storage_path, mime_type, file_size_bytes, checksum_sha256, is_private)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    `INSERT INTO documents (auction_id, uploaded_by, document_type, file_name, storage_path, mime_type, file_size_bytes, checksum_sha256, is_private, requires_payment)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
     [
       input.auctionId ?? null,
       input.uploadedBy,
@@ -64,6 +67,7 @@ export async function createDocument(input: {
       input.fileSizeBytes,
       input.checksumSha256,
       input.isPrivate,
+      input.requiresPayment ?? false,
     ],
   );
   return mapDocument(result.rows[0]);

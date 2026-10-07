@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { CircleAlert, Copy, Download, ReceiptText, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +13,17 @@ import { explainBidError, type BidErrorExplanation } from "@/lib/bid-errors";
 import { formatMoney } from "@/lib/format";
 import { createSealedCommitment, normalizeAmount, verifySealedCommitment } from "@/lib/sealed-bid";
 import { useT } from "@/i18n/context";
+import { apiRequest, v1 } from "@/lib/api/client";
+
+interface AuctionFormField {
+  id: string;
+  label: string;
+  fieldType: "text" | "number" | "choice" | "range";
+  options: string[];
+  minValue: number | null;
+  maxValue: number | null;
+  required: boolean;
+}
 
 interface PendingAttempt {
   amount: string;
@@ -49,6 +61,12 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
   const minimum = minimumBid(auction);
   const t = useT("auctions");
   const tc = useT("common");
+  const [formResponses, setFormResponses] = useState<Record<string, string>>({});
+  const formFields = useQuery({
+    queryKey: ["auction-form-fields", auction.id],
+    queryFn: () => apiRequest<{ items: AuctionFormField[] }>(v1(`/auctions/${auction.id}/form-fields`)),
+    enabled: !disabled,
+  });
 
   async function submit() {
     setProblem(null);
@@ -68,7 +86,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
     const current = attempt.current;
     try {
       await placeBid.mutateAsync({
-        body: { amount: current.amount, commitmentHash: current.commitmentHash },
+        body: { amount: current.amount, commitmentHash: current.commitmentHash, formResponses },
         idempotencyKey: current.idempotencyKey,
       });
       if (sealed && current.commitmentHash && current.nonce) {
@@ -96,7 +114,33 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
           void submit();
         }}
       >
-        <div className="flex-1 space-y-1.5">
+        <div className="flex-1 space-y-3">
+          {formFields.data?.items.map((field) => (
+            <div key={field.id} className="space-y-1.5">
+              <Label htmlFor={`auction-field-${field.id}`}>{field.label}{field.required ? " *" : ""}</Label>
+              {field.fieldType === "choice" ? (
+                <select
+                  id={`auction-field-${field.id}`}
+                  className="h-11 w-full rounded-md border bg-background px-3"
+                  value={formResponses[field.id] ?? ""}
+                  onChange={(event) => setFormResponses((current) => ({ ...current, [field.id]: event.target.value }))}
+                >
+                  <option value="">Select an option</option>
+                  {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              ) : (
+                <Input
+                  id={`auction-field-${field.id}`}
+                  type={field.fieldType === "number" || field.fieldType === "range" ? "number" : "text"}
+                  min={field.minValue ?? undefined}
+                  max={field.maxValue ?? undefined}
+                  value={formResponses[field.id] ?? ""}
+                  onChange={(event) => setFormResponses((current) => ({ ...current, [field.id]: event.target.value }))}
+                  disabled={disabled}
+                />
+              )}
+            </div>
+          ))}
           <Label htmlFor={`bid-amount-${auction.id}`}>{t("bid.yourBid", { currency: tc("currency") })}</Label>
           <Input
             id={`bid-amount-${auction.id}`}

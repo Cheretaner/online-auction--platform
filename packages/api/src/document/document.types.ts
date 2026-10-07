@@ -11,6 +11,7 @@ export interface DocumentRecord {
   fileSizeBytes: number;
   checksumSha256: string;
   isPrivate: boolean;
+  requiresPayment: boolean;
   summary: string | null;
   extractedText: string | null;
   ocrStatus: string;

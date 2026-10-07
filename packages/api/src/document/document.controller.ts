@@ -18,10 +18,11 @@ export const upload: RequestHandler = async (req, res) => {
 
   // Multipart fields arrive as strings, so this body cannot go through a
   // normal Zod body validator — it is checked here instead.
-  const { auctionId, docType, isPrivate } = req.body as {
+  const { auctionId, docType, isPrivate, requiresPayment } = req.body as {
     auctionId?: string;
     docType?: string;
     isPrivate?: string;
+    requiresPayment?: string;
   };
 
   if (!docType || !(DOCUMENT_TYPES as readonly string[]).includes(docType)) {
@@ -47,6 +48,9 @@ export const upload: RequestHandler = async (req, res) => {
       (auth.roles.some((role) => OFFICER_ROLES.includes(role)) && auth.organizationId === owner.orgId);
     if (!isStaff) keepPrivate = true;
   }
+  if (requiresPayment === "true" && !auctionId) {
+    throw AppError.badRequest("Paid documents must belong to an auction");
+  }
 
   const document = await service.uploadDocument({
     auctionId: auctionId || undefined,
@@ -57,6 +61,7 @@ export const upload: RequestHandler = async (req, res) => {
     mimeType: file.mimetype,
     data: file.buffer,
     isPrivate: keepPrivate,
+    requiresPayment: requiresPayment === "true",
   });
 
   res.status(HttpStatus.CREATED).json(document);

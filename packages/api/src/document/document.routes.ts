@@ -7,8 +7,15 @@ import * as controller from "./document.controller.js";
 import * as searchController from "./document-search.controller.js";
 import { documentUpload } from "./upload.middleware.js";
 import { requireDocumentUploads } from "./document-availability.middleware.js";
+import * as accessController from "./document-access.controller.js";
 
 export const documentRouter = Router();
+
+documentRouter.post(
+  "/access/:auctionId/initiate",
+  requireAuth(["bidder"]),
+  asyncHandler(accessController.initiate),
+);
 
 documentRouter.post(
   "/",

@@ -66,6 +66,26 @@ export async function placeBid(input: {
       const bidder = await repo.findBidder(input.bidderId);
       if (!bidder) throw new AppError("Bidder not found", HttpStatus.NOT_FOUND);
 
+      const formFields = await repo.listFormFields(auction.id);
+      for (const field of formFields) {
+        const value = input.body.formResponses?.[field.id];
+        if (field.required && (!value || !value.trim())) {
+          throw AppError.badRequest(`Required auction field '${field.id}' is missing`);
+        }
+        if (!value) continue;
+        if (field.fieldType === "choice" && !field.options.includes(value)) {
+          throw AppError.badRequest(`Invalid choice for auction field '${field.id}'`);
+        }
+        if (["number", "range"].includes(field.fieldType)) {
+          const numeric = Number(value);
+          if (!Number.isFinite(numeric) ||
+            (field.minValue !== null && numeric < Number(field.minValue)) ||
+            (field.maxValue !== null && numeric > Number(field.maxValue))) {
+            throw AppError.badRequest(`Value for auction field '${field.id}' is outside the allowed range`);
+          }
+        }
+      }
+
       const isOrgOfficer = await repo.isOrgOfficer(auction.orgId, input.bidderId);
       const depositVerified = await repo.hasVerifiedDeposit(
         auction.id,
@@ -118,6 +138,7 @@ export async function placeBid(input: {
       if (!isSealed) {
         await repo.supersedeOtherActiveBids(auction.id, input.bidderId, bid.id);
       }
+      await repo.saveFormResponses(bid.id, input.body.formResponses ?? {});
 
       const tallies = await repo.countActiveBids(auction.id);
       const highest = isSealed ? auction.currentHighestBid : maxMoney(tallies.highest, input.body.amount);
