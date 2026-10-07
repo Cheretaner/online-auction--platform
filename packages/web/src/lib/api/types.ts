@@ -4,6 +4,7 @@ import type {
   AuctionType,
   CreateAuctionItemRequest,
   DocumentType,
+  OrgType,
   Role,
   VerificationStatus,
 } from "@auction/shared";
@@ -93,7 +94,7 @@ export interface OrganizationRecord {
   id: string;
   name: string;
   slug: string;
-  orgType: string;
+  orgType: OrgType;
   taxpayerId: string;
   region: string;
   contactEmail: string;
@@ -110,6 +111,10 @@ export interface OrganizationMember {
   email?: string;
   fullName?: string;
   role: Role;
+}
+
+export interface AdminUserRecord extends PublicProfile {
+  roles: Role[];
 }
 
 export interface AuctionItem {

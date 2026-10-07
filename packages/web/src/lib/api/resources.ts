@@ -119,6 +119,7 @@ export const documentsApi = {
     apiRequest<{ items: DocumentOcrSearchHit[] }>(v1(`/documents/ocr/search${queryString({ auctionId, q })}`)),
   reviewOcrReference: (id: string, candidate: string) =>
     apiRequest<{ item: DepositReferenceOcrReview }>(v1(`/documents/${id}/ocr/reference-review`), { method: "POST", body: { candidate } }),
+  delete: (id: string) => apiRequest<void>(v1(`/documents/${id}`), { method: "DELETE", parse: "void" }),
   download: (id: string) => apiRequest<Blob>(v1(`/documents/${id}/content`), { parse: "blob" }),
 };
 

@@ -67,8 +67,11 @@ const envSchema = z
       .enum(["true", "false"])
       .default("true")
       .transform((value) => value === "true"),
-    STORAGE_DRIVER: z.enum(["memory", "filesystem"]).default("filesystem"),
+    STORAGE_DRIVER: z.enum(["memory", "filesystem", "supabase"]).default("filesystem"),
     STORAGE_DIR: z.string().default("./data/storage"),
+    SUPABASE_URL: z.string().url().optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+    SUPABASE_DOCUMENT_BUCKET: z.string().default("documents"),
     DOCUMENT_UPLOADS_ENABLED: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
     FILE_SCAN_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
     CLAMAV_HOST: z.string().default("127.0.0.1"),
@@ -143,14 +146,30 @@ const envSchema = z
         message: "must be true in production so uploads are scanned before storage",
       });
     }
-    if (value.NODE_ENV === "production" && value.STORAGE_DRIVER !== "filesystem") {
+    if (value.NODE_ENV === "production" && value.STORAGE_DRIVER === "supabase") {
+      if (!value.SUPABASE_URL) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SUPABASE_URL"],
+          message: "is required in production when STORAGE_DRIVER is supabase",
+        });
+      }
+      if (!value.SUPABASE_SERVICE_ROLE_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["SUPABASE_SERVICE_ROLE_KEY"],
+          message: "is required in production when STORAGE_DRIVER is supabase",
+        });
+      }
+    }
+    if (value.NODE_ENV === "production" && value.STORAGE_DRIVER !== "filesystem" && value.STORAGE_DRIVER !== "supabase") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["STORAGE_DRIVER"],
-        message: "must be filesystem in production; use a persistent mounted volume for uploaded documents",
+        message: "must be filesystem or supabase in production",
       });
     }
-    if (value.NODE_ENV === "production" && !isAbsolute(value.STORAGE_DIR)) {
+    if (value.NODE_ENV === "production" && value.STORAGE_DRIVER !== "supabase" && !isAbsolute(value.STORAGE_DIR)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["STORAGE_DIR"],

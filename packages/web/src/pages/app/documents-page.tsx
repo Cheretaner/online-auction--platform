@@ -10,11 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DocumentRow } from "@/features/documents/auction-documents";
 import { useMyDocuments, usePlatformCapabilities } from "@/features/operations/queries";
+import { useAuth } from "@/features/auth/auth-provider";
+import { hasRole } from "@/lib/format";
 import { useT } from "@/i18n/context";
 
 export default function DocumentsPage() {
   const query = useMyDocuments();
   const uploads = usePlatformCapabilities();
+  const { roles } = useAuth();
+  const canDelete = hasRole(roles, "auction_officer", "org_admin", "super_admin");
   const [search, setSearch] = useState("");
   const t = useT("account");
   const tc = useT("common");
@@ -84,7 +88,7 @@ export default function DocumentsPage() {
                 <CardContent className="p-4 sm:p-5">
                   <ul className="divide-y">
                     {filtered.map((document) => (
-                      <DocumentRow key={document.id} doc={document} />
+                      <DocumentRow key={document.id} doc={document} canDelete={canDelete} />
                     ))}
                   </ul>
                 </CardContent>

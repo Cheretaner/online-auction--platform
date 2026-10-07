@@ -88,6 +88,29 @@ export async function findByUploader(uploadedBy: string): Promise<DocumentRecord
   return rows.map(mapDocument);
 }
 
+export async function hasReferences(documentId: string): Promise<boolean> {
+  const result = await queryOne<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM deposits
+       WHERE document_id = $1 OR release_document_id = $1
+       UNION ALL
+       SELECT 1 FROM verifications
+       WHERE document_id = $1
+       LIMIT 1
+     ) AS exists`,
+    [documentId],
+  );
+  return Boolean(result?.exists);
+}
+
+export async function deleteById(documentId: string): Promise<boolean> {
+  const result = await query<{ id: string }>(
+    "DELETE FROM documents WHERE id = $1 RETURNING id",
+    [documentId],
+  );
+  return result.rows.length === 1;
+}
+
 export async function updateDocumentOcrResult(documentId: string, extractedText: string, ocrStatus: string): Promise<void> {
   await query(
     "UPDATE documents SET extracted_text = $1, ocr_status = $2, updated_at = NOW() WHERE id = $3",

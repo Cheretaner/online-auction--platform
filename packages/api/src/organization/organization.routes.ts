@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { AddOrganizationMemberRequest, CreateOrganizationRequest } from "@auction/shared";
+import { AddOrganizationMemberRequest, CreateOrganizationRequest, UpdateOrganizationRequest } from "@auction/shared";
 import { optionalAuth, requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { validate } from "../shared/middleware/validate.middleware.js";
@@ -21,6 +21,19 @@ organizationRouter.post(
   requireAuth(["super_admin"]),
   validate(CreateOrganizationRequest),
   asyncHandler(controller.create),
+);
+
+organizationRouter.patch(
+  "/:id",
+  requireAuth(["super_admin"]),
+  validate(UpdateOrganizationRequest),
+  asyncHandler(controller.update),
+);
+
+organizationRouter.delete(
+  "/:id",
+  requireAuth(["super_admin"]),
+  asyncHandler(controller.remove),
 );
 
 organizationRouter.get("/:id/members", requireAuth([...ADMINS]), asyncHandler(controller.listMembers));

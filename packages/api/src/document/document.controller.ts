@@ -79,6 +79,12 @@ export const getById: RequestHandler = async (req, res) => {
   res.json(doc);
 };
 
+export const deleteById: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  await service.deleteDocument(routeParam(req.params.id), auth);
+  res.status(HttpStatus.NO_CONTENT).send();
+};
+
 export const download: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
   const result = await service.readDocument(routeParam(req.params.id), auth);

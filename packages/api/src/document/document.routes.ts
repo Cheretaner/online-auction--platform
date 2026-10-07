@@ -37,6 +37,11 @@ documentRouter.get(
 );
 
 documentRouter.get("/:id", requireAuth(), asyncHandler(controller.getById));
+documentRouter.delete(
+  "/:id",
+  requireAuth(["auction_officer", "org_admin", "super_admin"]),
+  asyncHandler(controller.deleteById),
+);
 documentRouter.get("/:id/content", requireAuth(), asyncHandler(controller.download));
 documentRouter.get("/:id/ocr", requireAuth(), asyncHandler(controller.getOcr));
 documentRouter.post("/:id/ocr", requireAuth(), asyncHandler(controller.startOcr));

@@ -6,6 +6,7 @@ import type {
   CreateCategoryRequest,
   CreateDepositRequest,
   CreateOrganizationRequest,
+  CreateUserRequest,
   GenerateReportRequest,
   OpenDisputeRequest,
   ReviewDepositRequest,
@@ -30,7 +31,7 @@ import {
   platformApi,
   commandCenterApi,
 } from "@/lib/api/resources";
-import { organizationsApi } from "@/lib/api/organizations";
+import { organizationsApi, usersApi } from "@/lib/api/organizations";
 import { queryKeys } from "@/lib/query/keys";
 import type { AutofetchItemCorrections } from "@/lib/api/types";
 
@@ -81,6 +82,55 @@ export function useCreateOrganization() {
       organizationsApi.create(body),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+  });
+}
+
+export function useUpdateOrganization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof organizationsApi.update>[1] }) =>
+      organizationsApi.update(id, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+  });
+}
+
+export function useDeleteOrganization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => organizationsApi.delete(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+  });
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: queryKeys.users.list(),
+    queryFn: () => usersApi.list(),
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateUserRequest) => usersApi.create(body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all }),
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Parameters<typeof usersApi.update>[1] }) =>
+      usersApi.update(id, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all }),
+  });
+}
+
+export function useDeactivateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => usersApi.deactivate(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all }),
   });
 }
 
@@ -273,6 +323,14 @@ export function useUploadDocument() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (form: FormData) => documentsApi.upload(form),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+  });
+}
+
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => documentsApi.delete(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
   });
 }
