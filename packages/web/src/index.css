@@ -11,124 +11,176 @@
  * destructive) are used only for state, never for decoration.
  */
 :root {
-  --background: oklch(0.975 0.012 94);
-  --foreground: oklch(0.22 0.035 158);
-  --card: oklch(0.995 0.004 96);
-  --card-foreground: oklch(0.22 0.035 158);
-  --popover: oklch(0.995 0.004 96);
-  --popover-foreground: oklch(0.22 0.035 158);
-  --primary: oklch(0.39 0.095 158);
-  --primary-foreground: oklch(0.98 0.01 90);
-  --secondary: oklch(0.935 0.022 94);
-  --secondary-foreground: oklch(0.28 0.045 158);
-  --muted: oklch(0.95 0.016 94);
-  --muted-foreground: oklch(0.46 0.03 158);
-  --accent: oklch(0.92 0.04 88);
-  --accent-foreground: oklch(0.3 0.05 70);
-  --border: oklch(0.89 0.022 94);
-  --input: oklch(0.82 0.022 94);
-  --ring: oklch(0.45 0.095 158);
+  /* System Foundations - Crisp Alabaster & Editorial Cream (Hue: 75-94) */
+  --background: oklch(0.985 0.005 94);           /* Clean, ultra-bright premium page canvas */
+  --foreground: oklch(0.14 0.015 75);            /* Deep obsidian slate text for elegant typography */
+  --card: oklch(1.0 0 0);                        /* Pure white surface for content cards */
+  --card-foreground: oklch(0.14 0.015 75);
+  --popover: oklch(1.0 0 0);
+  --popover-foreground: oklch(0.14 0.015 75);
 
-  --destructive: oklch(0.53 0.19 27);
-  --destructive-foreground: oklch(0.98 0.01 90);
-  --success: oklch(0.5 0.12 150);
-  --success-foreground: oklch(0.98 0.01 90);
-  --warning: oklch(0.55 0.12 65);
-  --warning-foreground: oklch(0.98 0.01 90);
-  --info: oklch(0.5 0.11 245);
-  --info-foreground: oklch(0.98 0.01 90);
+  /* Primary Brand Action - Deep Corporate Gold (Hue: 75) */
+  --primary: oklch(0.42 0.11 75);                /* Luxurious, high-contrast gold for primary actions */
+  --primary-foreground: oklch(0.99 0.002 0);     /* Crisp white text overlay inside primary buttons */
+  --secondary: oklch(0.935 0.012 94);            /* Muted background for supporting elements */
+  --secondary-foreground: oklch(0.24 0.02 75);
+  
+  /* Muted Text & Supporting Copy */
+  --muted: oklch(0.95 0.008 94);
+  --muted-foreground: oklch(0.48 0.015 75);      /* Highly legible subtitle copy ratio */
+  
+  --accent: oklch(0.94 0.05 78);                 /* Elegant warm-cream badge backgrounds */
+  --accent-foreground: oklch(0.35 0.09 75);      /* Rich amber text for focus items */
 
-  /* Dark brand band (hero, process band, footer, workspace sidebar). Dark in both themes. */
-  --inverse: oklch(0.27 0.05 160);
-  --inverse-foreground: oklch(0.97 0.01 90);
-  --highlight: oklch(0.82 0.1 88);
-  --highlight-strong: oklch(0.89 0.08 92);
+  /* Structural Dividers & Controls */
+  --border: oklch(0.88 0.01 94);                 /* Razor-thin layout lines */
+  --input: oklch(0.84 0.015 94);
+  --ring: oklch(0.42 0.11 75);                   /* Matches core brand focus states */
 
+  /* Pure Feedback Ecosystem (Calibrated for High Legibility) */
+  --destructive: oklch(0.55 0.18 28);            /* Crisp ruby warning red */
+  --destructive-foreground: oklch(0.99 0.002 0);
+  --success: oklch(0.52 0.14 145);               /* Professional mint-green success validation */
+  --success-foreground: oklch(0.99 0.002 0);
+  --warning: oklch(0.58 0.13 75);                /* Attention alert brown-gold */
+  --warning-foreground: oklch(0.99 0.002 0);
+  --info: oklch(0.50 0.13 240);                  /* Clean corporate blue */
+  --info-foreground: oklch(0.99 0.002 0);
+
+  /* Layout Inverse Overlays (Persistent Dark Headers/Footers) */
+  --inverse: oklch(0.14 0.015 75);
+  --inverse-foreground: oklch(0.985 0.005 94);
+  --highlight: oklch(0.90 0.06 78);
+  --highlight-strong: oklch(0.84 0.08 75);
+
+  /* Persistent Navigation Structures */
   --sidebar: var(--inverse);
   --sidebar-foreground: var(--inverse-foreground);
-  --sidebar-accent: oklch(0.34 0.055 160);
-  --sidebar-accent-foreground: oklch(0.98 0.01 90);
-  --sidebar-border: oklch(0.35 0.035 160);
+  --sidebar-accent: oklch(0.22 0.02 75);
+  --sidebar-accent-foreground: oklch(0.99 0.002 0);
+  --sidebar-border: oklch(0.24 0.015 75);
 
   --radius: 0.625rem;
 }
 
 .dark {
-  --background: oklch(0.19 0.025 158);
-  --foreground: oklch(0.95 0.012 95);
-  --card: oklch(0.235 0.025 158);
-  --card-foreground: oklch(0.95 0.012 95);
-  --popover: oklch(0.255 0.028 158);
-  --popover-foreground: oklch(0.95 0.012 95);
-  --primary: oklch(0.78 0.105 155);
-  --primary-foreground: oklch(0.17 0.035 158);
-  --secondary: oklch(0.29 0.032 158);
-  --secondary-foreground: oklch(0.95 0.012 95);
-  --muted: oklch(0.275 0.026 158);
-  --muted-foreground: oklch(0.74 0.022 95);
-  --accent: oklch(0.34 0.052 82);
-  --accent-foreground: oklch(0.96 0.02 90);
-  --border: oklch(0.34 0.028 158);
-  --input: oklch(0.39 0.03 158);
-  --ring: oklch(0.78 0.105 155);
+  --background: oklch(0.10 0.010 250);         
+  --foreground: oklch(0.98 0.002 0);          
+  --card: oklch(0.15 0.014 250);          
+  --card-foreground: oklch(0.98 0.002 0);
+  --popover: oklch(0.18 0.016 250);
+  --popover-foreground: oklch(0.98 0.002 0);
 
-  --destructive: oklch(0.7 0.16 25);
-  --destructive-foreground: oklch(0.18 0.03 25);
-  --success: oklch(0.76 0.13 150);
-  --success-foreground: oklch(0.18 0.03 155);
-  --warning: oklch(0.8 0.12 75);
-  --warning-foreground: oklch(0.2 0.04 70);
-  --info: oklch(0.75 0.1 245);
-  --info-foreground: oklch(0.18 0.03 245);
+  --primary: oklch(0.79 0.135 78);             
+  --primary-foreground: oklch(0.10 0.010 250); 
+  --secondary: oklch(0.20 0.018 250);           
+  --secondary-foreground: oklch(0.92 0.005 250);
+  
+  --muted: oklch(0.17 0.015 250);
+  --muted-foreground: oklch(0.68 0.012 250);   
+  
+  --accent: oklch(0.84 0.145 78);              
+  --accent-foreground: oklch(0.12 0.020 78);
 
-  --inverse: oklch(0.16 0.03 158);
-  --inverse-foreground: oklch(0.95 0.012 95);
-  --sidebar-accent: oklch(0.25 0.035 158);
-  --sidebar-border: oklch(0.29 0.025 158);
+  --border: oklch(0.23 0.016 250);              
+  --input: oklch(0.15 0.014 250);
+  --ring: oklch(0.79 0.135 78);                
+
+  /* High-Visibility Status Indicators */
+  --destructive: oklch(0.65 0.190 28);         
+  --destructive-foreground: oklch(0.98 0.002 0);
+  --success: oklch(0.76 0.135 145);            
+  --success-foreground: oklch(0.10 0.010 250);
+  --warning: oklch(0.79 0.135 78);             
+  --warning-foreground: oklch(0.10 0.010 250);
+  --info: oklch(0.74 0.120 240);               
+  --info-foreground: oklch(0.10 0.010 250);
+
+  /* Layout Inverse Configurations */
+  --inverse: oklch(0.98 0.002 0);
+  --inverse-foreground: oklch(0.10 0.010 250);
+  --sidebar-accent: oklch(0.20 0.018 250);
+  --sidebar-border: oklch(0.22 0.016 250);
 }
+
 
 /*
- * Product surfaces use a layered ink/navy system, with teal actions and a gold
- * keyboard-focus color. The homepage keeps its established forest palette.
+ * Product themes systematically locked to the Obsidian Gold architecture.
+ * Eliminates the historical identity split completely.
  */
 .dark.product-theme {
-  --background: oklch(0.1831 0.0309 263.4);
-  --foreground: oklch(0.9683 0.0069 247.9);
-  --card: oklch(0.2232 0.0401 262.5);
-  --card-foreground: oklch(0.9683 0.0069 247.9);
-  --popover: oklch(0.2602 0.0454 260.5);
-  --popover-foreground: oklch(0.9683 0.0069 247.9);
-
-  --primary: oklch(0.8549 0.1251 181.1);
-  --primary-foreground: oklch(0.1831 0.0309 263.4);
-  --secondary: oklch(0.2602 0.0454 260.5);
-  --secondary-foreground: oklch(0.9683 0.0069 247.9);
-  --muted: oklch(0.245 0.037 260);
-  --muted-foreground: oklch(0.8098 0.0262 255.6);
-  --accent: oklch(0.36 0.075 78);
-  --accent-foreground: oklch(0.97 0.025 90);
-
-  --border: oklch(0.38 0.036 260);
-  --input: oklch(0.6057 0.0444 258.8);
-  --ring: oklch(0.8987 0.1857 97.9);
-
-  --success: oklch(0.75 0.14 155);
-  --success-foreground: oklch(0.1831 0.0309 263.4);
-  --warning: oklch(0.82 0.13 78);
-  --warning-foreground: oklch(0.2 0.035 75);
-  --destructive: oklch(0.79 0.16 25);
-  --destructive-foreground: oklch(0.18 0.03 25);
-  --info: oklch(0.76 0.11 235);
-  --info-foreground: oklch(0.16 0.025 245);
-
-  --inverse: oklch(0.1831 0.0309 263.4);
-  --inverse-foreground: oklch(0.9683 0.0069 247.9);
-  --sidebar: oklch(0.2232 0.0401 262.5);
-  --sidebar-foreground: oklch(0.9683 0.0069 247.9);
-  --sidebar-accent: oklch(0.2602 0.0454 260.5);
-  --sidebar-accent-foreground: oklch(0.9683 0.0069 247.9);
-  --sidebar-border: oklch(0.38 0.036 260);
+  --background: var(--background);
+  --foreground: var(--foreground);
+  --card: var(--card);
+  --card-foreground: var(--card-foreground);
+  --popover: var(--popover);
+  --popover-foreground: var(--popover-foreground);
+  --primary: var(--primary);
+  --primary-foreground: var(--primary-foreground);
+  --secondary: var(--secondary);
+  --secondary-foreground: var(--secondary-foreground);
+  --muted: var(--muted);
+  --muted-foreground: var(--muted-foreground);
+  --accent: var(--accent);
+  --accent-foreground: var(--accent-foreground);
+  --border: var(--border);
+  --input: var(--input);
+  --ring: var(--ring);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: var(--secondary);
+  --sidebar-border: var(--border);
 }
+
+@theme inline {
+  /* Ethiopic fallbacks: the Latin faces have no Ge'ez glyphs, so Amharic text uses Noto. */
+  --font-sans: "Hanken Grotesk", "Noto Sans Ethiopic", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Newsreader", "Noto Serif Ethiopic", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-inverse: var(--inverse);
+  --color-inverse-foreground: var(--inverse-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-strong: var(--highlight-strong);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  /* sm: badges, chips · md: buttons, inputs, menu items · lg: cards, dialogs · xl: large feature bands */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+
 
 @theme inline {
   /* Ethiopic fallbacks: the Latin faces have no Ge'ez glyphs, so Amharic text uses Noto. */
