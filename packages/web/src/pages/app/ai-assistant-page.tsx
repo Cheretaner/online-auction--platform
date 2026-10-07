@@ -7,7 +7,7 @@ import { useT } from "@/i18n/context";
 export default function AiAssistantPage() {
   const t = useT("tools");
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-4">
       <PageHeader
         title={t("assistant.pageTitle")}
         description={t("assistant.pageDescription")}

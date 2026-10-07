@@ -88,7 +88,7 @@ const envSchema = z
     AI_PROVIDER: z.enum(["auto", "stub", "gemini", "openrouter"]).default("auto"),
     AI_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
     GEMINI_API_KEY: z.string().optional(),
-    GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta/openai"),
+    GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta"),
     GEMINI_MODEL: z.string().default("gemini-flash-latest"),
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),

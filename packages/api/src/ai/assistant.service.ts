@@ -3,11 +3,22 @@ import { PLATFORM_GUIDE } from "./assistant.knowledge.js";
 import * as auctionRepo from "../auction/auction.repository.js";
 import * as auctionItemRepo from "../auction/auction-item.repository.js";
 import { env } from "../config/env.js";
+import * as audit from "../audit/audit.service.js";
+import { buildAssistantProvenance } from "./assistant.provenance.js";
+import {
+  buildAssistantWorkflowPrompt,
+  type AssistantWorkflowMode,
+} from "./assistant.workflow.js";
 
 export async function askAssistant(
   prompt: string,
   auctionId?: string,
   preferredLanguage?: "en" | "am",
+  mode: AssistantWorkflowMode = "general",
+  role = "authenticated_user",
+  sourceLinks: string[] = [],
+  actorId?: string,
+  actorRoles: string[] = [],
 ): Promise<{ answer: string; provider: string; fallback: boolean }> {
   const webBaseUrl = env.WEB_BASE_URL.replace(/\/$/, "");
   const websiteLinks = [
@@ -31,15 +42,7 @@ export async function askAssistant(
     `Reports workspace (authorized staff): ${webBaseUrl}/app/reports`,
     `Audit workspace (authorized staff): ${webBaseUrl}/app/audit`,
   ].join("\n");
-  const contextParts = [
-    preferredLanguage
-      ? `Language requirement: Reply in ${preferredLanguage === "am" ? "Amharic (አማርኛ)" : "English"}, as selected by the user. Preserve auction names, identifiers, dates, and ETB amounts exactly as provided.`
-      : "Language requirement: Reply in the same language as the user's question. Support English and Amharic (አማርኛ). Preserve auction names, identifiers, dates, and ETB amounts exactly as provided. If the question mixes languages, use the language used for the main request.",
-    `Verified Cheretanet website guide:\n${PLATFORM_GUIDE}`,
-    `Website base URL: ${webBaseUrl}`,
-    `Verified website links (use Markdown links with these exact URLs; signed-in and staff pages require the stated access):\n${websiteLinks}`,
-    `User question:\n${prompt}`,
-  ];
+  const contextParts: string[] = [];
   if (auctionId) {
     const auction = await auctionRepo.findById(auctionId);
     if (auction) {
@@ -75,5 +78,26 @@ export async function askAssistant(
       ].filter(Boolean).join("\n"));
     }
   }
-  return aiProviderAdapter.assist(contextParts.join("\n\n"));
+
+  const verifiedContext = contextParts.join("\n\n");
+  const workflowPrompt = buildAssistantWorkflowPrompt({
+    mode,
+    role,
+    prompt,
+    baseUrl: webBaseUrl,
+    verifiedContext,
+    sourceLinks: [...sourceLinks, ...websiteLinks.split("\n").filter((link) => link.startsWith("http"))],
+  });
+  const result = await aiProviderAdapter.assist(workflowPrompt);
+  await audit.appendAuditEvent(buildAssistantProvenance({
+    actorId,
+    actorRoles,
+    auctionId,
+    mode,
+    role,
+    provider: result.provider,
+    fallback: result.fallback,
+    sourceLinks,
+  }));
+  return result;
 }

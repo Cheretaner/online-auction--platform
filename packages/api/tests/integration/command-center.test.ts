@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { env } from "../../src/config/env.js";
 import {
-  TEST_DATABASE_URL,
   addMember,
   api,
   createAuction,
@@ -11,7 +11,9 @@ import {
   type TestContext,
 } from "./helpers.js";
 
-describe.skipIf(!TEST_DATABASE_URL)("operational exception command center (real Postgres)", () => {
+const databaseUrl = env.DATABASE_URL || process.env.TEST_DATABASE_URL;
+
+describe.skipIf(!databaseUrl)("operational exception command center (real Postgres)", () => {
   let ctx: TestContext;
   let orgId: string;
   let otherOrgId: string;

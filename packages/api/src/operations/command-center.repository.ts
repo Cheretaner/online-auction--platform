@@ -22,10 +22,10 @@ export async function listExceptions(orgId?: string): Promise<CommandCenterExcep
   const rows = await queryAll<DbException>(
     `WITH organization_items AS (
       SELECT
-        v.id,
+        v.id::text AS id,
         'verification' AS source,
         'KYC verification' AS title,
-        v.status AS status,
+        v.status::text AS status,
         CASE v.status
           WHEN 'pending' THEN 'high'
           WHEN 'unverified' THEN 'medium'
@@ -42,14 +42,14 @@ export async function listExceptions(orgId?: string): Promise<CommandCenterExcep
 
       UNION ALL
       SELECT
-        d.id,
+        d.id::text,
         'deposit' AS source,
         'Deposit ' || d.status AS title,
-        d.status AS status,
+        d.status::text AS status,
         CASE d.status WHEN 'pending' THEN 'high' ELSE 'low' END AS severity,
         d.created_at,
         d.updated_at,
-        d.auction_id,
+        d.auction_id::text AS auction_id,
         '/app/deposits' AS action_path
       FROM deposits d
       JOIN auctions a ON a.id = d.auction_id
@@ -58,14 +58,14 @@ export async function listExceptions(orgId?: string): Promise<CommandCenterExcep
 
       UNION ALL
       SELECT
-        d.id,
+        d.id::text,
         'dispute' AS source,
         'Dispute ' || d.status AS title,
-        d.status AS status,
+        d.status::text AS status,
         CASE d.status WHEN 'open' THEN 'high' WHEN 'under_review' THEN 'medium' ELSE 'low' END AS severity,
         d.created_at,
         d.updated_at,
-        d.auction_id,
+        d.auction_id::text AS auction_id,
         '/app/disputes' AS action_path
       FROM disputes d
       JOIN auctions a ON a.id = d.auction_id
@@ -74,14 +74,14 @@ export async function listExceptions(orgId?: string): Promise<CommandCenterExcep
 
       UNION ALL
       SELECT
-        f.id,
+        f.id::text,
         'anomaly' AS source,
         'Anomaly ' || f.severity AS title,
-        f.status AS status,
-        f.severity AS severity,
+        f.status::text AS status,
+        f.severity::text AS severity,
         f.created_at,
         f.updated_at,
-        f.auction_id,
+        f.auction_id::text AS auction_id,
         '/app/ai' AS action_path
       FROM anomaly_flags f
       JOIN auctions a ON a.id = f.auction_id

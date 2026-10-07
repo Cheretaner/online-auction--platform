@@ -82,9 +82,17 @@ export const getAnomaly: RequestHandler = async (req, res) => {
 };
 
 export const assist: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
   const body = req.body as AssistRequest;
-  if (body.auctionId) await assertAuctionAccess(body.auctionId, actorOf(getAuth(req)));
-  const result = await assistantService.askAssistant(body.prompt, body.auctionId, body.language);
+  if (body.auctionId) await assertAuctionAccess(body.auctionId, actorOf(auth));
+  const result = await assistantService.askAssistant(
+    body.prompt,
+    body.auctionId,
+    body.language,
+    body.mode,
+    body.role ?? auth.roles.join(","),
+    body.sourceLinks,
+  );
   res.json(result);
 };
 
