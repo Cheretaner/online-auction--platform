@@ -18,8 +18,7 @@ import {
   UserRound,
   Wallet,
   FolderOpen,
-  Radar,
-} from "lucide-react";
+  Radar,  ListChecks,} from "lucide-react";
 import { hasRole, isOfficer } from "@/lib/format";
 
 export type NavGroup = "Overview" | "Participation" | "Manage" | "Oversight" | "Tools" | "Account";
@@ -42,6 +41,7 @@ export type NavLabel =
   | "reports"
   | "audit"
   | "aiAssistant"
+  | "exceptions"
   | "telegram"
   | "profile";
 
@@ -74,6 +74,7 @@ export function getAppNav(roles: Role[]): NavItem[] {
     { to: "/app/ai", label: "anomalyReview", icon: ScanSearch, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
     { to: "/app/reports", label: "reports", icon: FileText, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
     { to: "/app/audit", label: "audit", icon: ScrollText, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
+    { to: "/app/exceptions", label: "exceptions", icon: ListChecks, group: "Oversight", roles: ["auction_officer", "org_admin", "compliance_officer", "super_admin"] },
     { to: "/app/ai-assistant", label: "aiAssistant", icon: Sparkles, group: "Tools" },
     { to: "/app/telegram", label: "telegram", icon: Send, group: "Tools" },
     { to: "/app/profile", label: "profile", icon: UserRound, group: "Account" },

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/page-header";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -34,8 +34,10 @@ const AWARDABLE = new Set(["closed", "under_review"]);
 
 export default function WorkspaceAuctionDetailPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const auction = useAuction(id);
   const record = auction.data;
+  const focusedDepositId = searchParams.get("source") === "deposit" ? searchParams.get("recordId") ?? undefined : undefined;
   const t = useT("workspace");
   return (
     <div>
@@ -77,13 +79,13 @@ export default function WorkspaceAuctionDetailPage() {
         error={auction.error}
         onRetry={() => void auction.refetch()}
       >
-        {record ? <Workspace auction={record} /> : null}
+        {record ? <Workspace auction={record} focusedDepositId={focusedDepositId} /> : null}
       </QueryState>
     </div>
   );
 }
 
-function Workspace({ auction }: { auction: Auction }) {
+function Workspace({ auction, focusedDepositId }: { auction: Auction; focusedDepositId?: string }) {
   const { roles } = useAuth();
   const anomalies = useAiAnomalies(auction.id);
   const disputes = useDisputes(auction.id);
@@ -125,7 +127,7 @@ function Workspace({ auction }: { auction: Auction }) {
         </TabsContent>
         <TabsContent value="deposits" className="pt-4">
           {Number(auction.depositAmount) > 0 ? (
-            <DepositReview auction={auction} />
+            <DepositReview auction={auction} focusedDepositId={focusedDepositId} />
           ) : (
             <EmptyState size="inline" icon={ShieldCheck} title={t("detail.noBidSecurity")} />
           )}

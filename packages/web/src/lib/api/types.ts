@@ -298,6 +298,18 @@ export interface VerificationRecord {
   updatedAt: string;
 }
 
+export interface CommandCenterException {
+  id: string;
+  source: "verification" | "deposit" | "dispute" | "anomaly";
+  title: string;
+  status: string;
+  severity: "low" | "medium" | "high";
+  createdAt: string;
+  updatedAt: string;
+  auctionId: string | null;
+  actionPath: string;
+}
+
 export interface AuditEvent {
   id: string;
   auctionId: string | null;

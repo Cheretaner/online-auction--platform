@@ -28,10 +28,18 @@ import {
   verificationApi,
   autofetchApi,
   platformApi,
+  commandCenterApi,
 } from "@/lib/api/resources";
 import { organizationsApi } from "@/lib/api/organizations";
 import { queryKeys } from "@/lib/query/keys";
 import type { AutofetchItemCorrections } from "@/lib/api/types";
+
+export function useCommandCenterExceptions() {
+  return useQuery({
+    queryKey: queryKeys.operations.exceptions,
+    queryFn: () => commandCenterApi.exceptions(),
+  });
+}
 
 export function useOrganizations() {
   return useQuery({
