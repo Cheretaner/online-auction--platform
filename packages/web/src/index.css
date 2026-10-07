@@ -54,42 +54,58 @@
 }
 
 .dark {
-  --background: oklch(0.19 0.025 158);
-  --foreground: oklch(0.95 0.012 95);
-  --card: oklch(0.235 0.025 158);
-  --card-foreground: oklch(0.95 0.012 95);
-  --popover: oklch(0.255 0.028 158);
-  --popover-foreground: oklch(0.95 0.012 95);
-  --primary: oklch(0.78 0.105 155);
-  --primary-foreground: oklch(0.17 0.035 158);
-  --secondary: oklch(0.29 0.032 158);
-  --secondary-foreground: oklch(0.95 0.012 95);
-  --muted: oklch(0.275 0.026 158);
-  --muted-foreground: oklch(0.74 0.022 95);
-  --accent: oklch(0.34 0.052 82);
-  --accent-foreground: oklch(0.96 0.02 90);
-  --border: oklch(0.34 0.028 158);
-  --input: oklch(0.39 0.03 158);
-  --ring: oklch(0.78 0.105 155);
+  /*
+   * Dark theme: forest-green brand identity preserved.
+   * Surfaces use a deep green-tinted neutral stack.
+   * Primary is a mid-lightness brand green — readable on dark surfaces,
+   * NOT the bright mint/teal that made buttons look like a crypto app.
+   */
+  --background: oklch(0.185 0.022 158);
+  --foreground: oklch(0.945 0.01 95);
+  --card: oklch(0.228 0.024 158);
+  --card-foreground: oklch(0.945 0.01 95);
+  --popover: oklch(0.248 0.026 158);
+  --popover-foreground: oklch(0.945 0.01 95);
 
-  --destructive: oklch(0.7 0.16 25);
-  --destructive-foreground: oklch(0.18 0.03 25);
-  --success: oklch(0.76 0.13 150);
-  --success-foreground: oklch(0.18 0.03 155);
-  --warning: oklch(0.8 0.12 75);
-  --warning-foreground: oklch(0.2 0.04 70);
-  --info: oklch(0.75 0.1 245);
-  --info-foreground: oklch(0.18 0.03 245);
+  /* Brand green: L=0.62 passes WCAG AA on these surfaces; hue 158 = same family as light primary. */
+  --primary: oklch(0.62 0.13 158);
+  --primary-foreground: oklch(0.975 0.008 95);
 
-  --inverse: oklch(0.16 0.03 158);
-  --inverse-foreground: oklch(0.95 0.012 95);
-  --sidebar-accent: oklch(0.25 0.035 158);
-  --sidebar-border: oklch(0.29 0.025 158);
+  --secondary: oklch(0.285 0.028 158);
+  --secondary-foreground: oklch(0.945 0.01 95);
+  --muted: oklch(0.268 0.024 158);
+  --muted-foreground: oklch(0.68 0.018 95);
+  --accent: oklch(0.315 0.042 82);
+  --accent-foreground: oklch(0.95 0.018 90);
+
+  /* Input border slightly lighter than card edge so fields are visible without being harsh. */
+  --border: oklch(0.33 0.026 158);
+  --input: oklch(0.355 0.026 158);
+  --ring: oklch(0.62 0.13 158);
+
+  /* Semantic: toned down from the original neon values — still clear, not glowing. */
+  --destructive: oklch(0.62 0.17 25);
+  --destructive-foreground: oklch(0.97 0.008 90);
+  --success: oklch(0.63 0.14 150);
+  --success-foreground: oklch(0.97 0.008 90);
+  --warning: oklch(0.68 0.13 72);
+  --warning-foreground: oklch(0.14 0.03 68);
+  --info: oklch(0.63 0.12 245);
+  --info-foreground: oklch(0.97 0.008 90);
+
+  --inverse: oklch(0.155 0.028 158);
+  --inverse-foreground: oklch(0.945 0.01 95);
+  --sidebar-accent: oklch(0.245 0.032 158);
+  --sidebar-border: oklch(0.285 0.022 158);
 }
 
 /*
- * Product surfaces use a layered ink/navy system, with teal actions and a gold
- * keyboard-focus color. The homepage keeps its established forest palette.
+ * Product surfaces use a layered ink/navy system. The navy surface family is
+ * intentional — it gives the workspace a professional, institutional depth.
+ * Primary and ring are corrected to the forest-green brand (hue 158),
+ * so buttons and interactive states read as Cheretanet, not a crypto app.
+ * The gold ring (--ring) is kept for keyboard-focus only — it pops on navy
+ * without conflicting with the green primary on filled elements.
  */
 .dark.product-theme {
   --background: oklch(0.1831 0.0309 263.4);
@@ -99,27 +115,41 @@
   --popover: oklch(0.2602 0.0454 260.5);
   --popover-foreground: oklch(0.9683 0.0069 247.9);
 
-  --primary: oklch(0.8549 0.1251 181.1);
-  --primary-foreground: oklch(0.1831 0.0309 263.4);
+  /*
+   * Primary: brand forest green (hue 158) at L=0.62 — enough contrast on
+   * the navy card (L≈0.22) for WCAG AA text, used as button fill.
+   * Foreground: near-white, matching the light-mode primary-foreground approach.
+   */
+  --primary: oklch(0.62 0.13 158);
+  --primary-foreground: oklch(0.975 0.008 95);
+
   --secondary: oklch(0.2602 0.0454 260.5);
   --secondary-foreground: oklch(0.9683 0.0069 247.9);
   --muted: oklch(0.245 0.037 260);
-  --muted-foreground: oklch(0.8098 0.0262 255.6);
-  --accent: oklch(0.36 0.075 78);
-  --accent-foreground: oklch(0.97 0.025 90);
+  --muted-foreground: oklch(0.72 0.022 255);
+  --accent: oklch(0.34 0.065 78);
+  --accent-foreground: oklch(0.97 0.02 90);
 
-  --border: oklch(0.38 0.036 260);
-  --input: oklch(0.6057 0.0444 258.8);
-  --ring: oklch(0.8987 0.1857 97.9);
+  /* Input border lighter than card so fields read clearly on navy. */
+  --border: oklch(0.36 0.034 260);
+  --input: oklch(0.42 0.038 260);
 
-  --success: oklch(0.75 0.14 155);
-  --success-foreground: oklch(0.1831 0.0309 263.4);
-  --warning: oklch(0.82 0.13 78);
-  --warning-foreground: oklch(0.2 0.035 75);
-  --destructive: oklch(0.79 0.16 25);
-  --destructive-foreground: oklch(0.18 0.03 25);
-  --info: oklch(0.76 0.11 235);
-  --info-foreground: oklch(0.16 0.025 245);
+  /*
+   * Ring stays gold — it is a deliberate keyboard-focus accent on navy
+   * surfaces and does not appear on filled buttons (which use their own
+   * background color). Gold on navy is a classically institutional pairing.
+   */
+  --ring: oklch(0.82 0.14 88);
+
+  /* Semantic: consistent with the corrected .dark values — mid-range, not neon. */
+  --success: oklch(0.63 0.14 150);
+  --success-foreground: oklch(0.97 0.008 90);
+  --warning: oklch(0.68 0.13 72);
+  --warning-foreground: oklch(0.14 0.03 68);
+  --destructive: oklch(0.62 0.17 25);
+  --destructive-foreground: oklch(0.97 0.008 90);
+  --info: oklch(0.63 0.12 235);
+  --info-foreground: oklch(0.97 0.008 90);
 
   --inverse: oklch(0.1831 0.0309 263.4);
   --inverse-foreground: oklch(0.9683 0.0069 247.9);
@@ -127,7 +157,7 @@
   --sidebar-foreground: oklch(0.9683 0.0069 247.9);
   --sidebar-accent: oklch(0.2602 0.0454 260.5);
   --sidebar-accent-foreground: oklch(0.9683 0.0069 247.9);
-  --sidebar-border: oklch(0.38 0.036 260);
+  --sidebar-border: oklch(0.36 0.034 260);
 }
 
 @theme inline {
