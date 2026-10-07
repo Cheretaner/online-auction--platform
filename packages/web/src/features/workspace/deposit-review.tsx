@@ -91,7 +91,7 @@ function DepositReferenceOcr({ deposit }: { deposit: DepositRecord }) {
 
 /** Bid security review for one auction: verify or reject what bidders
  * registered, and release instruments once the auction is over. */
-export function DepositReview({ auction }: { auction: Auction }) {
+export function DepositReview({ auction, focusedDepositId }: { auction: Auction; focusedDepositId?: string }) {
   const deposits = useAuctionDeposits(auction.id);
   const review = useReviewDeposit();
   const release = useReleaseDeposit();
@@ -103,7 +103,9 @@ export function DepositReview({ auction }: { auction: Auction }) {
   const [releaseEvidence, setReleaseEvidence] = useState<File | null>(null);
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [submittingRelease, setSubmittingRelease] = useState(false);
-  const items = deposits.data?.items ?? [];
+  const items = (deposits.data?.items ?? []).filter(
+    (deposit) => !focusedDepositId || deposit.id === focusedDepositId,
+  );
   const hasReleasableDeposit = items.some(
     (deposit) =>
       deposit.status === "verified" &&

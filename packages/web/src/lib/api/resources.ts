@@ -54,6 +54,7 @@ import type {
   TelegramStatus,
   VerificationRecord,
   WatchlistRecord,
+  CommandCenterException,
 } from "@/lib/api/types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -117,6 +118,11 @@ export const documentsApi = {
 
 export const platformApi = {
   capabilities: () => apiRequest<{ documentUploadsEnabled: boolean }>(v1("/capabilities")),
+};
+
+export const commandCenterApi = {
+  exceptions: () =>
+    apiRequest<{ items: CommandCenterException[] }>(v1("/operations/exceptions")),
 };
 
 export const verificationApi = {
