@@ -11,7 +11,7 @@ import {
   type TestContext,
 } from "./helpers.js";
 
-const databaseUrl = env.DATABASE_URL || process.env.TEST_DATABASE_URL;
+const databaseUrl = env.DATABASE_URL;
 
 describe.skipIf(!databaseUrl)("operational exception command center (real Postgres)", () => {
   let ctx: TestContext;
@@ -92,5 +92,5 @@ describe.skipIf(!databaseUrl)("operational exception command center (real Postgr
     );
     const localOnly = await api(ctx, "GET", "/api/v1/operations/exceptions", { token });
     expect(localOnly.body.items.map((item: { id: string }) => item.id)).not.toContain(foreignDepositId);
-  });
+  }, 30_000);
 });

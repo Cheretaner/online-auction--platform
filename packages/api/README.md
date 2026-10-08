@@ -48,14 +48,16 @@ start in production** without the first three:
 - `DATABASE_URL` — the managed PostgreSQL connection string
 - `BOOTSTRAP_SUPER_ADMIN_EMAIL` — whoever will run the platform
 - `CORS_ORIGIN` — the real web origin (`*` is refused in production)
-- `FILE_SCAN_ENABLED=true` — set the literal string `true`. Production refuses
-  to start unless uploads are configured for malware scanning.
+- `FILE_SCAN_ENABLED` — optional malware scanning, disabled by default. Set it
+  to `true` to scan uploads before storage; production uploads are allowed when
+  it is `false`, but then files are not checked for malware.
 - `CLAMAV_HOST` and `CLAMAV_PORT` — the address of a reachable ClamAV daemon
-  using the `clamd` TCP protocol (default port `3310`). The default host,
-  `127.0.0.1`, works only when ClamAV runs in the same container as the API.
-  With EthioDeploy, set `CLAMAV_HOST` to the internal hostname of a separately
-  provisioned ClamAV service. Uploads fail closed with 503 when the scanner
-  cannot be reached.
+  using the `clamd` TCP protocol (default port `3310`), required only when
+  `FILE_SCAN_ENABLED=true`. The default host, `127.0.0.1`, works only when
+  ClamAV runs in the same container as the API. With EthioDeploy, set
+  `CLAMAV_HOST` to the internal hostname of a separately provisioned ClamAV
+  service. When scanning is enabled, uploads fail closed with 503 if the
+  scanner cannot be reached.
 - `STORAGE_DRIVER=filesystem` and `STORAGE_DIR` - set `STORAGE_DIR` to the
   absolute path of a persistent volume mounted into the API container. The
   default relative directory is for local development; files in a container's
@@ -68,10 +70,9 @@ start in production** without the first three:
   normalized automatically. Keep the service role key server-side and never
   expose it to the web application.
 - `DOCUMENT_UPLOADS_ENABLED=false` disables document uploads and new identity
-  verification submissions when durable storage or a reachable malware scanner
-  is unavailable. Existing documents remain listed, but files on ephemeral
-  storage may already be unavailable. Keep the default `true` only when both
-  storage and scanning are configured.
+  verification submissions when durable storage is unavailable. Existing
+  documents remain listed, but files on ephemeral storage may already be
+  unavailable. Keep the default `true` when durable storage is configured.
 - `JWT_SECRET` — a random value of 32+ characters (the default is rejected)
 - `RUN_MIGRATIONS_ON_BOOT=true` — applies pending migrations on boot. The
   runner holds a Postgres advisory lock, so a rolling deploy queues instead of

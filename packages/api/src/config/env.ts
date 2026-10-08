@@ -148,13 +148,6 @@ const envSchema = z
     TWILIO_PHONE_NUMBER: z.preprocess((v) => (typeof v === "string" && v.trim() ? v.trim() : undefined), z.string().optional()),
   })
   .superRefine((value, ctx) => {
-    if (value.NODE_ENV === "production" && !value.FILE_SCAN_ENABLED) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["FILE_SCAN_ENABLED"],
-        message: "must be true in production so uploads are scanned before storage",
-      });
-    }
     if (value.NODE_ENV === "production" && value.STORAGE_DRIVER === "supabase") {
       if (!value.SUPABASE_URL) {
         ctx.addIssue({

@@ -6,7 +6,7 @@ export const requireDocumentUploads: RequestHandler = (_req, _res, next) => {
   if (!env.DOCUMENT_UPLOADS_ENABLED) {
     next(
       new AppError(
-        "Document uploads and document-based identity verification are temporarily unavailable while secure storage and malware scanning are configured.",
+        "Document uploads and document-based identity verification are temporarily unavailable while secure storage is configured.",
         HttpStatus.SERVICE_UNAVAILABLE,
       ),
     );
