@@ -5,6 +5,8 @@ import { isUniqueViolation } from "../kernel/pg.js";
 import * as audit from "../audit/audit.service.js";
 import { IdentityRepository } from "../identity/identity.repository.js";
 import * as notifications from "../notification/notification.service.js";
+import * as auctionService from "../auction/auction.service.js";
+import { canTransition } from "../auction/auction.stateMachine.js";
 import * as repo from "./organization.repository.js";
 import type { Organization } from "./organization.types.js";
 
@@ -136,6 +138,58 @@ export async function deleteOrganization(
       action: "organization.deleted",
       payload: { name: organization.name },
     });
+  }, { userId: actor.userId, organizationId: id });
+}
+
+export async function archiveGeneratedOrganization(
+  id: string,
+  actor: { userId: string; roles: Role[] },
+): Promise<{ organization: Organization; cancelledAuctions: number }> {
+  return withTransaction(async () => {
+    const organization = await getOrganization(id);
+    const generatedName = /^Org [0-9a-f]{8}$/i.test(organization.name);
+    if (!generatedName || organization.slug !== `org-${organization.id}`) {
+      throw AppError.unprocessable(
+        "Only organizations matching the generated fixture pattern can be archived",
+      );
+    }
+    if (!organization.isActive) {
+      throw AppError.unprocessable("Generated organization is already archived");
+    }
+
+    const auctions = await repo.listAuctionsForGeneratedOrganization(id);
+    if (auctions.some((auction) => !/^Auction [0-9a-f]{8}$/i.test(auction.title))) {
+      throw AppError.unprocessable(
+        "This organization has auctions outside the generated fixture pattern",
+      );
+    }
+
+    let cancelledAuctions = 0;
+    for (const auction of auctions) {
+      if (!canTransition(auction.status, "cancelled")) continue;
+      await auctionService.cancelAuction(
+        auction.id,
+        id,
+        actor,
+        "Generated fixture data archived by a platform administrator",
+      );
+      cancelledAuctions += 1;
+    }
+
+    const archived = await repo.updateOrganization(id, { isActive: false });
+    if (!archived) throw AppError.notFound("Organization not found");
+
+    await audit.appendAuditEvent({
+      auctionId: null,
+      actorId: actor.userId,
+      actorRole: audit.actorRoleOf(actor.roles),
+      entityType: "organization",
+      entityId: id,
+      action: "organization.generated_archived",
+      payload: { name: organization.name, cancelledAuctions },
+    });
+
+    return { organization: archived, cancelledAuctions };
   }, { userId: actor.userId, organizationId: id });
 }
 

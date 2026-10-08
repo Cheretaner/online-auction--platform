@@ -1,4 +1,4 @@
-import type { OrgType } from "@auction/shared";
+import type { AuctionStatus, OrgType } from "@auction/shared";
 import { query, queryOne, queryAll } from "../infrastructure/database/query.js";
 import type { Organization } from "./organization.types.js";
 
@@ -65,7 +65,9 @@ export async function findByTaxpayerId(taxpayerId: string): Promise<Organization
 }
 
 export async function listOrganizations(): Promise<Organization[]> {
-  const rows = await queryAll<DbOrg>("SELECT * FROM organizations ORDER BY created_at DESC");
+  const rows = await queryAll<DbOrg>(
+    "SELECT * FROM organizations WHERE is_active = TRUE ORDER BY created_at DESC",
+  );
   return rows.map(mapOrg);
 }
 
@@ -111,6 +113,18 @@ export async function hasOperationalDependencies(id: string): Promise<boolean> {
     queryOne<{ exists: boolean }>("SELECT EXISTS (SELECT 1 FROM autofetch_pending_items WHERE organization_id = $1) AS exists", [id]),
   ]);
   return Boolean(auction?.exists || source?.exists || pending?.exists);
+}
+
+export async function listAuctionsForGeneratedOrganization(
+  organizationId: string,
+): Promise<Array<{ id: string; title: string; status: AuctionStatus }>> {
+  return queryAll(
+    `SELECT id, title, status
+       FROM auctions
+      WHERE org_id = $1
+      ORDER BY created_at ASC, id ASC`,
+    [organizationId],
+  );
 }
 
 export async function deleteOrganization(id: string): Promise<void> {

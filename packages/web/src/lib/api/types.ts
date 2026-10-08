@@ -107,6 +107,11 @@ export interface OrganizationRecord {
   updatedAt: string;
 }
 
+export interface ArchiveGeneratedOrganizationResult {
+  organization: OrganizationRecord;
+  cancelledAuctions: number;
+}
+
 export interface OrganizationMember {
   userId: string;
   email?: string;

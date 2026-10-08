@@ -216,7 +216,10 @@ export async function listPublicAuctions(
   filters: PublicAuctionFilters,
   client?: Queryable,
 ): Promise<{ items: Auction[]; total: number }> {
-  const where: string[] = [`a.status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')`];
+  const where: string[] = [
+    `a.status IN ('scheduled', 'live', 'closed', 'under_review', 'awarded')`,
+    `EXISTS (SELECT 1 FROM organizations o WHERE o.id = a.org_id AND o.is_active = TRUE)`,
+  ];
   const values: unknown[] = [];
   const param = (value: unknown) => {
     values.push(value);

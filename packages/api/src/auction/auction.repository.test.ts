@@ -2,15 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   queryAll: vi.fn(),
+  queryOne: vi.fn(),
 }));
 
 vi.mock("../infrastructure/database/query.js", () => ({
   query: vi.fn(),
-  queryOne: vi.fn(),
+  queryOne: mocks.queryOne,
   queryAll: mocks.queryAll,
 }));
 
-import { listByOrgId } from "./auction.repository.js";
+import { listByOrgId, listPublicAuctions } from "./auction.repository.js";
 
 describe("listByOrgId", () => {
   beforeEach(() => {
@@ -36,6 +37,22 @@ describe("listByOrgId", () => {
     expect(mocks.queryAll).toHaveBeenCalledWith(
       expect.not.stringContaining("AND status"),
       ["org-id", 51],
+      undefined,
+    );
+  });
+
+  it("excludes auctions owned by inactive organizations from the public catalogue", async () => {
+    mocks.queryOne.mockResolvedValue({ total: "0" });
+    await listPublicAuctions({ limit: 20, offset: 0 });
+
+    expect(mocks.queryOne).toHaveBeenCalledWith(
+      expect.stringContaining("o.is_active = TRUE"),
+      [20, 0],
+      undefined,
+    );
+    expect(mocks.queryAll).toHaveBeenCalledWith(
+      expect.stringContaining("o.is_active = TRUE"),
+      [20, 0],
       undefined,
     );
   });

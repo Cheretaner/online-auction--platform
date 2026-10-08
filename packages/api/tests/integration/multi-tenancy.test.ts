@@ -53,18 +53,19 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
         amount: "100.00",
         referenceNumber: `CPO-${randomUUID().slice(0, 6)}`,
         issuingBank: "Commercial Bank of Ethiopia",
-        instrumentType: "cpo",
+        instrumentType: "transfer",
       },
     });
-    expect(created.status).toBe(201);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
     const depositId = created.body.id;
 
     const foreign = await api(ctx, "POST", `/api/v1/deposits/${depositId}/review`, {
       token: tokenB,
       body: { decision: "verified" },
     });
-    expect(foreign.status).toBe(403);
-    expect((await api(ctx, "GET", `/api/v1/deposits/${depositId}`, { token: tokenB })).status).toBe(403);
+    expect(foreign.status, JSON.stringify(foreign.body)).toBe(403);
+    const foreignRead = await api(ctx, "GET", `/api/v1/deposits/${depositId}`, { token: tokenB });
+    expect(foreignRead.status, JSON.stringify(foreignRead.body)).toBe(403);
 
     const own = await api(ctx, "POST", `/api/v1/deposits/${depositId}/review`, {
       token: tokenA,
@@ -102,7 +103,7 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
       token: bidderToken,
       body: { auctionId: auctionA, reason: "The closing time moved without notice to bidders." },
     });
-    expect(opened.status).toBe(201);
+    expect(opened.status, JSON.stringify(opened.body)).toBe(201);
     const disputeId = opened.body.id;
 
     const listB = await api(ctx, "GET", "/api/v1/disputes", { token: tokenB });
@@ -124,7 +125,8 @@ describe.skipIf(!TEST_DATABASE_URL)("organization boundaries (real Postgres)", (
       token: outsider,
       body: { auctionId: live, reason: "I never took part but want to stop this auction." },
     });
-    expect(refused.status).toBe(403);
+    expect(refused.status, JSON.stringify(refused.body)).toBe(403);
+    expect(refused.body.message).toContain("Only participants");
 
     const bid = await api(ctx, "POST", `/api/v1/auctions/${live}/bids`, {
       token: bidderToken,
