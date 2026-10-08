@@ -48,12 +48,12 @@ const footerLink =
 export function SiteFooter() {
   const t = useT("layout");
   return (
-    <footer className="bg-inverse text-inverse-foreground">
-      <div className="page-container py-12 lg:py-16">
-        <div className="grid gap-10 border-b border-inverse-foreground/10 pb-10 md:grid-cols-2 lg:grid-cols-[1.2fr_2fr]">
-          <div className="max-w-sm">
+    <footer className="site-footer bg-inverse text-inverse-foreground">
+      <div className="page-container py-10 sm:py-12 lg:py-14">
+        <div className="grid items-start gap-x-12 gap-y-10 border-b border-inverse-foreground/15 pb-10 md:grid-cols-[minmax(15rem,0.9fr)_minmax(0,2fr)] lg:gap-x-20">
+          <div className="max-w-md">
             <BrandLogo tone="inverse" className="focus-visible:ring-highlight focus-visible:ring-offset-inverse" />
-            <p className="mt-5 text-sm leading-6 text-inverse-foreground/75">
+            <p className="mt-4 max-w-sm text-sm leading-6 text-inverse-foreground/75">
               {t("footer.about")}
             </p>
             <p className="eyebrow mt-6 text-highlight">{t("footer.follow")}</p>
@@ -75,7 +75,7 @@ export function SiteFooter() {
             </ul>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-10">
             {linkColumns.map(({ title, links }) => (
               <nav key={title} aria-label={t(`footer.${title}`)}>
                 <h2 className="eyebrow text-inverse-foreground">{t(`footer.${title}`)}</h2>
@@ -93,7 +93,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 pt-6 text-xs text-inverse-foreground/55 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 pt-6 text-xs text-inverse-foreground/70 sm:flex-row sm:items-center sm:justify-between">
           <p>{t("footer.copyright", { year: new Date().getFullYear() })}</p>
           <p className="inline-flex items-center gap-1.5">
             <MapPin className="size-3.5" aria-hidden /> {t("footer.location")}

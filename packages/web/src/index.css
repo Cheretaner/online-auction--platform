@@ -39,8 +39,8 @@
   --info: #006E2A;
   --info-foreground: #FFFFFF;
 
-  --inverse: #353028;
-  --inverse-foreground: #F9EFE4;
+  --inverse: #173B35;
+  --inverse-foreground: #F5F2E9;
 
   --highlight: #EFE3D5;
   --highlight-strong: #DEC1AC;
@@ -92,8 +92,8 @@
   --info: #74B9FF;
   --info-foreground: #0A0A0C;
 
-  --inverse: #F8FAFC;
-  --inverse-foreground: #0A0A0C;
+  --inverse: #101B22;
+  --inverse-foreground: #F1F4EE;
 
   --highlight: #3A2E1C;
   --highlight-strong: #C9974D;
@@ -110,6 +110,21 @@
   --sidebar-foreground: var(--foreground);
   --sidebar-accent: var(--secondary);
   --sidebar-border: var(--border);
+}
+
+.site-footer {
+  --inverse: #322214;
+  --inverse-foreground: #F9EFE4;
+  --highlight: #DEC1AC;
+  --highlight-strong: #C9974D;
+  background-image: none;
+}
+
+.dark .site-footer {
+  --inverse: #1A1A22;
+  --inverse-foreground: #F8FAFC;
+  --highlight: #C9974D;
+  --highlight-strong: #C9974D;
 }
 
 @theme inline {

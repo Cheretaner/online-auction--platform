@@ -61,6 +61,21 @@ using Nixpacks. `nixpacks.toml` in the repository root pins the Node/pnpm
 toolchain, the build (`pnpm install --frozen-lockfile && pnpm build`) and the
 start command (`node packages/api/dist/server.js`).
 
+Keep deployment secrets in the service's **runtime environment only**; do not
+add them as Docker build arguments or build-time environment variables. The
+build does not need `CHAPA_SECRET_KEY`, `CHAPA_WEBHOOK_SECRET`,
+`PII_ENCRYPTION_KEY`, `PII_HASH_SECRET`, `DATABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, or other API credentials. Nixpacks builds those
+values into Docker `ARG`/`ENV` instructions when the platform exposes them to
+the build, which both triggers Docker's `SecretsUsedInArgOrEnv` check and can
+persist secrets in image metadata. Move the flagged variables to the service's
+runtime-only secrets/environment settings, remove any corresponding build
+arguments, and rebuild. Only pass values genuinely needed to compile static
+web assets as build variables; `VITE_*` values are public and become part of
+the browser bundle. If the host only supports exposing secrets as Docker build
+arguments or environment variables, do not pass API secrets into that build;
+use the host's runtime secret facility.
+
 Set these as environment variables on the platform — the API **refuses to
 start in production** without the first three:
 

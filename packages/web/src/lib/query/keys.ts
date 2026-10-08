@@ -6,7 +6,7 @@ export const queryKeys = {
     all: ["auctions"] as const,
     public: (params: object = {}) => ["auctions", "public", params] as const,
     detail: (id: string) => ["auctions", "detail", id] as const,
-    org: (orgId: string) => ["auctions", "org", orgId] as const,
+    org: (orgId: string, params: object = {}) => ["auctions", "org", orgId, params] as const,
     items: (auctionId: string) => ["auctions", auctionId, "items"] as const,
     item: (auctionId: string, itemId: string) => ["auctions", auctionId, "items", itemId] as const,
     bids: (auctionId: string, userId?: string) => userId

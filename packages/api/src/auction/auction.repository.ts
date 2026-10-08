@@ -422,10 +422,16 @@ export async function listByOrgId(
   limit = 50,
   cursor?: { c: string; i: string },
   client?: Queryable,
+  status?: Auction["status"],
 ): Promise<PaginatedResult<Auction>> {
   let sql = `SELECT * FROM auctions WHERE org_id = $1`;
   const values: any[] = [orgId];
   let paramIndex = 2;
+
+  if (status) {
+    sql += ` AND status = $${paramIndex++}`;
+    values.push(status);
+  }
 
   if (cursor) {
     sql += ` AND (created_at, id) < ($${paramIndex++}, $${paramIndex++})`;

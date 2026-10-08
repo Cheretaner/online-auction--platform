@@ -46,7 +46,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                         cn(
                           "relative flex min-h-10 items-center gap-3 rounded-md px-3 text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-highlight focus-visible:ring-offset-sidebar",
                           isActive &&
-                            "bg-sidebar-accent font-medium text-sidebar-accent-foreground before:absolute before:inset-y-2 before:-left-3 before:w-1 before:rounded-r-full before:bg-highlight",
+                          "bg-sidebar-accent font-medium text-sidebar-accent-foreground before:absolute before:inset-y-2 before:-left-3 before:w-1 before:rounded-r-full before:bg-highlight",
                         )
                       }
                     >
@@ -136,7 +136,8 @@ export function AppShell() {
     <div className="product-ui flex min-h-svh bg-background">
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
         <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
-<BrandLogo className="text-primary dark:text-foreground" />        </div>
+          <BrandLogo tone="inverse" />
+        </div>
         <SidebarScroll>
           <SidebarNav />
         </SidebarScroll>

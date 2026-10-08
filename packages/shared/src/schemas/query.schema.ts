@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AUCTION_STATUS } from "../enums.js";
 
 /** Query-string shape for endpoints that list rows belonging to one auction. */
 export const AuctionScopedQuery = z.object({
@@ -36,3 +37,10 @@ export const PublicAuctionListQuery = z.object({
     .optional(),
 });
 export type PublicAuctionListQuery = z.infer<typeof PublicAuctionListQuery>;
+
+/** Query-string shape for auctions owned by one organization. */
+export const OrganizationAuctionListQuery = z.object({
+  status: z.enum(AUCTION_STATUS).optional(),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+});
+export type OrganizationAuctionListQuery = z.infer<typeof OrganizationAuctionListQuery>;

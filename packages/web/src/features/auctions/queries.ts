@@ -10,7 +10,7 @@ import type {
   WithdrawBidRequest,
 } from "@auction/shared";
 import { QUERY_STALE_TIMES } from "@/config/constants";
-import { auctionsApi, type PublicAuctionParams } from "@/lib/api/auctions";
+import { auctionsApi, type OrganizationAuctionParams, type PublicAuctionParams } from "@/lib/api/auctions";
 import { queryKeys } from "@/lib/query/keys";
 import { useAuth } from "@/features/auth/auth-provider";
 import { readPrivateBidHistory, savePrivateBidHistory } from "@/lib/query/private-bid-cache";
@@ -32,10 +32,10 @@ export function useAuction(id: string | undefined) {
   });
 }
 
-export function useOrgAuctions(orgId: string | undefined) {
+export function useOrgAuctions(orgId: string | undefined, params: OrganizationAuctionParams = {}) {
   return useQuery({
-    queryKey: queryKeys.auctions.org(orgId ?? ""),
-    queryFn: () => auctionsApi.listByOrg(orgId!),
+    queryKey: queryKeys.auctions.org(orgId ?? "", params),
+    queryFn: () => auctionsApi.listByOrg(orgId!, params),
     enabled: Boolean(orgId),
   });
 }

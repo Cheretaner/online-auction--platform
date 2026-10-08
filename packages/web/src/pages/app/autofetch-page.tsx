@@ -1,6 +1,6 @@
 import { useId, useState, type FormEvent } from "react";
 import type { CreateAuctionItemRequest } from "@auction/shared";
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Inbox, Pencil, Radar, RefreshCw, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Inbox, Pencil, Plus, Radar, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, SectionHeader } from "@/components/layout/page-header";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatCard } from "@/components/ui/stat-card";
 import { useAuth } from "@/features/auth/auth-provider";
 import { useOrgAuctions } from "@/features/auctions/queries";
+import { Link } from "react-router-dom";
 import {
   useApproveAutofetchItem,
   useAutofetchPending,
@@ -101,13 +102,18 @@ export default function AutofetchPage() {
   const { organizationId, roles } = useAuth();
   const canReview = roles.includes("org_admin") || roles.includes("compliance_officer");
   const canManageSources = roles.includes("org_admin") || roles.includes("auction_officer");
-  const sources = useAutofetchSources();
-  const pending = useAutofetchPending(queueOffset, canReview);
-  const stats = useAutofetchStats(canReview);
-  const auctions = useOrgAuctions(canReview ? organizationId ?? undefined : undefined);
+  const canCreateAuctions = roles.includes("org_admin") || roles.includes("auction_officer") || roles.includes("super_admin");
+  const hasOrgContext = Boolean(organizationId);
+  const sources = useAutofetchSources(hasOrgContext && (canReview || canManageSources));
+  const pending = useAutofetchPending(queueOffset, canReview && hasOrgContext);
+  const stats = useAutofetchStats(canReview && hasOrgContext);
+  const auctions = useOrgAuctions(
+    canReview ? organizationId ?? undefined : undefined,
+    { status: "draft", limit: 500 },
+  );
   const sourceItems = sources.data ?? [];
   const pendingItems = pending.data?.items ?? [];
-  const draftAuctions = auctions.data?.items.filter((auction) => auction.status === "draft") ?? [];
+  const draftAuctions = auctions.data?.items ?? [];
   const t = useT("tools");
 
   return (
@@ -131,9 +137,34 @@ export default function AutofetchPage() {
           title={t("autofetch.queue")}
           description={t("autofetch.queueDescription")}
         />
+        {(canReview || canManageSources) && !organizationId ? (
+          <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-foreground" role="status">
+            {t("autofetch.selectOrganization")}
+          </p>
+        ) : null}
+        {canReview && organizationId && auctions.isLoading ? (
+          <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground" role="status">
+            {t("autofetch.loadingAuctions")}
+          </p>
+        ) : null}
+        {canReview && organizationId && auctions.isError ? (
+          <ErrorState error={auctions.error} onRetry={() => void auctions.refetch()} />
+        ) : null}
+        {canReview && organizationId && !auctions.isLoading && !auctions.isError && draftAuctions.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed bg-muted/30 p-4">
+            <p className="text-sm text-muted-foreground">{t("autofetch.noDraftAuctions")}</p>
+            {canCreateAuctions ? (
+              <Button asChild size="sm" variant="outline">
+                <Link to="/app/auctions/new">
+                  <Plus aria-hidden /> {t("autofetch.createDraftAuction")}
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {!canReview ? (
           <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">{t("autofetch.reviewerAccess")}</p>
-        ) : pending.isLoading ? (
+        ) : !organizationId ? null : pending.isLoading ? (
           <PageSkeleton rows={2} />
         ) : pending.isError ? (
           <ErrorState error={pending.error} onRetry={() => void pending.refetch()} />
@@ -165,7 +196,7 @@ export default function AutofetchPage() {
 
       <section className="space-y-4">
         <SectionHeader title={t("autofetch.sources")} />
-        {sources.isLoading ? (
+        {!organizationId ? null : sources.isLoading ? (
           <PageSkeleton rows={2} />
         ) : sources.isError ? (
           <ErrorState error={sources.error} onRetry={() => void sources.refetch()} />
@@ -178,7 +209,7 @@ export default function AutofetchPage() {
             ))}
           </ul>
         )}
-        {canManageSources ? <AddSourceForm /> : null}
+        {canManageSources && organizationId ? <AddSourceForm /> : null}
       </section>
     </div>
   );
@@ -754,9 +785,15 @@ function QueueItem({ item, auctions }: { item: PendingItem; auctions: Auction[] 
           >
             <div className="min-w-0 flex-1 space-y-1.5">
               <Label htmlFor={`${id}-auction`}>{t("autofetch.addToAuction")}</Label>
-              <NativeSelect id={`${id}-auction`} value={auctionId} onChange={(event) => setAuctionId(event.target.value)}>
-                <option value="">{t("autofetch.chooseAuction")}</option>
-                {auctions.length === 0 ? <option value="" disabled>No draft auctions available</option> : null}
+              <NativeSelect
+                id={`${id}-auction`}
+                value={auctionId}
+                onChange={(event) => setAuctionId(event.target.value)}
+                disabled={auctions.length === 0}
+              >
+                <option value="">
+                  {auctions.length === 0 ? t("autofetch.noDraftAuctionsShort") : t("autofetch.chooseAuction")}
+                </option>
                 {auctions.map((auction) => (
                   <option key={auction.id} value={auction.id}>
                     {auction.title}

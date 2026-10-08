@@ -21,6 +21,11 @@ export interface PublicAuctionParams {
   offset?: number;
 }
 
+export interface OrganizationAuctionParams {
+  status?: string;
+  limit?: number;
+}
+
 function toQuery(params: PublicAuctionParams): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -45,8 +50,8 @@ export const auctionsApi = {
     apiRequest<Auction>(v1(`/auctions/${id}/status`), { method: "PATCH", body }),
   cancel: (id: string, body: CancelAuctionRequest) =>
     apiRequest<Auction>(v1(`/auctions/${id}`), { method: "DELETE", body }),
-  listByOrg: (orgId: string) =>
-    apiRequest<ItemList<Auction>>(v1(`/organizations/${orgId}/auctions`)),
+  listByOrg: (orgId: string, params: OrganizationAuctionParams = {}) =>
+    apiRequest<ItemList<Auction>>(v1(`/organizations/${orgId}/auctions${toQuery(params)}`)),
   listItems: (auctionId: string) =>
     apiRequest<ItemList<AuctionItem>>(v1(`/auctions/${auctionId}/items`)),
   getItem: (auctionId: string, itemId: string) =>

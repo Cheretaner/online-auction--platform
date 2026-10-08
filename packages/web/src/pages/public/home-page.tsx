@@ -234,16 +234,16 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      <section className="grid gap-10 rounded-xl bg-inverse p-6 text-inverse-foreground sm:p-9 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:p-12" aria-labelledby="process-title">
+      <section className="grid gap-10 rounded-xl bg-[#1F1B14] p-6 text-inverse-foreground sm:p-9 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:p-12" aria-labelledby="process-title">
         <div>
-          <p className="eyebrow text-highlight">{t("route.eyebrow")}</p>
-          <h2 id="process-title" className="mt-3 max-w-md text-3xl leading-tight font-semibold text-inverse-foreground sm:text-4xl">
+          <p className="eyebrow text-highlight-strong">{t("route.eyebrow")}</p>
+          <h2 id="process-title" className="mt-3 max-w-md text-3xl leading-tight font-bold text-inverse-foreground sm:text-4xl">
             {t("route.title")}
           </h2>
           <p className="mt-4 max-w-md text-sm leading-6 text-inverse-foreground/75">
             {t("route.body")}
           </p>
-          <Button asChild className="mt-6 bg-highlight text-inverse hover:bg-highlight-strong">
+          <Button asChild className="mt-6 bg-highlight-strong text-inverse hover:bg-highlight">
             <Link to="/auctions#how-to-participate">{t("route.guide")} <ArrowRight aria-hidden="true" /></Link>
           </Button>
         </div>
@@ -476,7 +476,7 @@ function ParticipationSteps() {
           >
             {/* Horizontal divider highlight: draws left to right. */}
             <span
-              className={`absolute inset-x-0 -top-px h-0.5 origin-left bg-highlight transition-transform duration-500 ease-out ${
+              className={`absolute inset-x-0 -top-px h-0.5 origin-left bg-highlight-strong transition-transform duration-500 ease-out ${
                 isSelected ? "scale-x-100" : "scale-x-0"
               }`}
               aria-hidden="true"
@@ -484,7 +484,7 @@ function ParticipationSteps() {
             {/* Vertical divider highlight on the right-hand column: draws top to bottom. */}
             {rightColumn ? (
               <span
-                className={`absolute inset-y-0 -left-px hidden w-0.5 origin-top bg-highlight transition-transform delay-150 duration-500 ease-out sm:block ${
+                className={`absolute inset-y-0 -left-px hidden w-0.5 origin-top bg-highlight-strong transition-transform delay-150 duration-500 ease-out sm:block ${
                   isSelected ? "scale-y-100" : "scale-y-0"
                 }`}
                 aria-hidden="true"
@@ -500,7 +500,7 @@ function ParticipationSteps() {
             >
               <p
                 className={`eyebrow inline-flex items-center gap-2 transition-colors duration-300 ${
-                  isSelected ? "text-highlight-strong" : "text-highlight/70"
+                  isSelected ? "text-highlight-strong" : "text-highlight-strong"
                 }`}
               >
                 <span

@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import type {
   PublicAuctionListQuery,
+  OrganizationAuctionListQuery,
   CancelAuctionRequest,
   CreateAuctionRequest,
   TransitionAuctionRequest,
@@ -63,7 +64,8 @@ export const listByOrg: RequestHandler = async (req, res) => {
   if (auth.organizationId !== orgId && !auth.roles.includes("super_admin")) {
     throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
   }
-  const items = await AuctionService.listByOrg(orgId);
+  const filters = req.query as unknown as OrganizationAuctionListQuery;
+  const items = await AuctionService.listByOrg(orgId, filters);
   res.json({ items });
 };
 

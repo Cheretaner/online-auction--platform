@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   PublicAuctionListQuery,
+  OrganizationAuctionListQuery,
   CancelAuctionRequest,
   CreateAuctionRequest,
   TransitionAuctionRequest,
@@ -73,4 +74,9 @@ auctionRouter.delete(
 
 export const orgAuctionRouter = Router({ mergeParams: true });
 
-orgAuctionRouter.get("/", requireAuth(), asyncHandler(controller.listByOrg));
+orgAuctionRouter.get(
+  "/",
+  requireAuth(),
+  validate(OrganizationAuctionListQuery, "query"),
+  asyncHandler(controller.listByOrg),
+);

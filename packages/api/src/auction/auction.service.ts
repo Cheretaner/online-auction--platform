@@ -82,8 +82,11 @@ export async function listPublicAuctions(filters: AuctionRepo.PublicAuctionFilte
   return AuctionRepo.listPublicAuctions(filters);
 }
 
-export async function listByOrg(orgId: string): Promise<Auction[]> {
-  const result = await AuctionRepo.listByOrgId(orgId);
+export async function listByOrg(
+  orgId: string,
+  filters: { status?: Auction["status"]; limit: number } = { limit: 50 },
+): Promise<Auction[]> {
+  const result = await AuctionRepo.listByOrgId(orgId, filters.limit, undefined, undefined, filters.status);
   return result.items;
 }
 
