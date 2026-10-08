@@ -6,9 +6,9 @@ export const documentUpload = multer({
   limits: {
     fileSize: 20 * 1024 * 1024,
     files: 1,
-    fields: 3,
+    fields: 4,
     fieldSize: 2 * 1024,
     fieldNameSize: 64,
-    parts: 4,
+    parts: 5,
   },
 });

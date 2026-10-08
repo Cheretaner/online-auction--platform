@@ -83,7 +83,7 @@ export const depositsApi = {
   create: (body: CreateDepositRequest) =>
     apiRequest<DepositRecord>(v1("/deposits"), { method: "POST", body }),
   initiateChapa: (body: { auctionId: string }) =>
-    apiRequest<ChapaDepositInitiation>(v1("/deposits/initiate"), { method: "POST", body }),
+    apiRequest<ChapaDepositInitiation>(v1("/deposits/initiate"), { method: "POST", body, timeoutMs: 45_000 }),
   listMine: () => apiRequest<ItemList<DepositRecord>>(v1("/deposits/me")),
   listByAuction: (auctionId: string) =>
     apiRequest<ItemList<DepositRecord>>(v1(`/deposits${queryString({ auctionId })}`)),
@@ -111,7 +111,7 @@ export const documentsApi = {
   verifyAccess: (auctionId: string) =>
     apiRequest<DocumentAccessStatus>(v1(`/documents/access/${auctionId}/verify`), { method: "POST" }),
   upload: (form: FormData) =>
-    apiRequest<DocumentRecord>(v1("/documents"), { method: "POST", body: form }),
+    apiRequest<DocumentRecord>(v1("/documents"), { method: "POST", body: form, timeoutMs: 120_000 }),
   listMine: () => apiRequest<ItemList<DocumentRecord>>(v1("/documents/me")),
   listByAuction: (auctionId: string) =>
     apiRequest<ItemList<DocumentRecord>>(v1(`/documents${queryString({ auctionId })}`)),
@@ -184,7 +184,10 @@ export const reportsApi = {
   financialReconciliation: (auctionId: string) =>
     apiRequest<FinancialReconciliationSnapshot>(v1(`/reports/financial-reconciliation${queryString({ auctionId })}`)),
   historicalInsights: (auctionId: string) =>
-    apiRequest<HistoricalAuctionInsights>(v1(`/reports/historical-insights${queryString({ auctionId })}`)),
+    apiRequest<HistoricalAuctionInsights>(
+      v1(`/reports/historical-insights${queryString({ auctionId })}`),
+      { timeoutMs: 45_000 },
+    ),
 };
 
 export const watchlistsApi = {

@@ -1,4 +1,5 @@
 import type { Role } from "@auction/shared";
+import type { PublicProfile } from "./identity.types.js";
 import { queryOne, queryAll } from "../infrastructure/database/query.js";
 import type { Queryable } from "../infrastructure/database/query.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
@@ -25,6 +26,10 @@ interface DbProfile {
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
+}
+
+interface DbAdminUser extends Omit<DbProfile, "password_hash" | "national_id" | "tin_number" | "national_id_hash" | "tin_number_hash"> {
+  roles: string[];
 }
 
 function mapProfile(row: DbProfile): Profile {
@@ -200,11 +205,44 @@ export class IdentityRepository {
     ]);
   }
 
-  async listProfiles(): Promise<Profile[]> {
-    const rows = await queryAll<DbProfile>(
-      `SELECT * FROM profiles WHERE is_active = TRUE ORDER BY created_at DESC`,
+  async listAdminUsers(): Promise<Array<PublicProfile & { roles: Role[] }>> {
+    const rows = await queryAll<DbAdminUser>(
+      `SELECT p.id, p.email, p.full_name, p.phone, p.account_type, p.business_name,
+              p.region, p.preferred_language, p.verification_status, p.platform_role,
+              p.is_active, p.created_at, p.updated_at,
+              COALESCE(
+                array_agg(DISTINCT user_roles.role) FILTER (WHERE user_roles.role IS NOT NULL),
+                ARRAY['bidder']::text[]
+              ) AS roles
+         FROM profiles p
+         LEFT JOIN LATERAL (
+           SELECT om.role
+             FROM organization_members om
+            WHERE om.user_id = p.id
+           UNION
+           SELECT p.platform_role
+            WHERE p.platform_role IS NOT NULL
+         ) AS user_roles ON TRUE
+        WHERE p.is_active = TRUE
+        GROUP BY p.id
+        ORDER BY p.created_at DESC`,
     );
-    return rows.map(mapProfile);
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      fullName: row.full_name,
+      phone: row.phone,
+      accountType: row.account_type,
+      businessName: row.business_name,
+      region: row.region,
+      preferredLanguage: row.preferred_language,
+      verificationStatus: row.verification_status,
+      platformRole: row.platform_role ? mapDbRole(row.platform_role) : null,
+      isActive: row.is_active,
+      createdAt: new Date(row.created_at).toISOString(),
+      updatedAt: new Date(row.updated_at).toISOString(),
+      roles: [...new Set(row.roles.map(mapDbRole))],
+    }));
   }
 
   async updatePlatformProfile(

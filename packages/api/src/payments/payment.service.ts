@@ -154,9 +154,13 @@ export async function initiateChapaDeposit(
       checkoutUrl,
       status: "pending",
     };
-  } catch {
+  } catch (error) {
     // Keep the attempt retryable with the same tx_ref if the network failed
     // after Chapa accepted the initialization request.
+    logger.error(
+      { err: error, txRef: prepared.transaction.txRef },
+      "Chapa checkout initialization failed",
+    );
     throw new AppError("Could not start Chapa checkout. Retry shortly.", HttpStatus.SERVICE_UNAVAILABLE);
   }
 }

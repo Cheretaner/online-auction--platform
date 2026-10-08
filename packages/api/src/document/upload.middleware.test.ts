@@ -31,17 +31,18 @@ async function post(app: express.Express, path: string, form = new FormData()) {
 }
 
 describe("document multipart upload limits", () => {
-  it("accepts one file and the three supported metadata fields", async () => {
+  it("accepts one file and all four supported metadata fields", async () => {
     const form = new FormData();
     form.append("docType", "identity_document");
     form.append("isPrivate", "true");
     form.append("auctionId", "auction-id");
+    form.append("requiresPayment", "false");
     form.append("file", new Blob(["%PDF-1.7\n"], { type: "application/pdf" }), "evidence.pdf");
     const response = await post(createUploadTestApp(), "/", form);
     const body = await response.json() as { fields: string[]; fileName: string };
 
     expect(response.status).toBe(200);
-    expect(body.fields).toHaveLength(3);
+    expect(body.fields).toHaveLength(4);
     expect(body.fileName).toBe("evidence.pdf");
   });
 
@@ -51,6 +52,7 @@ describe("document multipart upload limits", () => {
     form.append("two", "2");
     form.append("three", "3");
     form.append("four", "4");
+    form.append("five", "5");
     const response = await post(createUploadTestApp(), "/", form);
     const body = await response.json() as { error: { code: string } };
 

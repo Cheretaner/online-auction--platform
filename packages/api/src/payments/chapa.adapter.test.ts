@@ -51,6 +51,22 @@ describe("ChapaAdapter", () => {
     });
   });
 
+  it("preserves Chapa's rejection reason for server-side diagnostics", async () => {
+    const adapter = new ChapaAdapter(async () => new Response(JSON.stringify({
+      status: "failed",
+      message: "Merchant account is not enabled",
+    }), { status: 400 }));
+
+    await expect(adapter.initialize({
+      txRef: "dep-test-reference",
+      amount: "100.00",
+      email: "bidder@example.test",
+      firstName: "Test",
+      lastName: "Bidder",
+      returnUrl: "https://auction.example.test/app/deposits",
+    })).rejects.toThrow("Merchant account is not enabled");
+  });
+
   it("initiates and verifies full refunds using Chapa references", async () => {
     const responses = [
       { status: "success", data: { ref_id: "refund-ref" } },

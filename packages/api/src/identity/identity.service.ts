@@ -327,13 +327,7 @@ export class IdentityService {
   }
 
   async listUsers(): Promise<Array<PublicProfile & { roles: Role[] }>> {
-    const profiles = await this.repository.listProfiles();
-    return Promise.all(
-      profiles.map(async (profile) => ({
-        ...toPublicProfile(profile),
-        roles: await this.repository.findUserRoles(profile.id),
-      })),
-    );
+    return this.repository.listAdminUsers();
   }
 
   async createUser(data: CreateUserRequest, actor: { userId: string; roles: Role[] }): Promise<PublicProfile> {

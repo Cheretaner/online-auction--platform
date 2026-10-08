@@ -72,11 +72,15 @@ export class ChapaAdapter {
           description: "Bid security deposit",
         },
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(30_000),
     });
     const payload = initializeResponseSchema.safeParse(await response.json().catch(() => null));
     if (!response.ok || !payload.success || payload.data.status !== "success" || !payload.data.data?.checkout_url) {
-      throw new Error("Chapa could not initialize the payment");
+      throw new Error(
+        payload.success
+          ? payload.data.message ?? `Chapa rejected checkout initialization (HTTP ${response.status})`
+          : `Chapa returned an invalid checkout response (HTTP ${response.status})`,
+      );
     }
     const checkoutUrl = new URL(payload.data.data.checkout_url);
     if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.chapa.co") {
@@ -90,7 +94,7 @@ export class ChapaAdapter {
       `https://api.chapa.co/v1/transaction/verify/${encodeURIComponent(txRef)}`,
       {
         headers: { Authorization: `Bearer ${env.CHAPA_SECRET_KEY}` },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(30_000),
       },
     );
     const payload = verifyResponseSchema.safeParse(await response.json().catch(() => null));
