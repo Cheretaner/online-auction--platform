@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateUserRequest, ROLES, UpdateUserRequest } from "@auction/shared";
-import { useForm, type FieldValues, type UseFormReturn } from "react-hook-form";
+import { useForm, type FieldValues, type Path, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -78,13 +78,62 @@ function UserCreator() {
   );
 }
 
-function UserField({ form, name, label, type = "text" }: { form: UseFormReturn<FieldValues>; name: "fullName" | "email" | "password"; label: string; type?: string }) {
-  return <FormField control={form.control} name={name} render={({ field }) => <FormItem><FormLabel>{label}</FormLabel><FormControl><Input type={type} {...field} /></FormControl><FormMessage /></FormItem>} />;
+function UserField<T extends FieldValues>({
+  form,
+  name,
+  label,
+  type = "text",
+}: {
+  form: UseFormReturn<T>;
+  name: Path<T>;
+  label: string;
+  type?: string;
+}) {
+  return (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <FormControl>
+            <Input type={type} {...field} value={field.value ?? ""} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
 }
 
-function UserRoleField({ form }: { form: UseFormReturn<FieldValues> }) {
+function UserRoleField<T extends FieldValues>({ form }: { form: UseFormReturn<T> }) {
   const t = useT("tools");
-  return <FormField control={form.control} name="platformRole" render={({ field }) => <FormItem><FormLabel>{t("orgs.platformRole")}</FormLabel><Select value={field.value ?? ""} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{ROLES.map((role) => <SelectItem key={role} value={role}>{enumLabel(role)}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />;
+  return (
+    <FormField
+      control={form.control}
+      name={"platformRole" as Path<T>}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{t("orgs.platformRole")}</FormLabel>
+          <Select value={field.value ?? ""} onValueChange={field.onChange}>
+            <FormControl>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {enumLabel(role)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
 }
 
 function UserEditor({ user }: { user: AdminUserRecord }) {
