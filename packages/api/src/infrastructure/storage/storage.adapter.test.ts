@@ -21,6 +21,7 @@ describe("MemoryStorageAdapter", () => {
 describe("SupabaseStorageAdapter", () => {
   it("delegates storage operations while preserving the adapter contract", async () => {
     const objects = new Map<string, { data: ArrayBuffer; contentType: string }>();
+    let storageError: (Error & { statusCode: string; status?: number }) | null = null;
     const storageClient = {
       storage: {
         from: () => ({
@@ -30,15 +31,19 @@ describe("SupabaseStorageAdapter", () => {
             return { data: { path } };
           },
           download: async (path: string) => {
+            if (storageError) return { data: null, error: storageError };
             const object = objects.get(path);
             return {
               data: object
                 ? new Blob([object.data], { type: object.contentType })
-                : new Blob([new Uint8Array(0)]),
+                : null,
               error: null,
             };
           },
-          exists: async (path: string) => ({ data: objects.has(path), error: null }),
+          exists: async (path: string) => ({
+            data: objects.has(path),
+            error: storageError,
+          }),
           remove: async (paths: string[]) => {
             paths.forEach((path) => objects.delete(path));
             return { data: [], error: null };
@@ -53,5 +58,17 @@ describe("SupabaseStorageAdapter", () => {
     expect((await storage.get("uploads/test.pdf"))?.data.toString()).toBe("pdf");
     await storage.delete("uploads/test.pdf");
     expect(await storage.exists("uploads/test.pdf")).toBe(false);
+    expect(await storage.get("uploads/test.pdf")).toBeNull();
+
+    storageError = Object.assign(new Error("Object not found"), { statusCode: "404" });
+    expect(await storage.get("uploads/missing.pdf")).toBeNull();
+    expect(await storage.exists("uploads/missing.pdf")).toBe(false);
+
+    storageError = Object.assign(new Error("Object not found"), { statusCode: "400", status: 400 });
+    expect(await storage.exists("uploads/missing.pdf")).toBe(false);
+
+    storageError = Object.assign(new Error("Storage service unavailable"), { statusCode: "500" });
+    await expect(storage.get("uploads/test.pdf")).rejects.toThrow("Storage service unavailable");
+    await expect(storage.exists("uploads/test.pdf")).rejects.toThrow("Storage service unavailable");
   });
 });

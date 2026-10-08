@@ -13,7 +13,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["cheretanet.png", "apple-touch-icon.png"],
+      includeAssets: ["pwa-icon-192.png", "apple-touch-icon.png"],
       manifest: {
         name: "Cheretanet Auctions",
         short_name: "Cheretanet",

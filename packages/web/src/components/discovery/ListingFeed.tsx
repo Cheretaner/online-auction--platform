@@ -89,9 +89,9 @@ function PriceSummary({ auction }: { auction: Auction }) {
     amount = formatMoney(auction.startPrice)
   }
   return (
-    <div className="flex flex-col justify-center rounded-lg border bg-primary/[0.04] p-4 md:items-end md:text-right">
+    <div className="flex min-w-0 flex-col justify-center rounded-lg border bg-primary/[0.04] p-4 md:items-end md:text-right">
       <p className="eyebrow text-muted-foreground">{caption}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{amount}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums break-all">{amount}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         {auction.bidCount === 1 ? tc('bidCountOne') : tc('bidCountOther', { count: auction.bidCount })}
         {auction.auctionType === 'open_ascending'
@@ -118,7 +118,7 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
     <Card
       interactive
       className={cn(
-        'group relative flex flex-col gap-4 overflow-hidden p-4 sm:p-5',
+        'group relative flex min-w-0 flex-col gap-4 overflow-hidden p-4 sm:p-5',
         featured && 'border-primary/45 shadow-sm',
         finished && 'bg-card/80',
       )}
@@ -143,10 +143,13 @@ function AuctionListing({ auction, issuer, featured }: { auction: Auction; issue
         <StatusChips auction={auction} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] lg:items-stretch">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,15rem)] lg:items-stretch">
         <div className="min-w-0 space-y-2.5">
-          <h2 className="text-xl leading-snug font-semibold sm:text-2xl">
-            <Link to={`/auctions/${auction.id}`} className="rounded-sm transition-colors hover:text-primary focus-visible:text-primary">
+          <h2 className="text-xl leading-snug font-semibold break-words sm:text-2xl">
+            <Link
+              to={`/auctions/${auction.id}`}
+              className="rounded-sm transition-colors hover:text-primary focus-visible:text-primary"
+            >
               {auction.title}
             </Link>
           </h2>
@@ -237,11 +240,11 @@ export function ListingFeed({
     )
   } else {
     body = (
-      <div className="grid gap-4">
+      <div className="grid min-w-0 gap-4">
         {auctions.map((auction, index) => {
           const featured = index === 0 && auction.status === 'live'
           return (
-            <div key={auction.id} >
+            <div key={auction.id} className="min-w-0">
               <AuctionListing
                 auction={auction}
                 issuer={issuerName(auction.orgId)}

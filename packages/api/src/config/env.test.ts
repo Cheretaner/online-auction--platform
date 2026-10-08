@@ -63,6 +63,7 @@ describe("production environment hardening", () => {
     process.env.FILE_SCAN_ENABLED = "true";
     process.env.STORAGE_DRIVER = "supabase";
     process.env.SUPABASE_URL = "https://example.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "";
     process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL = "admin@example.com";
     process.env.GEMINI_API_KEY = "test-gemini-key";
     process.env.AI_PROVIDER = "gemini";
@@ -72,5 +73,13 @@ describe("production environment hardening", () => {
     process.env.MAIL_FROM = "noreply@example.com";
 
     await expect(import("./env.js")).rejects.toThrow(/SUPABASE_SERVICE_ROLE_KEY/);
+  });
+
+  it("normalizes a Supabase REST API URL to the project URL used by Storage", async () => {
+    process.env.NODE_ENV = "test";
+    process.env.SUPABASE_URL = "https://example.supabase.co/rest/v1/";
+
+    const { env } = await import("./env.js");
+    expect(env.SUPABASE_URL).toBe("https://example.supabase.co");
   });
 });

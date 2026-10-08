@@ -14,7 +14,9 @@ export function Toaster(props: ToasterProps) {
       duration={6000}
       toastOptions={{
         classNames: {
-          toast: "group toast group-[.toaster]:rounded-lg group-[.toaster]:border-border group-[.toaster]:bg-card group-[.toaster]:font-sans group-[.toaster]:text-foreground group-[.toaster]:shadow-lg group-[.toaster]:data-[type=success]:border-emerald-500/40 group-[.toaster]:data-[type=error]:border-destructive/40 group-[.toaster]:data-[type=warning]:border-amber-500/40",
+          // Border tints use semantic tokens so they adapt correctly in dark mode
+          // rather than pinning to hardcoded Tailwind palette values.
+          toast: "group toast group-[.toaster]:rounded-lg group-[.toaster]:border-border group-[.toaster]:bg-card group-[.toaster]:font-sans group-[.toaster]:text-foreground group-[.toaster]:shadow-lg group-[.toaster]:data-[type=success]:border-success/40 group-[.toaster]:data-[type=error]:border-destructive/40 group-[.toaster]:data-[type=warning]:border-warning/40",
           description: "group-[.toast]:text-muted-foreground",
           actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-foreground",

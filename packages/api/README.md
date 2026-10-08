@@ -62,9 +62,11 @@ start in production** without the first three:
   writable layer disappear when it is replaced. Lost blobs cannot be restored
   from document metadata, so affected files need to be uploaded again.
 - `STORAGE_DRIVER=supabase` uses the backend-only Supabase Storage SDK. Configure
-  `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_DOCUMENT_BUCKET`
-  in the deployed environment; the bucket must already exist. Keep the service
-  role key server-side and never expose it to the web application.
+  `SUPABASE_URL` as the project URL (not the REST endpoint), plus
+  `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_DOCUMENT_BUCKET` in the deployed
+  environment; the bucket must already exist. A URL ending in `/rest/v1` is
+  normalized automatically. Keep the service role key server-side and never
+  expose it to the web application.
 - `DOCUMENT_UPLOADS_ENABLED=false` disables document uploads and new identity
   verification submissions when durable storage or a reachable malware scanner
   is unavailable. Existing documents remain listed, but files on ephemeral
