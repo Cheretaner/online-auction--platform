@@ -60,6 +60,17 @@ export const remove: RequestHandler = async (req, res) => {
   res.status(HttpStatus.NO_CONTENT).send();
 };
 
+export const archiveGenerated: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  if (!auth.roles.includes("super_admin")) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+  }
+  res.json(await service.archiveGeneratedOrganization(routeParam(req.params.id), {
+    userId: auth.userId,
+    roles: auth.roles,
+  }));
+};
+
 export const listMembers: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
   const organizationId = routeParam(req.params.id);

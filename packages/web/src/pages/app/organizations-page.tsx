@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateOrganizationRequest, ORG_TYPES } from "@auction/shared";
-import { Building2, ChevronDown, Pencil, Trash2, UserPlus } from "lucide-react";
+import { Archive, Building2, ChevronDown, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/features/auth/auth-provider";
 import {
   useAddOrgMember,
+  useArchiveGeneratedOrganization,
   useCreateOrganization,
   useDeleteOrganization,
   useOrganizations,
@@ -172,8 +173,12 @@ function OrganizationCard({ org, canManage }: { org: OrganizationRecord; canMana
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const remove = useDeleteOrganization();
+  const archive = useArchiveGeneratedOrganization();
   const t = useT("tools");
+  const isGeneratedOrganization =
+    /^Org [0-9a-f]{8}$/i.test(org.name) && org.slug === `org-${org.id}`;
   return (
     <Card>
       <CardContent className="space-y-4 p-4 sm:p-5">
@@ -198,6 +203,11 @@ function OrganizationCard({ org, canManage }: { org: OrganizationRecord; canMana
                 <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
                   <Pencil aria-hidden /> {t("orgs.edit")}
                 </Button>
+                {isGeneratedOrganization && org.isActive ? (
+                  <Button size="sm" variant="outline" onClick={() => setArchiving(true)}>
+                    <Archive aria-hidden /> {t("orgs.archiveGenerated")}
+                  </Button>
+                ) : null}
                 <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleting(true)}>
                   <Trash2 aria-hidden /> {t("orgs.delete")}
                 </Button>
@@ -236,6 +246,24 @@ function OrganizationCard({ org, canManage }: { org: OrganizationRecord; canMana
               onError: (error) => toast.error(getErrorMessage(error)),
             })}
           />
+          {isGeneratedOrganization ? (
+            <ConfirmDialog
+              open={archiving}
+              onOpenChange={setArchiving}
+              title={t("orgs.archiveGeneratedTitle")}
+              description={t("orgs.archiveGeneratedDescription", { name: org.name })}
+              confirmLabel={t("orgs.archiveGenerated")}
+              destructive
+              pending={archive.isPending}
+              onConfirm={() => archive.mutate(org.id, {
+                onSuccess: () => {
+                  setArchiving(false);
+                  toast.success(t("orgs.archiveGeneratedSuccess"));
+                },
+                onError: (error) => toast.error(getErrorMessage(error)),
+              })}
+            />
+          ) : null}
         </>
       ) : null}
     </Card>

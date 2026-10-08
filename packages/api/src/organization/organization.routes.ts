@@ -30,6 +30,12 @@ organizationRouter.patch(
   asyncHandler(controller.update),
 );
 
+organizationRouter.post(
+  "/:id/archive-generated",
+  requireAuth(["super_admin"]),
+  asyncHandler(controller.archiveGenerated),
+);
+
 organizationRouter.delete(
   "/:id",
   requireAuth(["super_admin"]),

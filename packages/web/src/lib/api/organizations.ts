@@ -6,7 +6,13 @@ import type {
   UpdateUserRequest,
 } from "@auction/shared";
 import { apiRequest, v1 } from "@/lib/api/client";
-import type { AdminUserRecord, ItemList, OrganizationMember, OrganizationRecord } from "@/lib/api/types";
+import type {
+  AdminUserRecord,
+  ArchiveGeneratedOrganizationResult,
+  ItemList,
+  OrganizationMember,
+  OrganizationRecord,
+} from "@/lib/api/types";
 
 export const organizationsApi = {
   list: () => apiRequest<ItemList<OrganizationRecord>>(v1("/organizations")),
@@ -17,6 +23,11 @@ export const organizationsApi = {
     apiRequest<OrganizationRecord>(v1(`/organizations/${id}`), { method: "PATCH", body }),
   delete: (id: string) =>
     apiRequest<void>(v1(`/organizations/${id}`), { method: "DELETE", parse: "void" }),
+  archiveGenerated: (id: string) =>
+    apiRequest<ArchiveGeneratedOrganizationResult>(
+      v1(`/organizations/${id}/archive-generated`),
+      { method: "POST" },
+    ),
   listMembers: (id: string) =>
     apiRequest<ItemList<OrganizationMember>>(v1(`/organizations/${id}/members`)),
   addMember: (id: string, body: AddOrganizationMemberRequest) =>
