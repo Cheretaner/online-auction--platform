@@ -22,6 +22,25 @@ function assertSafeKey(key: string): void {
   }
 }
 
+function isStorageNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (("status" in error && error.status === 404) ||
+      ("statusCode" in error && String(error.statusCode) === "404"))
+  );
+}
+
+function isStorageExistenceMiss(error: unknown): boolean {
+  return (
+    isStorageNotFound(error) ||
+    (typeof error === "object" &&
+      error !== null &&
+      (("status" in error && error.status === 400) ||
+        ("statusCode" in error && String(error.statusCode) === "400")))
+  );
+}
+
 export class MemoryStorageAdapter implements StorageAdapter {
   private readonly files = new Map<string, StoredObject>();
 
@@ -119,7 +138,11 @@ export class SupabaseStorageAdapter implements StorageAdapter {
   async get(key: string): Promise<StoredObject | null> {
     assertSafeKey(key);
     const { data, error } = await this.getBucket().download(key);
-    if (error || !data) return null;
+    if (error) {
+      if (isStorageNotFound(error)) return null;
+      throw error;
+    }
+    if (!data) return null;
     return {
       data: Buffer.from(await data.arrayBuffer()),
       contentType: data.type || "application/octet-stream",
@@ -135,7 +158,10 @@ export class SupabaseStorageAdapter implements StorageAdapter {
   async exists(key: string): Promise<boolean> {
     assertSafeKey(key);
     const { data, error } = await this.getBucket().exists(key);
-    if (error) return false;
+    if (error) {
+      if (isStorageExistenceMiss(error)) return false;
+      throw error;
+    }
     return data;
   }
 }

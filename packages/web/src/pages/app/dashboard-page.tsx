@@ -72,8 +72,8 @@ export default function DashboardPage() {
           label={t("dashboard.identity")}
           value={statusLabel(
             verification.data?.status ??
-              session?.user.verificationStatus ??
-              "unverified",
+            session?.user.verificationStatus ??
+            "unverified",
           )}
           hint={t("dashboard.identityHint")}
           icon={CheckCircle2}
@@ -111,7 +111,7 @@ export default function DashboardPage() {
         </section>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="flex w-full justify-around gap-8">
         <Card className="h-full">
           <CardHeader>
             <CardTitle>{t("dashboard.access")}</CardTitle>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="h-full">
+        <Card className="h-full flex-1">
           <CardHeader>
             <CardTitle>{t("dashboard.quickLinks")}</CardTitle>
             <CardDescription>{t("dashboard.quickLinksDescription")}</CardDescription>
@@ -152,6 +152,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
     </div>
   );
 }

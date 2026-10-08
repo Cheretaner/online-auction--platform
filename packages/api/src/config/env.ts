@@ -69,7 +69,16 @@ const envSchema = z
       .transform((value) => value === "true"),
     STORAGE_DRIVER: z.enum(["memory", "filesystem", "supabase"]).default("filesystem"),
     STORAGE_DIR: z.string().default("./data/storage"),
-    SUPABASE_URL: z.string().url().optional(),
+    SUPABASE_URL: z
+      .string()
+      .url()
+      .optional()
+      .transform((value) => {
+        if (!value) return value;
+        const url = new URL(value);
+        url.pathname = url.pathname.replace(/\/rest\/v1\/?$/i, "").replace(/\/+$/, "");
+        return url.toString().replace(/\/$/, "");
+      }),
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
     SUPABASE_DOCUMENT_BUCKET: z.string().default("documents"),
     DOCUMENT_UPLOADS_ENABLED: z.enum(["true", "false"]).default("true").transform((value) => value === "true"),
