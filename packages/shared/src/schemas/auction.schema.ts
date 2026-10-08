@@ -8,6 +8,7 @@ const OptionalMoney = z.preprocess(
   (value) => value === "" ? undefined : value,
   Money.optional(),
 );
+const DocumentAccessFee = Money.refine((value) => Number(value) > 0, "Document access fee must be greater than zero");
 
 export const CreateAuctionRequest = z.object({
   organizationId: z.string().uuid(),
@@ -18,6 +19,7 @@ export const CreateAuctionRequest = z.object({
   reservePrice: OptionalMoney,
   minIncrement: Money,
   depositAmount: Money.default("0.00"),
+  documentAccessFee: DocumentAccessFee.default("1.00"),
   eligibilityRules: z.string().max(2000).optional(),
   region: z.string().max(80).optional(),
   opensAt: z.preprocess((val) => {
@@ -45,6 +47,7 @@ export const UpdateAuctionRequest = z.object({
   reservePrice: OptionalMoney,
   minIncrement: Money.optional(),
   depositAmount: Money.optional(),
+  documentAccessFee: DocumentAccessFee.optional(),
   eligibilityRules: z.string().max(2000).optional(),
   region: z.string().max(80).optional(),
   opensAt: z.string().datetime().optional(),

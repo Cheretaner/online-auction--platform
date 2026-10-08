@@ -18,6 +18,7 @@ import { assertBidPlacement } from "./placement.policy.js";
 import { computeAntiSnipe } from "./bidding.rules.js";
 import type { BidRecord, PlaceBidResult } from "./bidding.types.js";
 import { toPublicBid } from "./bidding.visibility.js";
+import { auctionRequiresDocumentAccess, hasPaidDocumentAccess } from "../document/document-access.service.js";
 
 function requireKey(idempotencyKey?: string): string {
   if (!idempotencyKey) {
@@ -65,6 +66,14 @@ export async function placeBid(input: {
 
       const bidder = await repo.findBidder(input.bidderId);
       if (!bidder) throw new AppError("Bidder not found", HttpStatus.NOT_FOUND);
+
+      if (
+        input.roles.includes("bidder") &&
+        await auctionRequiresDocumentAccess(auction.id) &&
+        !(await hasPaidDocumentAccess(auction.id, input.bidderId))
+      ) {
+        throw new AppError("Pay for the tender documents before placing a bid", HttpStatus.FORBIDDEN, "DOCUMENT_ACCESS_REQUIRED");
+      }
 
       const formFields = await repo.listFormFields(auction.id);
       for (const field of formFields) {

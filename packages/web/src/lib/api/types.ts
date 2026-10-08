@@ -54,6 +54,7 @@ export interface Auction {
   currentHighestBid: string | null;
   bidCount: number;
   depositAmount: string;
+  documentAccessFee: string;
   eligibilityRules: string | null;
   region: string | null;
   antiSnipeSeconds: number;
@@ -157,10 +158,10 @@ export interface DocumentRecord {
   uploadedBy: string;
   documentType: DocumentType;
   fileName: string;
-  storagePath: string;
+  storagePath?: string;
   mimeType: string;
   fileSizeBytes: number;
-  checksumSha256: string;
+  checksumSha256?: string;
   isPrivate: boolean;
   requiresPayment: boolean;
   summary: string | null;
@@ -211,9 +212,18 @@ export interface SettlementRecord {
 }
 
 export interface DocumentAccessInitiation {
-  status: string;
+  status: "pending" | "succeeded";
   checkoutUrl: string | null;
   txRef: string;
+}
+
+export interface DocumentAccessStatus {
+  required: boolean;
+  paid: boolean;
+  status: "not_required" | "not_purchased" | "pending" | "succeeded" | "failed" | "reconciliation_required";
+  amount: string;
+  paidAt: string | null;
+  checkoutUrl: string | null;
 }
 
 export interface RefundLetter {

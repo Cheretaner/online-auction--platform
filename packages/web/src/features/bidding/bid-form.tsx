@@ -14,6 +14,9 @@ import { formatMoney } from "@/lib/format";
 import { createSealedCommitment, normalizeAmount, verifySealedCommitment } from "@/lib/sealed-bid";
 import { useT } from "@/i18n/context";
 import { apiRequest, v1 } from "@/lib/api/client";
+import { useAuth } from "@/features/auth/auth-provider";
+import { useDocumentAccessStatus } from "@/features/operations/queries";
+import { DocumentAccessControl } from "@/features/documents/document-access-control";
 
 interface AuctionFormField {
   id: string;
@@ -61,14 +64,23 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
   const minimum = minimumBid(auction);
   const t = useT("auctions");
   const tc = useT("common");
+  const { roles, session } = useAuth();
+  const isBidder = roles.includes("bidder");
+  const documentAccess = useDocumentAccessStatus(auction.id, !disabled && isBidder, session?.user.id);
+  const accessBlocked = isBidder && (
+    documentAccess.isLoading ||
+    documentAccess.isError ||
+    Boolean(documentAccess.data?.required && !documentAccess.data.paid)
+  );
   const [formResponses, setFormResponses] = useState<Record<string, string>>({});
   const formFields = useQuery({
     queryKey: ["auction-form-fields", auction.id],
     queryFn: () => apiRequest<{ items: AuctionFormField[] }>(v1(`/auctions/${auction.id}/form-fields`)),
-    enabled: !disabled,
+    enabled: !disabled && !accessBlocked,
   });
 
   async function submit() {
+    if (accessBlocked) return;
     setProblem(null);
     const normalized = normalizeAmount(amount.trim());
     if (!/^\d+\.\d{2}$/.test(normalized)) {
@@ -107,6 +119,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
 
   return (
     <div className="space-y-4">
+      {isBidder ? <DocumentAccessControl auctionId={auction.id} enabled={!disabled} /> : null}
       <form
         className="flex flex-col gap-3 @md:flex-row @md:items-start"
         onSubmit={(event) => {
@@ -136,7 +149,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
                   max={field.maxValue ?? undefined}
                   value={formResponses[field.id] ?? ""}
                   onChange={(event) => setFormResponses((current) => ({ ...current, [field.id]: event.target.value }))}
-                  disabled={disabled}
+                  disabled={disabled || accessBlocked}
                 />
               )}
             </div>
@@ -148,7 +161,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
             placeholder={minimum}
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            disabled={disabled}
+            disabled={disabled || accessBlocked}
             aria-invalid={problem ? true : undefined}
             aria-describedby={`bid-hint-${auction.id}`}
             className="h-11 text-base tabular-nums"
@@ -163,7 +176,7 @@ export function BidForm({ auction, disabled }: { auction: Auction; disabled?: bo
           type="submit"
           size="lg"
           className="@md:mt-6"
-          disabled={disabled || !amount.trim()}
+          disabled={disabled || accessBlocked || !amount.trim()}
           loading={placeBid.isPending}
         >
           {placeBid.isPending ? t("bid.submitting") : sealed ? t("bid.submitSealed") : t("bid.place")}

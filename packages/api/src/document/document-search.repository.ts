@@ -124,7 +124,7 @@ export async function searchDocuments(
       ["org_admin", "auction_officer", "compliance_officer"].includes(role),
     ));
     where.push(`(
-      is_private = FALSE
+      (requires_payment = FALSE AND is_private = FALSE)
       OR uploaded_by = ${userId}
       OR ${isSuperAdmin}::BOOLEAN
       OR (${isCompliance}::BOOLEAN AND auction_id IS NULL)
@@ -136,7 +136,17 @@ export async function searchDocuments(
              AND a.org_id = ${organizationId}
         )
       )
+      OR (
+        requires_payment = TRUE AND EXISTS (
+          SELECT 1 FROM auction_document_access ada
+           WHERE ada.auction_id = searchable_documents.auction_id
+             AND ada.bidder_id = ${userId}
+             AND ada.status = 'succeeded'
+        )
+      )
     )`);
+  } else {
+    where.push("requires_payment = FALSE");
   }
 
   const whereSql = where.join(" AND ");
@@ -146,7 +156,8 @@ export async function searchDocuments(
              d.created_at AS uploaded_at,
              COALESCE(ocr.extracted_text, d.extracted_text) AS extracted_text,
              COALESCE(ocr.status, d.ocr_status) AS ocr_status,
-             d.is_private
+             d.is_private,
+             d.requires_payment
         FROM documents d
         LEFT JOIN document_ocr_results ocr ON ocr.document_id = d.id
     )

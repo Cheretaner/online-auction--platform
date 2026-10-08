@@ -51,6 +51,7 @@ export class ChapaAdapter {
     firstName: string;
     lastName: string;
     returnUrl: string;
+    customization?: { title: string; description: string };
   }): Promise<string> {
     const response = await this.request("https://api.chapa.co/v1/transaction/initialize", {
       method: "POST",
@@ -66,7 +67,10 @@ export class ChapaAdapter {
         last_name: input.lastName,
         tx_ref: input.txRef,
         return_url: input.returnUrl,
-        customization: { title: "Auction bid security", description: "Bid security deposit" },
+        customization: input.customization ?? {
+          title: "Auction bid security",
+          description: "Bid security deposit",
+        },
       }),
       signal: AbortSignal.timeout(15_000),
     });

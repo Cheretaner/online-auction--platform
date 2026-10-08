@@ -37,6 +37,7 @@ import type {
   CountResponse,
   ChapaDepositInitiation,
   DocumentAccessInitiation,
+  DocumentAccessStatus,
   DepositRecord,
   FinancialReconciliationSnapshot,
   DisputeRecord,
@@ -105,6 +106,10 @@ export const refundLettersApi = {
 export const documentsApi = {
   initiateAccess: (auctionId: string) =>
     apiRequest<DocumentAccessInitiation>(v1(`/documents/access/${auctionId}/initiate`), { method: "POST" }),
+  accessStatus: (auctionId: string) =>
+    apiRequest<DocumentAccessStatus>(v1(`/documents/access/${auctionId}`)),
+  verifyAccess: (auctionId: string) =>
+    apiRequest<DocumentAccessStatus>(v1(`/documents/access/${auctionId}/verify`), { method: "POST" }),
   upload: (form: FormData) =>
     apiRequest<DocumentRecord>(v1("/documents"), { method: "POST", body: form }),
   listMine: () => apiRequest<ItemList<DocumentRecord>>(v1("/documents/me")),

@@ -16,6 +16,16 @@ documentRouter.post(
   requireAuth(["bidder"]),
   asyncHandler(accessController.initiate),
 );
+documentRouter.get(
+  "/access/:auctionId",
+  requireAuth(["bidder"]),
+  asyncHandler(accessController.status),
+);
+documentRouter.post(
+  "/access/:auctionId/verify",
+  requireAuth(["bidder"]),
+  asyncHandler(accessController.verify),
+);
 
 documentRouter.post(
   "/",

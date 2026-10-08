@@ -60,6 +60,7 @@ export const ERROR_CODES = [
   "REFRESH_TOKEN_INVALID",
   "REFRESH_TOKEN_REUSED",
   "RESET_TOKEN_INVALID",
+  "DOCUMENT_ACCESS_REQUIRED",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

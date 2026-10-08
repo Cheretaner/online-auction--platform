@@ -158,18 +158,20 @@ export interface DocumentViewer {
  * compliance officers.
  */
 export async function canReadDocument(document: DocumentRecord, viewer: DocumentViewer): Promise<boolean> {
-  if (document.requiresPayment && document.auctionId && !(await hasPaidDocumentAccess(document.auctionId, viewer.userId))) {
-    return false;
-  }
-  if (!document.isPrivate) return true;
   if (document.uploadedBy === viewer.userId) return true;
   if (viewer.roles.includes("super_admin")) return true;
-  if (!document.auctionId) return viewer.roles.includes("compliance_officer");
-
-  const isOfficer = viewer.roles.some((role) => OFFICER_ROLES.includes(role));
-  if (!isOfficer || !viewer.organizationId) return false;
-  const owner = await findAuctionOwner(document.auctionId);
-  return owner?.orgId === viewer.organizationId;
+  let isAuctionOfficer = false;
+  if (document.auctionId && viewer.organizationId && viewer.roles.some((role) => OFFICER_ROLES.includes(role))) {
+    const owner = await findAuctionOwner(document.auctionId);
+    isAuctionOfficer = owner?.orgId === viewer.organizationId;
+  }
+  if (!document.auctionId && viewer.roles.includes("compliance_officer")) return true;
+  if (isAuctionOfficer) return true;
+  if (document.requiresPayment) {
+    return Boolean(document.auctionId && await hasPaidDocumentAccess(document.auctionId, viewer.userId));
+  }
+  if (!document.isPrivate) return true;
+  return false;
 }
 
 export async function readDocument(

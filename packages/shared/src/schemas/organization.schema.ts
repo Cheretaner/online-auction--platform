@@ -11,7 +11,9 @@ export const CreateOrganizationRequest = z.object({
 });
 export type CreateOrganizationRequest = z.infer<typeof CreateOrganizationRequest>;
 
-export const UpdateOrganizationRequest = CreateOrganizationRequest.partial();
+export const UpdateOrganizationRequest = CreateOrganizationRequest.partial().extend({
+  isActive: z.boolean().optional(),
+});
 export type UpdateOrganizationRequest = z.infer<typeof UpdateOrganizationRequest>;
 
 export const Organization = z.object({

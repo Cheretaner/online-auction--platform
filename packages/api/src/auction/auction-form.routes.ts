@@ -5,7 +5,7 @@ import { requireAuth } from "../shared/middleware/auth.middleware.js";
 import { asyncHandler } from "../shared/middleware/asyncHandler.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import { assertAuctionAccess } from "../shared/authz/auction-access.js";
-import { hasPaidDocumentAccess } from "../document/document-access.service.js";
+import { auctionRequiresDocumentAccess, hasPaidDocumentAccess } from "../document/document-access.service.js";
 
 const field = z.object({
   label: z.string().trim().min(1).max(200),
@@ -22,7 +22,11 @@ export const auctionFormRouter = Router({ mergeParams: true });
 auctionFormRouter.get("/", requireAuth(), asyncHandler(async (req, res) => {
   const auth = getAuth(req);
   const auctionId = routeParam(req.params.auctionId);
-  if (auth.roles.includes("bidder") && !(await hasPaidDocumentAccess(auctionId, auth.userId))) {
+  if (
+    auth.roles.includes("bidder") &&
+    await auctionRequiresDocumentAccess(auctionId) &&
+    !(await hasPaidDocumentAccess(auctionId, auth.userId))
+  ) {
     res.status(403).json({ error: { message: "Pay for the tender documents before viewing bid fields", code: "DOCUMENT_ACCESS_REQUIRED" } });
     return;
   }

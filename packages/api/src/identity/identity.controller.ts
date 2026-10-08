@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import type {
   CreateUserRequest,
+  GoogleLoginRequest,
   LoginRequest,
   PasswordResetConfirm,
   PasswordResetRequest,
@@ -12,6 +13,7 @@ import type {
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import { IdentityService } from "./identity.service.js";
+import { verifyGoogleCredential } from "./google-token.js";
 
 const service = new IdentityService();
 
@@ -22,6 +24,13 @@ export const register: RequestHandler = async (req, res) => {
 
 export const login: RequestHandler = async (req, res) => {
   const session = await service.login(req.body as LoginRequest);
+  res.json(session);
+};
+
+export const googleLogin: RequestHandler = async (req, res) => {
+  const body = req.body as GoogleLoginRequest;
+  const identity = await verifyGoogleCredential(body.credential);
+  const session = await service.loginWithGoogle(identity);
   res.json(session);
 };
 

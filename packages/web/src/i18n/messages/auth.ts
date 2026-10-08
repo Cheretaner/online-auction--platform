@@ -4,6 +4,13 @@ export const auth = defineMessages(
   {
     email: "Email",
     password: "Password",
+    google: {
+      or: "or",
+      failed: "Google sign-in failed",
+      unavailable: "Google sign-in is currently unavailable. Please try again later.",
+      notConfigured: "Google sign-in is not configured. Use email and password instead.",
+      retry: "Try Google sign-in again",
+    },
     login: {
       eyebrow: "Welcome back",
       title: "Sign in to Cheretanet",
@@ -65,6 +72,13 @@ export const auth = defineMessages(
   {
     email: "ኢሜይል",
     password: "የይለፍ ቃል",
+    google: {
+      or: "ወይም",
+      failed: "በGoogle መግባት አልተሳካም",
+      unavailable: "የGoogle መግባት አሁን አይገኝም። እባክዎ ቆይተው ይሞክሩ።",
+      notConfigured: "የGoogle መግቢያ አልተዋቀረም። በኢሜይልና በይለፍ ቃል ይግቡ።",
+      retry: "የGoogle መግቢያን እንደገና ይሞክሩ",
+    },
     login: {
       eyebrow: "እንኳን ደህና መጡ",
       title: "ወደ ጨረታኔት ይግቡ",

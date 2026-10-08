@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   LoginRequest,
   CreateUserRequest,
+  GoogleLoginRequest,
   PasswordResetConfirm,
   PasswordResetRequest,
   RefreshTokenRequest,
@@ -22,6 +23,7 @@ const router = Router();
 // guessing cannot consume the generous global API allowance.
 router.post("/register", authRateLimiter, validate(RegisterRequest), asyncHandler(controller.register));
 router.post("/login", authRateLimiter, validate(LoginRequest), asyncHandler(controller.login));
+router.post("/google", authRateLimiter, validate(GoogleLoginRequest), asyncHandler(controller.googleLogin));
 router.post("/refresh", authRateLimiter, validate(RefreshTokenRequest), asyncHandler(controller.refresh));
 router.post("/logout", authRateLimiter, validate(RefreshTokenRequest), asyncHandler(controller.logout));
 router.post(

@@ -36,6 +36,7 @@ const envSchema = z
     JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
     JWT_ISSUER: z.string().default("auction-api"),
     JWT_AUDIENCE: z.string().default("auction-web"),
+    GOOGLE_CLIENT_ID: z.string().trim().optional(),
     CORS_ORIGIN: z.string().default("*"),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),

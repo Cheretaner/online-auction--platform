@@ -22,6 +22,7 @@ import { logger } from "../shared/utils/logger.js";
 import { IdentityRepository } from "./identity.repository.js";
 import * as sessions from "./session.repository.js";
 import type { AuthSession, Profile, PublicProfile } from "./identity.types.js";
+import type { GoogleIdentity } from "./google-token.js";
 
 const BCRYPT_ROUNDS = 12;
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -33,6 +34,13 @@ function hashResetToken(token: string): string {
 function toPublicProfile(profile: Profile): PublicProfile {
   const { passwordHash: _passwordHash, nationalId: _nationalId, tinNumber: _tinNumber, ...rest } = profile;
   return rest;
+}
+
+async function bootstrapPlatformRole(email: string, repository: IdentityRepository): Promise<Role | null> {
+  const bootstrapEmail = env.BOOTSTRAP_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  if (bootstrapEmail) return bootstrapEmail === email ? "super_admin" : null;
+  if (env.NODE_ENV !== "production" && (await repository.countProfiles()) === 0) return "super_admin";
+  return null;
 }
 
 export class IdentityService {
@@ -113,14 +121,7 @@ export class IdentityService {
     // the shape of the address lets anyone claim the role. The "first
     // account wins" fallback is for local development only; production
     // requires BOOTSTRAP_SUPER_ADMIN_EMAIL (see config/env.ts).
-    let platformRole: Role | null = null;
-    const bootstrapEmail = env.BOOTSTRAP_SUPER_ADMIN_EMAIL?.trim().toLowerCase();
-    if (
-      (bootstrapEmail && bootstrapEmail === email) ||
-      (!bootstrapEmail && env.NODE_ENV !== "production" && (await this.repository.countProfiles()) === 0)
-    ) {
-      platformRole = "super_admin";
-    }
+    const platformRole = await bootstrapPlatformRole(email, this.repository);
 
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 
@@ -146,6 +147,59 @@ export class IdentityService {
     }
 
     return this.buildSession(profile);
+  }
+
+  async loginWithGoogle(identity: GoogleIdentity): Promise<AuthSession> {
+    const email = identity.email.trim().toLowerCase();
+    const existingGoogleProfile = await this.repository.findProfileByGoogleSubject(identity.subject);
+    if (existingGoogleProfile) return this.buildSession(existingGoogleProfile);
+
+    const existingEmailProfile = await this.repository.findProfileByEmail(email);
+    if (existingEmailProfile) {
+      let linkedProfile: Profile | null;
+      try {
+        linkedProfile = await this.repository.linkGoogleSubject(existingEmailProfile.id, identity.subject);
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+        linkedProfile = null;
+      }
+      if (linkedProfile) return this.buildSession(linkedProfile);
+
+      const concurrentlyLinkedProfile = await this.repository.findProfileByGoogleSubject(identity.subject);
+      if (concurrentlyLinkedProfile) return this.buildSession(concurrentlyLinkedProfile);
+      throw AppError.conflict("This email is already linked to a different Google account");
+    }
+
+    const passwordHash = await bcrypt.hash(randomBytes(32).toString("base64url"), BCRYPT_ROUNDS);
+    try {
+      const profile = await this.repository.createProfile({
+        email,
+        fullName: identity.name?.trim() || email.split("@")[0],
+        passwordHash,
+        accountType: "individual",
+        platformRole: await bootstrapPlatformRole(email, this.repository),
+        googleSubject: identity.subject,
+      });
+      return this.buildSession(profile);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      const concurrentlyCreatedProfile = await this.repository.findProfileByGoogleSubject(identity.subject);
+      if (concurrentlyCreatedProfile) return this.buildSession(concurrentlyCreatedProfile);
+
+      const concurrentlyRegisteredProfile = await this.repository.findProfileByEmail(email);
+      if (concurrentlyRegisteredProfile) {
+        let linkedProfile: Profile | null;
+        try {
+          linkedProfile = await this.repository.linkGoogleSubject(concurrentlyRegisteredProfile.id, identity.subject);
+        } catch (linkError) {
+          if (!isUniqueViolation(linkError)) throw linkError;
+          linkedProfile = null;
+        }
+        if (linkedProfile) return this.buildSession(linkedProfile);
+      }
+      throw AppError.conflict("An account already exists with this email");
+    }
   }
 
   async login(data: LoginRequest): Promise<AuthSession> {

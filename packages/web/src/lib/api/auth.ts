@@ -11,6 +11,12 @@ export const authApi = {
     apiRequest<AuthSession>(v1("/auth/register"), { method: "POST", body, skipAuth: true }),
   login: (body: LoginRequest) =>
     apiRequest<AuthSession>(v1("/auth/login"), { method: "POST", body, skipAuth: true }),
+  googleLogin: (credential: string) =>
+    apiRequest<AuthSession>(v1("/auth/google"), {
+      method: "POST",
+      body: { credential },
+      skipAuth: true,
+    }),
   refresh: (refreshToken: string) =>
     apiRequest<AuthSession>(v1("/auth/refresh"), {
       method: "POST",

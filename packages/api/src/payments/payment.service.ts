@@ -297,9 +297,11 @@ export async function processChapaWebhook(
   txRef: string,
   eventHash: string,
 ): Promise<"processed" | "duplicate" | "pending"> {
-  if (await processDocumentAccessPayment(txRef, eventHash)) {
+  const documentAccessPayment = await processDocumentAccessPayment(txRef);
+  if (documentAccessPayment === "processed") {
     return "processed";
   }
+  if (documentAccessPayment === "pending") return "pending";
   const owner = await paymentRepo.findPaymentOwnerByTxRef(txRef);
   if (!owner) throw AppError.notFound("Payment reference not found");
   const verified = await chapa.verify(txRef);

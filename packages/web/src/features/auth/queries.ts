@@ -58,6 +58,17 @@ export function useLoginMutation() {
   });
 }
 
+export function useGoogleLoginMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (credential: string) => authApi.googleLogin(credential).then(persistSession),
+    onSuccess: (session) => {
+      queryClient.setQueryData(queryKeys.session, session);
+      queryClient.setQueryData(queryKeys.me, session.user);
+    },
+  });
+}
+
 export function useRegisterMutation() {
   const queryClient = useQueryClient();
   return useMutation({

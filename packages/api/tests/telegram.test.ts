@@ -18,6 +18,7 @@ describe("Telegram Channel Message Formatting", () => {
     currentHighestBid: "1340000",
     bidCount: 7,
     depositAmount: "50000",
+    documentAccessFee: "1.00",
     eligibilityRules: "Open to Ethiopian citizens and licensed businesses",
     region: "Addis Ababa",
     antiSnipeSeconds: 120,

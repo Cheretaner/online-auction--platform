@@ -25,6 +25,7 @@ function mapRowToAuction(row: any): Auction {
     currentHighestBid: row.current_highest_bid,
     bidCount: row.bid_count,
     depositAmount: row.deposit_amount,
+    documentAccessFee: row.document_access_fee,
     eligibilityRules: row.eligibility_rules,
     region: row.region,
     antiSnipeSeconds: row.anti_snipe_seconds ?? 120,
@@ -57,13 +58,14 @@ export async function createAuction(
     INSERT INTO auctions (
       org_id, title, description, auction_type, start_price, 
       reserve_price, min_increment, deposit_amount, 
+      document_access_fee,
       eligibility_rules, region, opens_at, closes_at, original_closes_at,
       created_by, status
     ) VALUES (
       $1, $2, $3, $4, $5, 
-      $6, $7, $8, 
-      $9, $10, $11, $12, $13,
-      $14, 'draft'
+      $6, $7, $8, $9,
+      $10, $11, $12, $13, $14,
+      $15, 'draft'
     ) RETURNING *
   `;
 
@@ -76,6 +78,7 @@ export async function createAuction(
     data.reservePrice ?? null,
     data.minIncrement,
     data.depositAmount ?? "0.00",
+    data.documentAccessFee ?? "1.00",
     data.eligibilityRules || null,
     data.region || null,
     data.opensAt,
@@ -127,6 +130,10 @@ export async function updateAuction(
   if (data.depositAmount !== undefined) {
     updates.push(`deposit_amount = $${paramIndex++}`);
     values.push(data.depositAmount);
+  }
+  if (data.documentAccessFee !== undefined) {
+    updates.push(`document_access_fee = $${paramIndex++}`);
+    values.push(data.documentAccessFee);
   }
   if (data.eligibilityRules !== undefined) {
     updates.push(`eligibility_rules = $${paramIndex++}`);

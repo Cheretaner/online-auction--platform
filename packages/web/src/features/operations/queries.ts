@@ -102,6 +102,18 @@ export function useDeleteOrganization() {
   });
 }
 
+export function useArchiveGeneratedOrganization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => organizationsApi.archiveGenerated(id),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.auctions.all }),
+      ]),
+  });
+}
+
 export function useUsers() {
   return useQuery({
     queryKey: queryKeys.users.list(),
@@ -316,6 +328,28 @@ export function useAuctionDocuments(
     queryKey: queryKeys.auctions.documents(auctionId ?? ""),
     queryFn: () => documentsApi.listByAuction(auctionId!),
     enabled: Boolean(auctionId) && enabled,
+  });
+}
+
+export function useDocumentAccessStatus(auctionId: string | undefined, enabled = true, viewerId?: string) {
+  return useQuery({
+    queryKey: ["document-access", auctionId ?? "", viewerId ?? ""],
+    queryFn: async () => {
+      const status = await documentsApi.accessStatus(auctionId!);
+      return status.status === "pending"
+        ? documentsApi.verifyAccess(auctionId!)
+        : status;
+    },
+    enabled: Boolean(auctionId) && enabled,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useInitiateDocumentAccess(auctionId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => documentsApi.initiateAccess(auctionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["document-access", auctionId] }),
   });
 }
 

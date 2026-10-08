@@ -28,6 +28,25 @@ curl -s localhost:3000/health/ready
 pnpm --filter @auction/api smoke       # walks the whole flow end to end
 ```
 
+### Google sign-in
+
+Create an OAuth 2.0 **Web application** client in Google Cloud Console and add
+the web app origins under **Authorized JavaScript origins** (for local
+development, `http://localhost:5173`). Set its client ID as
+`VITE_GOOGLE_CLIENT_ID` in the web app's build environment and `GOOGLE_CLIENT_ID`
+in the API environment. Both values must be the same; no client secret is used.
+For local development, set them in `packages/web/.env` and `packages/api/.env`
+respectively, then restart the API and rebuild/restart Vite after changing the
+web value. For production, the web value must be present at build time and the
+API value must be present in the running service's environment. If the API says
+Google sign-in is not configured, its `GOOGLE_CLIENT_ID` is missing; if it
+rejects a token, confirm both values match and that the browser's exact origin
+(including scheme and port) is allowed in Google Cloud Console.
+Run the database migrations (`pnpm migrate` or `RUN_MIGRATIONS_ON_BOOT=true`)
+before deploying. The API verifies Google's ID token and only accepts verified
+email addresses; signing in with an existing verified email links that Google
+identity to the existing account.
+
 ---
 
 ## Production deployment
@@ -230,6 +249,15 @@ curl -sX POST localhost:3000/api/v1/organizations/$ORG_ID/members \
   -d '{"email":"officer@example.gov","role":"auction_officer"}'
 ```
 
+Generated fixture organizations can be removed from public use in the
+super-admin Organizations page with **Remove generated data**. The server
+accepts `POST /api/v1/organizations/{id}/archive-generated` only for records
+matching the integration-fixture naming and identifier pattern. It cancels
+cancellable auctions through the normal audited workflow, deactivates the
+organization, and keeps auction/audit history. Inactive organizations and
+their auctions no longer appear in public discovery. This is an archive, not
+a physical purge; do not delete audit ledger entries.
+
 ## Organization context
 
 Organization-scoped endpoints read `organizationId` from the access token,
@@ -265,6 +293,24 @@ Placement is serialised by `SELECT ... FOR UPDATE` on the auction row and
 checks, in order: auction live, within the time window, not self-bidding,
 bidder KYC-verified, verified deposit where required, sealed/open commitment
 consistency, and the minimum acceptable amount.
+
+## Paid tender documents
+
+Organization staff can mark eligible tender-pack documents as payment-required
+when uploading them and configure a one-time document-access fee on the auction.
+The fee grants the bidder access to all paid tender-pack documents for that
+auction. Private operational documents are not converted into paid documents.
+Access is enforced by the API for document metadata, previews, downloads, OCR
+search, and bid submission; changing a document's public flag does not bypass a
+paid-document requirement.
+
+Set `CHAPA_SECRET_KEY` and `CHAPA_WEBHOOK_SECRET` in the API environment to
+enable paid access. Apply migration `025_paid_document_access` before deploying
+the updated API (or enable `RUN_MIGRATIONS_ON_BOOT=true`). Bidders initiate
+payment with `POST /api/v1/documents/access/:auctionId/initiate`, check the
+attempt with `GET /api/v1/documents/access/:auctionId`, and reconcile a pending
+attempt with `POST /api/v1/documents/access/:auctionId/verify`. A verified
+successful payment grants ongoing access; a failed attempt can be retried.
 
 ## Audit ledger
 

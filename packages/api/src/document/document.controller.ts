@@ -6,8 +6,16 @@ import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import { findAuctionOwner } from "../shared/authz/auction-access.js";
 import * as service from "./document.service.js";
+import { hasPaidDocumentAccess } from "./document-access.service.js";
 
 const OFFICER_ROLES = ["auction_officer", "org_admin", "compliance_officer", "super_admin"];
+const PAID_TENDER_DOCUMENT_TYPES = new Set<DocumentType>([
+  "specification",
+  "inspection_report",
+  "terms",
+  "image",
+  "other",
+]);
 
 export const upload: RequestHandler = async (req, res) => {
   const auth = getAuth(req);
@@ -35,6 +43,7 @@ export const upload: RequestHandler = async (req, res) => {
 
   // Default to private: a document is only public once someone says so.
   let keepPrivate = isPrivate !== "false";
+  let isAuctionStaff = false;
   if (docType === "identity_document") keepPrivate = true;
   if (auctionId) {
     const owner = await findAuctionOwner(auctionId);
@@ -43,13 +52,22 @@ export const upload: RequestHandler = async (req, res) => {
     // pack. Anyone else (a bidder attaching a deposit proof or dispute
     // evidence) can attach a document, but it stays private: visible to the
     // uploader and to that organization's officers.
-    const isStaff =
+    isAuctionStaff =
       auth.roles.includes("super_admin") ||
       (auth.roles.some((role) => OFFICER_ROLES.includes(role)) && auth.organizationId === owner.orgId);
-    if (!isStaff) keepPrivate = true;
+    if (!isAuctionStaff) keepPrivate = true;
   }
   if (requiresPayment === "true" && !auctionId) {
     throw AppError.badRequest("Paid documents must belong to an auction");
+  }
+  if (requiresPayment === "true") {
+    if (!PAID_TENDER_DOCUMENT_TYPES.has(docType as DocumentType)) {
+      throw AppError.badRequest("Only tender-pack documents can require payment");
+    }
+    if (!isAuctionStaff) {
+      throw new AppError("Only the auction organization can mark documents as paid", HttpStatus.FORBIDDEN, "FORBIDDEN");
+    }
+    keepPrivate = true;
   }
 
   const document = await service.uploadDocument({
@@ -113,8 +131,19 @@ export const listByAuction: RequestHandler = async (req, res) => {
 
   const docs = await service.listByAuction(auctionId);
 
-  // Bidders see only the published pack, not internal inspection notes.
-  res.json({ items: isOfficer ? docs : docs.filter((doc) => !doc.isPrivate) });
+  // Non-staff can see the published pack and paywalled document metadata,
+  // but never internal private operational documents.
+  const visible = isOfficer
+    ? docs
+    : docs.filter((doc) => !doc.isPrivate || (doc.requiresPayment && auth.roles.includes("bidder")));
+  const paid = !isOfficer && await hasPaidDocumentAccess(auctionId, auth.userId);
+  res.json({
+    items: visible.map((doc) => {
+      if (isOfficer || paid || !doc.requiresPayment) return doc;
+      const { storagePath: _storagePath, checksumSha256: _checksum, extractedText: _text, summary: _summary, ...metadata } = doc;
+      return { ...metadata, extractedText: null, summary: null };
+    }),
+  });
 };
 
 export const listMine: RequestHandler = async (req, res) => {

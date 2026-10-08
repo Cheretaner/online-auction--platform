@@ -47,6 +47,12 @@ export const LoginRequest = z.object({
 
 export type LoginRequest = z.infer<typeof LoginRequest>;
 
+export const GoogleLoginRequest = z.object({
+  credential: z.string().min(1).max(8192),
+});
+
+export type GoogleLoginRequest = z.infer<typeof GoogleLoginRequest>;
+
 export const RefreshTokenRequest = z.object({
   refreshToken: z.string().min(10),
 });

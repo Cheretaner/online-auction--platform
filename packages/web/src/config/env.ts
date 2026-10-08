@@ -6,6 +6,7 @@ const envSchema = z.object({
     .optional()
     .transform((value) => value?.replace(/\/$/, "") ?? ""),
   VITE_APP_NAME: z.string().min(1).default("Cheretanet"),
+  VITE_GOOGLE_CLIENT_ID: z.string().trim().optional(),
   VITE_VOXIDE_PUBLIC_KEY: z
     .string()
     .optional()
@@ -18,6 +19,7 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse({
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   VITE_APP_NAME: import.meta.env.VITE_APP_NAME,
+  VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
   VITE_VOXIDE_PUBLIC_KEY: import.meta.env.VITE_VOXIDE_PUBLIC_KEY,
 });
 
@@ -30,6 +32,7 @@ if (!parsed.success) {
 export const env = {
   apiBaseUrl: parsed.data.VITE_API_BASE_URL,
   appName: parsed.data.VITE_APP_NAME,
+  googleClientId: parsed.data.VITE_GOOGLE_CLIENT_ID || undefined,
   voxidePublicKey: parsed.data.VITE_VOXIDE_PUBLIC_KEY || undefined,
 };
 

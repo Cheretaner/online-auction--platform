@@ -62,6 +62,7 @@ export default function AuctionFormPage() {
       reservePrice: "",
       minIncrement: "1.00",
       depositAmount: "0.00",
+      documentAccessFee: "1.00",
       eligibilityRules: "",
       region: "",
       opensAt: "",
@@ -85,6 +86,7 @@ export default function AuctionFormPage() {
       reservePrice: auction.reservePrice ?? "",
       minIncrement: auction.minIncrement,
       depositAmount: auction.depositAmount,
+      documentAccessFee: auction.documentAccessFee,
       eligibilityRules: auction.eligibilityRules ?? "",
       region: auction.region ?? "",
       opensAt: toDatetimeLocalValue(auction.opensAt),
@@ -291,6 +293,20 @@ export default function AuctionFormPage() {
                         <Input inputMode="decimal" className="tabular-nums" {...field} />
                       </FormControl>
                       <FormDescription>{t("form.depositHint")}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="documentAccessFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("form.documentAccessFee", { currency: tc("currency") })}</FormLabel>
+                      <FormControl>
+                        <Input inputMode="decimal" className="tabular-nums" {...field} />
+                      </FormControl>
+                      <FormDescription>{t("form.documentAccessFeeHint")}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

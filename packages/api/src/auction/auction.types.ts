@@ -13,6 +13,7 @@ export interface Auction {
   currentHighestBid: string | null;
   bidCount: number;
   depositAmount: string;
+  documentAccessFee: string;
   eligibilityRules: string | null;
   region: string | null;
   antiSnipeSeconds: number;

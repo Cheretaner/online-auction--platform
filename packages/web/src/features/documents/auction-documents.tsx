@@ -9,11 +9,15 @@ import { Button } from "@/components/ui/button";
 import { FieldHint, Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useAuctionDocuments, useDeleteDocument, useUploadDocument } from "@/features/operations/queries";
+import {
+  useAuctionDocuments,
+  useDeleteDocument,
+  useDocumentAccessStatus,
+  useUploadDocument,
+} from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
-import { documentsApi } from "@/lib/api/resources";
 import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
 import { useAuth } from "@/features/auth/auth-provider";
 import { hasRole } from "@/lib/format";
@@ -28,6 +32,7 @@ import {
   useSearchReviewedOcr,
   useStartDocumentOcr,
 } from "@/features/operations/queries";
+import { DocumentAccessControl } from "@/features/documents/document-access-control";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -36,16 +41,42 @@ function formatSize(bytes: number) {
 }
 
 const OCR_DOCUMENT_TYPES = new Set<DocumentType>(["specification", "inspection_report", "terms", "other"]);
+const PAID_TENDER_DOCUMENT_TYPES = new Set<DocumentType>([
+  "specification",
+  "inspection_report",
+  "terms",
+  "image",
+  "other",
+]);
 
-export function DocumentRow({ doc, canReview = false, canDelete = false }: { doc: DocumentRecord; canReview?: boolean; canDelete?: boolean }) {
+export function DocumentRow({
+  doc,
+  canReview = false,
+  canDelete = false,
+  isBidder = false,
+  hasPaidAccess = false,
+}: {
+  doc: DocumentRecord;
+  canReview?: boolean;
+  canDelete?: boolean;
+  isBidder?: boolean;
+  hasPaidAccess?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
-  const [paymentBusy, setPaymentBusy] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const remove = useDeleteDocument();
   const [reviewedText, setReviewedText] = useState<string | null>(null);
   const t = useT("auctions");
   const tc = useT("common");
+  const { session } = useAuth();
+  const documentReadable =
+    !doc.requiresPayment ||
+    !isBidder ||
+    hasPaidAccess ||
+    doc.uploadedBy === session?.user.id ||
+    canReview ||
+    canDelete;
   const ocr = useDocumentOcr(doc.id, canReview && showOcr);
   const startOcr = useStartDocumentOcr(doc.id);
   const reviewOcr = useReviewDocumentOcr(doc.id);
@@ -90,23 +121,6 @@ export function DocumentRow({ doc, canReview = false, canDelete = false }: { doc
           </p>
         </div>
         <div className="flex flex-wrap gap-2 sm:shrink-0">
-        {doc.requiresPayment && doc.auctionId ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={paymentBusy}
-            onClick={() => {
-              setPaymentBusy(true);
-              void documentsApi.initiateAccess(doc.auctionId!).then((result) => {
-                if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
-                else toast.success("Document access is active.");
-              }).catch((error: unknown) => toast.error(getErrorMessage(error, "Could not start document payment.")))
-                .finally(() => setPaymentBusy(false));
-            }}
-          >
-            {paymentBusy ? "Opening payment..." : "Pay to access"}
-          </Button>
-        ) : null}
         {canReview && supportsOcr ? (
           <Button
             size="sm"
@@ -118,21 +132,25 @@ export function DocumentRow({ doc, canReview = false, canDelete = false }: { doc
             onClick={() => showOcr ? setShowOcr(false) : void openExtraction()}
           >{showOcr ? t("documents.hideOcr") : ocr.data ? t("documents.viewOcr") : t("documents.extractText")}</Button>
         ) : null}
-        <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} />
-        <Button
-          size="sm"
-          variant="outline"
-          loading={busy}
-          onClick={() => {
-            setBusy(true);
-            downloadDocument(doc.id, doc.fileName)
-              .catch((error: unknown) => toast.error(getErrorMessage(error, tc("downloadFailed"))))
-              .finally(() => setBusy(false));
-          }}
-        >
-          {busy ? null : <Download aria-hidden />}
-          {busy ? tc("downloading") : tc("download")}
-        </Button>
+        {documentReadable ? (
+          <>
+            <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} />
+            <Button
+              size="sm"
+              variant="outline"
+              loading={busy}
+              onClick={() => {
+                setBusy(true);
+                downloadDocument(doc.id, doc.fileName)
+                  .catch((error: unknown) => toast.error(getErrorMessage(error, tc("downloadFailed"))))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              {busy ? null : <Download aria-hidden />}
+              {busy ? tc("downloading") : tc("download")}
+            </Button>
+          </>
+        ) : null}
         {canDelete ? (
           <Button
             size="sm"
@@ -244,10 +262,13 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
   const upload = useUploadDocument();
   const uploads = usePlatformCapabilities(Boolean(canUpload));
   const fileRef = useRef<HTMLInputElement>(null);
-  const { roles } = useAuth();
+  const { roles, session } = useAuth();
+  const isBidder = roles.includes("bidder");
   const canDelete = hasRole(roles, "auction_officer", "org_admin", "super_admin");
+  const access = useDocumentAccessStatus(auctionId, isBidder, session?.user.id);
   const [docType, setDocType] = useState<DocumentType>("specification");
   const [publicDoc, setPublicDoc] = useState(true);
+  const [requiresPayment, setRequiresPayment] = useState(false);
   const [ocrQuery, setOcrQuery] = useState("");
   const [ocrSearch, setOcrSearch] = useState("");
   const t = useT("auctions");
@@ -267,10 +288,18 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
       ) : (
         <ul>
           {items.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} canReview={canReview} canDelete={canDelete} />
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              canReview={canReview}
+              canDelete={canDelete}
+              isBidder={isBidder}
+              hasPaidAccess={Boolean(access.data?.paid)}
+            />
           ))}
         </ul>
       )}
+      {isBidder && access.data?.required ? <DocumentAccessControl auctionId={auctionId} /> : null}
 
       {canReview ? (
         <section className="space-y-3 rounded-lg border p-4" aria-label={t("documents.searchOcr")}>
@@ -347,10 +376,12 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
             form.set("docType", docType);
             form.set("auctionId", auctionId);
             form.set("isPrivate", publicDoc ? "false" : "true");
+            form.set("requiresPayment", requiresPayment ? "true" : "false");
             upload.mutate(form, {
               onSuccess: () => {
                 toast.success(t("documents.uploaded"));
                 if (fileRef.current) fileRef.current.value = "";
+                setRequiresPayment(false);
               },
               onError: (error) => toast.error(getErrorMessage(error, tc("uploadFailed"))),
             });
@@ -375,7 +406,11 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DOCUMENT_TYPES.filter((type) => !["identity_document", "deposit_release_evidence"].includes(type)).map((type) => (
+                {DOCUMENT_TYPES.filter((type) =>
+                  requiresPayment
+                    ? PAID_TENDER_DOCUMENT_TYPES.has(type)
+                    : !["identity_document", "deposit_release_evidence"].includes(type),
+                ).map((type) => (
                   <SelectItem key={type} value={type}>
                     {enumLabel(type)}
                   </SelectItem>
@@ -387,10 +422,37 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
             {upload.isPending ? t("documents.uploading") : t("documents.upload")}
           </Button>
           <div className="flex items-start gap-3 sm:col-span-3">
-            <Switch id={`doc-public-${auctionId}`} checked={publicDoc} onCheckedChange={setPublicDoc} />
+            <Switch
+              id={`doc-public-${auctionId}`}
+              checked={publicDoc}
+              onCheckedChange={(checked) => {
+                setPublicDoc(checked);
+                if (checked) setRequiresPayment(false);
+              }}
+              disabled={upload.isPending}
+            />
             <div>
               <Label htmlFor={`doc-public-${auctionId}`}>{t("documents.publish")}</Label>
               <FieldHint>{t("documents.publishHint")}</FieldHint>
+            </div>
+            <div className="flex items-start gap-3 sm:col-span-3">
+              <Switch
+                id={`doc-paid-${auctionId}`}
+                checked={requiresPayment}
+                onCheckedChange={(checked) => {
+                  setRequiresPayment(checked);
+                  if (checked) setPublicDoc(false);
+                }}
+                disabled={upload.isPending || !PAID_TENDER_DOCUMENT_TYPES.has(docType)}
+              />
+              <div>
+                <Label htmlFor={`doc-paid-${auctionId}`}>{t("documents.requirePayment")}</Label>
+                <FieldHint>
+                  {PAID_TENDER_DOCUMENT_TYPES.has(docType)
+                    ? t("documents.requirePaymentHint")
+                    : t("documents.requirePaymentTypeHint")}
+                </FieldHint>
+              </div>
             </div>
           </div>
         </form>

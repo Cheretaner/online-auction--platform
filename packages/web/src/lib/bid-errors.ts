@@ -18,6 +18,8 @@ export function explainBidError(error: unknown): BidErrorExplanation {
       };
     case "DEPOSIT_REQUIRED":
       return { message: translate("auctions", "bid.errors.depositRequired") };
+    case "DOCUMENT_ACCESS_REQUIRED":
+      return { message: translate("auctions", "documents.accessRequired") };
     case "BID_BELOW_MINIMUM":
       return { message: translate("auctions", "bid.errors.belowMinimum") };
     case "AUCTION_CLOSED":

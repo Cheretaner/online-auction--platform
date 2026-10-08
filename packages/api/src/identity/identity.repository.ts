@@ -49,6 +49,14 @@ function mapProfile(row: DbProfile): Profile {
 }
 
 export class IdentityRepository {
+  async findProfileByGoogleSubject(subject: string): Promise<Profile | null> {
+    const row = await queryOne<DbProfile>(
+      `SELECT * FROM profiles WHERE google_subject = $1 AND is_active = TRUE`,
+      [subject],
+    );
+    return row ? mapProfile(row) : null;
+  }
+
   async findProfileByEmail(email: string): Promise<Profile | null> {
     const row = await queryOne<DbProfile>(
       `SELECT * FROM profiles WHERE lower(email) = lower($1) AND is_active = TRUE`,
@@ -77,13 +85,14 @@ export class IdentityRepository {
     tinNumber?: string;
     region?: string;
     platformRole?: Role | null;
+    googleSubject?: string;
   }): Promise<Profile> {
     return withTransaction(async (client) => {
       const row = await queryOne<DbProfile>(
         `INSERT INTO profiles (
            email, full_name, password_hash, phone, account_type,
-           business_name, national_id, tin_number, national_id_hash, tin_number_hash, region, platform_role
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           business_name, national_id, tin_number, national_id_hash, tin_number_hash, region, platform_role, google_subject
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *`,
         [
           data.email,
@@ -98,12 +107,25 @@ export class IdentityRepository {
           hashSensitive(data.tinNumber),
           data.region ?? null,
           data.platformRole ?? null,
+          data.googleSubject ?? null,
         ],
         client,
       );
       if (!row) throw new Error("Failed to create profile");
       return mapProfile(row);
     });
+  }
+
+  async linkGoogleSubject(userId: string, subject: string): Promise<Profile | null> {
+    const row = await queryOne<DbProfile>(
+      `UPDATE profiles
+          SET google_subject = $2, updated_at = NOW()
+        WHERE id = $1 AND is_active = TRUE
+          AND (google_subject IS NULL OR google_subject = $2)
+        RETURNING *`,
+      [userId, subject],
+    );
+    return row ? mapProfile(row) : null;
   }
 
   async updateProfile(

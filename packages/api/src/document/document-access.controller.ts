@@ -9,3 +9,21 @@ export const initiate: RequestHandler = async (req, res) => {
     routeParam(req.params.auctionId),
   ));
 };
+
+export const status: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  res.json(await service.getDocumentAccessStatus(
+    routeParam(req.params.auctionId),
+    auth.userId,
+    false,
+  ));
+};
+
+export const verify: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  res.json(await service.getDocumentAccessStatus(
+    routeParam(req.params.auctionId),
+    auth.userId,
+    true,
+  ));
+};

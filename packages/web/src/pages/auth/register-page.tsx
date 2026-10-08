@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRegisterMutation } from "@/features/auth/queries";
+import { useGoogleLoginMutation, useRegisterMutation } from "@/features/auth/queries";
+import { GoogleSignInButton } from "@/features/auth/google-sign-in-button";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { getErrorMessage } from "@/lib/api/errors";
 import { useT } from "@/i18n/context";
@@ -78,6 +79,7 @@ const registerResolver: Resolver<RegisterFormValues> = async (values, context, o
 export default function RegisterPage() {
   const navigate = useNavigate();
   const register = useRegisterMutation();
+  const googleLogin = useGoogleLoginMutation();
   const t = useT("auth");
   const form = useForm<RegisterFormValues>({
     resolver: registerResolver,
@@ -94,6 +96,14 @@ export default function RegisterPage() {
     },
   });
   const accountType = useWatch({ control: form.control, name: "accountType" });
+  const handleGoogleCredential = async (credential: string) => {
+    try {
+      await googleLogin.mutateAsync(credential);
+      navigate("/app", { replace: true });
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("google.failed")));
+    }
+  };
 
   return (
     <AuthCard
@@ -110,6 +120,10 @@ export default function RegisterPage() {
         </>
       }
     >
+      <GoogleSignInButton
+        onCredential={(credential) => void handleGoogleCredential(credential)}
+        disabled={googleLogin.isPending}
+      />
           <Form {...form}>
             <form
               className="grid gap-4 sm:grid-cols-2"

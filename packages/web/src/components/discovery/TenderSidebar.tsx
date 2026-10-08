@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/features/auth/auth-provider'
-import { useAuctionDocuments } from '@/features/operations/queries'
+import { useAuctionDocuments, useDocumentAccessStatus } from '@/features/operations/queries'
 import { getErrorMessage } from '@/lib/api/errors'
 import type { Auction } from '@/lib/api/types'
 import { downloadDocument } from '@/lib/download'
 import { DocumentPreviewButton } from '@/features/documents/document-preview-button'
 import { enumLabel, formatDateTime, formatMoney, regionLabel } from '@/lib/format'
 import { useT } from '@/i18n/context'
+import { DocumentAccessControl } from '@/features/documents/document-access-control'
 
 const steps = ['step1', 'step2', 'step3'] as const
 
@@ -22,8 +23,10 @@ function SectionTitle({ children }: { children: ReactNode }) {
 }
 
 function Documents({ auctionId }: { auctionId: string }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, roles, session } = useAuth()
+  const isBidder = roles.includes('bidder')
   const docs = useAuctionDocuments(auctionId, isAuthenticated)
+  const access = useDocumentAccessStatus(auctionId, isAuthenticated && isBidder, session?.user.id)
   const t = useT('auctions')
   const tc = useT('common')
   if (!isAuthenticated) {
@@ -40,35 +43,45 @@ function Documents({ auctionId }: { auctionId: string }) {
   if (docs.isLoading) return <Skeleton className="h-12 w-full" />
   if (items.length === 0) return <p className="text-sm text-muted-foreground">{t('sidebar.noDocuments')}</p>
   return (
-    <ul className="flex flex-col gap-2">
-      {items.map((doc) => (
-        <li key={doc.id}>
-          <div className="flex items-center gap-2 rounded-md border bg-background p-2.5">
-            <span className="flex min-w-0 items-center gap-2.5">
-              <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-medium">{doc.fileName}</span>
-                <span className="text-xs text-muted-foreground capitalize">
-                  {enumLabel(doc.documentType)} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+    <div className="space-y-3">
+      {isBidder && access.data?.required ? <DocumentAccessControl auctionId={auctionId} /> : null}
+      <ul className="flex flex-col gap-2">
+        {items.map((doc) => {
+          const canRead = !doc.requiresPayment || !isBidder || access.data?.paid || doc.uploadedBy === session?.user.id
+          return (
+            <li key={doc.id}>
+              <div className="flex items-center gap-2 rounded-md border bg-background p-2.5">
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium">{doc.fileName}</span>
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {enumLabel(doc.documentType)} · {(doc.fileSizeBytes / 1024).toFixed(0)} KB
+                    </span>
+                  </span>
                 </span>
-              </span>
-            </span>
-            <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} size="icon" />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={tc('download')}
-              onClick={() => downloadDocument(doc.id, doc.fileName).catch((error: unknown) =>
-                toast.error(getErrorMessage(error, tc('downloadFailed'))),
-              )}
-            >
-              <Download className="size-4 text-muted-foreground" aria-hidden />
-            </Button>
-          </div>
-        </li>
-      ))}
-    </ul>
+                {canRead ? (
+                  <>
+                    <DocumentPreviewButton documentId={doc.id} fileName={doc.fileName} mimeType={doc.mimeType} size="icon" />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={tc('download')}
+                      onClick={() => downloadDocument(doc.id, doc.fileName).catch((error: unknown) =>
+                        toast.error(getErrorMessage(error, tc('downloadFailed'))),
+                      )}
+                    >
+                      <Download className="size-4 text-muted-foreground" aria-hidden />
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 
