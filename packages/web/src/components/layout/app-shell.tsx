@@ -136,8 +136,7 @@ export function AppShell() {
     <div className="product-ui flex min-h-svh bg-background">
       <aside className="sticky top-0 hidden h-svh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
         <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
-          <BrandLogo tone="inverse" to="/" className="focus-visible:ring-highlight focus-visible:ring-offset-sidebar" />
-        </div>
+<BrandLogo className="text-primary dark:text-foreground" />        </div>
         <SidebarScroll>
           <SidebarNav />
         </SidebarScroll>

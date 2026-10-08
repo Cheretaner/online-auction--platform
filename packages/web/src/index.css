@@ -3,129 +3,109 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Cheretanet design tokens.
- *
- * Palette: forest green brand on warm "paper" neutrals, with a gold highlight
- * for dark (inverse) bands. Semantic colours (success, warning, info,
- * destructive) are used only for state, never for decoration.
- */
 :root {
-  /* System Foundations - Crisp Alabaster & Editorial Cream (Hue: 75-94) */
-  --background: oklch(0.985 0.005 94);           /* Clean, ultra-bright premium page canvas */
-  --foreground: oklch(0.14 0.015 75);            /* Deep obsidian slate text for elegant typography */
-  --card: oklch(1.0 0 0);                        /* Pure white surface for content cards */
-  --card-foreground: oklch(0.14 0.015 75);
-  --popover: oklch(1.0 0 0);
-  --popover-foreground: oklch(0.14 0.015 75);
+  --background: oklch(0.985 0.005 94);
+  --foreground: #1F1B14;
+  --card: #FFFFFF;
+  --card-foreground: #1F1B14;
+  --popover: #FFFFFF;
+  --popover-foreground: #1F1B14;
 
-  /* Primary Brand Action - Deep Corporate Gold (Hue: 75) */
-  --primary: oklch(0.42 0.11 75);                /* Luxurious, high-contrast gold for primary actions */
-  --primary-foreground: oklch(0.99 0.002 0);     /* Crisp white text overlay inside primary buttons */
-  --secondary: oklch(0.935 0.012 94);            /* Muted background for supporting elements */
-  --secondary-foreground: oklch(0.24 0.02 75);
-  
-  /* Muted Text & Supporting Copy */
-  --muted: oklch(0.95 0.008 94);
-  --muted-foreground: oklch(0.48 0.015 75);      /* Highly legible subtitle copy ratio */
-  
-  --accent: oklch(0.94 0.05 78);                 /* Elegant warm-cream badge backgrounds */
-  --accent-foreground: oklch(0.35 0.09 75);      /* Rich amber text for focus items */
+  --primary: #322214;
+  --primary-foreground: #FFFFFF;
 
-  /* Structural Dividers & Controls */
-  --border: oklch(0.88 0.01 94);                 /* Razor-thin layout lines */
-  --input: oklch(0.84 0.015 94);
-  --ring: oklch(0.42 0.11 75);                   /* Matches core brand focus states */
+  --secondary: #F1E7DB;
+  --secondary-foreground: #322214;
 
-  /* Pure Feedback Ecosystem (Calibrated for High Legibility) */
-  --destructive: oklch(0.55 0.18 28);            /* Crisp ruby warning red */
-  --destructive-foreground: oklch(0.99 0.002 0);
-  --success: oklch(0.52 0.14 145);               /* Professional mint-green success validation */
-  --success-foreground: oklch(0.99 0.002 0);
-  --warning: oklch(0.58 0.13 75);                /* Attention alert brown-gold */
-  --warning-foreground: oklch(0.99 0.002 0);
-  --info: oklch(0.50 0.13 240);                  /* Clean corporate blue */
-  --info-foreground: oklch(0.99 0.002 0);
+  --muted: #F7ECE1;
+  --muted-foreground: #80756D;
 
-  /* Layout Inverse Overlays (Persistent Dark Headers/Footers) */
-  --inverse: oklch(0.14 0.015 75);
-  --inverse-foreground: oklch(0.985 0.005 94);
-  --highlight: oklch(0.90 0.06 78);
-  --highlight-strong: oklch(0.84 0.08 75);
+  --accent: #F1E7DB;
+  --accent-foreground: #322214;
 
-  /* Persistent Navigation Structures */
-  --sidebar: var(--inverse);
-  --sidebar-foreground: var(--inverse-foreground);
-  --sidebar-accent: oklch(0.22 0.02 75);
-  --sidebar-accent-foreground: oklch(0.99 0.002 0);
-  --sidebar-border: oklch(0.24 0.015 75);
+  --border: #D2C4BB;
+  --input: #D2C4BB;
+  --ring: #705A49;
+
+  --destructive: #BA1A1A;
+  --destructive-foreground: #FFFFFF;
+
+  --success: #006E2A;
+  --success-foreground: #FFFFFF;
+
+  --warning: #705A49;
+  --warning-foreground: #FFFFFF;
+
+  --info: #006E2A;
+  --info-foreground: #FFFFFF;
+
+  --inverse: #353028;
+  --inverse-foreground: #F9EFE4;
+
+  --highlight: #EFE3D5;
+  --highlight-strong: #DEC1AC;
+
+  --sidebar: #353028;
+  --sidebar-foreground: #F9EFE4;
+  --sidebar-accent: #4A3728;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #80756D;
 
   --radius: 0.625rem;
 }
 
 .dark {
-  --background: oklch(0.10 0.010 250);         
-  --foreground: oklch(0.98 0.002 0);          
-  --card: oklch(0.15 0.014 250);          
-  --card-foreground: oklch(0.98 0.002 0);
-  --popover: oklch(0.18 0.016 250);
-  --popover-foreground: oklch(0.98 0.002 0);
+  --background: #0A0A0C;
+  --foreground: #F8FAFC;
 
-  --primary: oklch(0.79 0.135 78);             
-  --primary-foreground: oklch(0.10 0.010 250); 
-  --secondary: oklch(0.20 0.018 250);           
-  --secondary-foreground: oklch(0.92 0.005 250);
-  
-  --muted: oklch(0.17 0.015 250);
-  --muted-foreground: oklch(0.68 0.012 250);   
-  
-  --accent: oklch(0.84 0.145 78);              
-  --accent-foreground: oklch(0.12 0.020 78);
+  --card: #1A1A22;
+  --card-foreground: #F8FAFC;
 
-  --border: oklch(0.23 0.016 250);              
-  --input: oklch(0.15 0.014 250);
-  --ring: oklch(0.79 0.135 78);                
+  --popover: #1A1A22;
+  --popover-foreground: #F8FAFC;
 
-  /* High-Visibility Status Indicators */
-  --destructive: oklch(0.65 0.190 28);         
-  --destructive-foreground: oklch(0.98 0.002 0);
-  --success: oklch(0.76 0.135 145);            
-  --success-foreground: oklch(0.10 0.010 250);
-  --warning: oklch(0.79 0.135 78);             
-  --warning-foreground: oklch(0.10 0.010 250);
-  --info: oklch(0.74 0.120 240);               
-  --info-foreground: oklch(0.10 0.010 250);
+  --primary: #C9974D;
+  --primary-foreground: #0A0A0C;
 
-  /* Layout Inverse Configurations */
-  --inverse: oklch(0.98 0.002 0);
-  --inverse-foreground: oklch(0.10 0.010 250);
-  --sidebar-accent: oklch(0.20 0.018 250);
-  --sidebar-border: oklch(0.22 0.016 250);
+  --secondary: #262630;
+  --secondary-foreground: #F8FAFC;
+
+  --muted: #262630;
+  --muted-foreground: #94A3B8;
+
+  --accent: #3A2E1C;
+  --accent-foreground: #E6C78F;
+
+  --border: #3F3F46;
+  --input: #3F3F46;
+  --ring: #C9974D;
+
+  --destructive: #F87171;
+  --destructive-foreground: #0A0A0C;
+
+  --success: #34D399;
+  --success-foreground: #0A0A0C;
+
+  --warning: #C9974D;
+  --warning-foreground: #0A0A0C;
+
+  --info: #74B9FF;
+  --info-foreground: #0A0A0C;
+
+  --inverse: #F8FAFC;
+  --inverse-foreground: #0A0A0C;
+
+  --highlight: #3A2E1C;
+  --highlight-strong: #C9974D;
+
+  --sidebar: #1A1A22;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-accent: #262630;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #3F3F46;
 }
 
-
-/*
- * Product themes systematically locked to the Obsidian Gold architecture.
- * Eliminates the historical identity split completely.
- */
 .dark.product-theme {
-  --background: var(--background);
-  --foreground: var(--foreground);
-  --card: var(--card);
-  --card-foreground: var(--card-foreground);
-  --popover: var(--popover);
-  --popover-foreground: var(--popover-foreground);
-  --primary: var(--primary);
-  --primary-foreground: var(--primary-foreground);
-  --secondary: var(--secondary);
-  --secondary-foreground: var(--secondary-foreground);
-  --muted: var(--muted);
-  --muted-foreground: var(--muted-foreground);
-  --accent: var(--accent);
-  --accent-foreground: var(--accent-foreground);
-  --border: var(--border);
-  --input: var(--input);
-  --ring: var(--ring);
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-accent: var(--secondary);
@@ -133,97 +113,59 @@
 }
 
 @theme inline {
-  /* Ethiopic fallbacks: the Latin faces have no Ge'ez glyphs, so Amharic text uses Noto. */
   --font-sans: "Hanken Grotesk", "Noto Sans Ethiopic", ui-sans-serif, system-ui, sans-serif;
   --font-heading: "Newsreader", "Noto Serif Ethiopic", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+
   --color-inverse: var(--inverse);
   --color-inverse-foreground: var(--inverse-foreground);
+
   --color-highlight: var(--highlight);
   --color-highlight-strong: var(--highlight-strong);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
 
-  /* sm: badges, chips · md: buttons, inputs, menu items · lg: cards, dialogs · xl: large feature bands */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
-
-
-
-@theme inline {
-  /* Ethiopic fallbacks: the Latin faces have no Ge'ez glyphs, so Amharic text uses Noto. */
-  --font-sans: "Hanken Grotesk", "Noto Sans Ethiopic", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: "Newsreader", "Noto Serif Ethiopic", ui-serif, Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-inverse: var(--inverse);
-  --color-inverse-foreground: var(--inverse-foreground);
-  --color-highlight: var(--highlight);
-  --color-highlight-strong: var(--highlight-strong);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-
-  /* sm: badges, chips · md: buttons, inputs, menu items · lg: cards, dialogs · xl: large feature bands */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -238,7 +180,6 @@
   html {
     @apply scroll-smooth;
     width: 100%;
-    /* Keeps anchored sections clear of the sticky header. */
     scroll-padding-top: 7rem;
   }
 
@@ -283,18 +224,14 @@
   }
 }
 
-/* Page-width container shared by the public header, pages and footer, so their edges line up. */
 @utility page-container {
   @apply mx-auto w-full max-w-[84rem] px-4 sm:px-6 lg:px-8;
 }
 
-/* Small uppercase label for metadata, eyebrows and table headings. */
 @utility eyebrow {
   @apply font-mono text-[11px] leading-4 font-medium tracking-[0.08em] uppercase;
 }
 
-/* Ge'ez script has no letter case and suffers under wide tracking and a
-   monospace face, so Amharic labels use the sans face at a readable size. */
 :lang(am) .eyebrow {
   font-family: var(--font-sans);
   font-size: 12px;
@@ -302,7 +239,6 @@
   font-weight: 600;
 }
 
-/* Ethiopic glyphs need a little more line height than Latin text. */
 :lang(am) body {
   line-height: 1.6;
 }
