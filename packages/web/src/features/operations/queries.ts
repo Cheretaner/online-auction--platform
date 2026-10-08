@@ -282,7 +282,7 @@ export function useInitiateChapaDeposit() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { auctionId: string }) => depositsApi.initiateChapa(body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["deposits"] }),
   });
 }
 

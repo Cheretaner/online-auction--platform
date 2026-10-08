@@ -41,6 +41,16 @@ export interface ChapaVerification {
   providerReference: string | null;
 }
 
+export class ChapaInitializationError extends Error {
+  constructor(
+    message: string,
+    readonly definitiveFailure: boolean,
+  ) {
+    super(message);
+    this.name = "ChapaInitializationError";
+  }
+}
+
 export class ChapaAdapter {
   constructor(private readonly request: typeof fetch = fetch) {}
 
@@ -75,12 +85,22 @@ export class ChapaAdapter {
       signal: AbortSignal.timeout(30_000),
     });
     const payload = initializeResponseSchema.safeParse(await response.json().catch(() => null));
-    if (!response.ok || !payload.success || payload.data.status !== "success" || !payload.data.data?.checkout_url) {
-      throw new Error(
+    if (!response.ok) {
+      throw new ChapaInitializationError(
         payload.success
           ? payload.data.message ?? `Chapa rejected checkout initialization (HTTP ${response.status})`
-          : `Chapa returned an invalid checkout response (HTTP ${response.status})`,
+          : `Chapa rejected checkout initialization (HTTP ${response.status})`,
+        response.status >= 400 && response.status < 500,
       );
+    }
+    if (!payload.success) {
+      throw new ChapaInitializationError("Chapa returned an invalid checkout response", false);
+    }
+    if (payload.data.status !== "success") {
+      throw new ChapaInitializationError(payload.data.message ?? "Chapa rejected checkout initialization", true);
+    }
+    if (!payload.data.data?.checkout_url) {
+      throw new ChapaInitializationError("Chapa returned no checkout URL", false);
     }
     const checkoutUrl = new URL(payload.data.data.checkout_url);
     if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.chapa.co") {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ChapaAdapter } from "./chapa.adapter.js";
+import { ChapaAdapter, ChapaInitializationError } from "./chapa.adapter.js";
 
 describe("ChapaAdapter", () => {
   it("accepts only Chapa's HTTPS hosted-checkout URL", async () => {
@@ -64,7 +64,33 @@ describe("ChapaAdapter", () => {
       firstName: "Test",
       lastName: "Bidder",
       returnUrl: "https://auction.example.test/app/deposits",
-    })).rejects.toThrow("Merchant account is not enabled");
+    })).rejects.toMatchObject({
+      message: "Merchant account is not enabled",
+      definitiveFailure: true,
+    });
+  });
+
+  it("does not treat a network failure as a definitive checkout rejection", async () => {
+    const adapter = new ChapaAdapter(async () => {
+      throw new TypeError("network unavailable");
+    });
+
+    await expect(adapter.initialize({
+      txRef: "dep-test-reference",
+      amount: "100.00",
+      email: "bidder@example.test",
+      firstName: "Test",
+      lastName: "Bidder",
+      returnUrl: "https://auction.example.test/app/deposits",
+    })).rejects.toThrow("network unavailable");
+    await expect(adapter.initialize({
+      txRef: "dep-test-reference",
+      amount: "100.00",
+      email: "bidder@example.test",
+      firstName: "Test",
+      lastName: "Bidder",
+      returnUrl: "https://auction.example.test/app/deposits",
+    })).rejects.not.toBeInstanceOf(ChapaInitializationError);
   });
 
   it("initiates and verifies full refunds using Chapa references", async () => {

@@ -19,6 +19,7 @@ import {
 } from "@/features/operations/queries";
 import type { BidderReadiness } from "@/features/bidding/use-bidder-readiness";
 import { getErrorMessage } from "@/lib/api/errors";
+import { closeCheckoutWindow, navigateCheckoutWindow, openCheckoutWindow } from "@/lib/payments/checkout-window";
 import type { Auction } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { enumLabel, formatMoney } from "@/lib/format";
@@ -91,13 +92,18 @@ export function BidderReadinessPanel({ auction, readiness }: { auction: Auction;
                 t("readiness.depositRejected", { reason: deposit.rejectionReason ?? t("readiness.noReason") })}
             </p>
           ) : null}
-          {deposit?.instrumentType === "chapa" && ["pending", "rejected"].includes(deposit.status) && acceptsDeposits ? (
+          {deposit?.instrumentType === "chapa" && deposit.status === "pending" && acceptsDeposits ? (
             <ChapaCheckoutButton auction={auction} />
           ) : (!deposit || deposit.status === "rejected") && acceptsDeposits ? (
             deposit?.status === "rejected" ? (
-              <p className="text-sm text-muted-foreground">
-                {t("readiness.depositRejectedHelp")}
-              </p>
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {t("readiness.depositRejectedHelp")}
+                </p>
+                {deposit.instrumentType === "chapa" ? (
+                  <DepositForm auction={auction} />
+                ) : null}
+              </>
             ) : (
               <DepositForm auction={auction} />
             )
@@ -136,6 +142,7 @@ function DepositForm({ auction }: { auction: Auction }) {
       instrumentType: "cpo" as const,
     },
   });
+  const requiresCpoProof = form.watch("instrumentType") === "cpo";
 
   return (
     <div className="space-y-3">
@@ -148,10 +155,14 @@ function DepositForm({ auction }: { auction: Auction }) {
           try {
             let documentId: string | undefined;
             const file = proof;
+            if (values.instrumentType === "cpo" && !file) {
+              toast.error(t("readiness.cpoProofRequired"));
+              return;
+            }
             if (file) {
               const data = new FormData();
               data.set("file", file);
-              data.set("docType", "other");
+              data.set("docType", values.instrumentType === "cpo" ? "cpo_proof" : "other");
               data.set("auctionId", auction.id);
               data.set("isPrivate", "true");
               documentId = (await upload.mutateAsync(data)).id;
@@ -242,12 +253,13 @@ function DepositForm({ auction }: { auction: Auction }) {
         <div className="space-y-1.5 @md:col-span-2">
           <Label htmlFor={`deposit-proof-${auction.id}`}>
             {t("readiness.proof")}
-            <OptionalHint />
+            {requiresCpoProof ? null : <OptionalHint />}
           </Label>
           <Input
             id={`deposit-proof-${auction.id}`}
             type="file"
             accept="image/*,application/pdf"
+            required={requiresCpoProof}
             disabled={!uploads.isSuccess || !uploads.data.documentUploadsEnabled}
             onChange={(event) => setProof(event.target.files?.[0] ?? null)}
           />
@@ -259,7 +271,9 @@ function DepositForm({ auction }: { auction: Auction }) {
                 {uploads.isError ? tc("documentUploadsStatusUnknown") : tc("documentUploadsUnavailable")}
               </AlertTitle>
             </Alert>
-          ) : <FieldHint>{t("readiness.proofHint")}</FieldHint>}
+          ) : <FieldHint>
+            {requiresCpoProof ? t("readiness.cpoProofRequired") : t("readiness.proofHint")}
+          </FieldHint>}
         </div>
         <div className="@md:col-span-2">
           <Button type="submit" loading={submitting}>
@@ -282,13 +296,22 @@ function ChapaCheckoutButton({ auction, disabled = false }: { auction: Auction; 
       type="button"
       variant="outline"
       disabled={chapa.isPending || disabled}
-      onClick={() => chapa.mutate({ auctionId: auction.id }, {
-        onSuccess: (result) => {
-          if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
-          else toast.success(t("readiness.alreadyVerified"));
-        },
-        onError: (error) => toast.error(getErrorMessage(error)),
-      })}
+      onClick={() => {
+        const checkoutWindow = openCheckoutWindow();
+        chapa.mutate({ auctionId: auction.id }, {
+          onSuccess: (result) => {
+            if (result.checkoutUrl) navigateCheckoutWindow(checkoutWindow, result.checkoutUrl);
+            else {
+              closeCheckoutWindow(checkoutWindow);
+              toast.success(t("readiness.alreadyVerified"));
+            }
+          },
+          onError: (error) => {
+            closeCheckoutWindow(checkoutWindow);
+            toast.error(getErrorMessage(error));
+          },
+        });
+      }}
     >
       <CreditCard className="size-4" aria-hidden />
       {chapa.isPending ? t("readiness.openingCheckout") : t("readiness.payDepositChapa")}

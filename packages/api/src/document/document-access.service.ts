@@ -8,6 +8,7 @@ import { ChapaAdapter } from "../payments/chapa.adapter.js";
 import { env } from "../config/env.js";
 import { compareMoney } from "../kernel/money.js";
 import * as audit from "../audit/audit.service.js";
+import { logger } from "../shared/utils/logger.js";
 
 const identityRepo = new IdentityRepository();
 const chapa = new ChapaAdapter();
@@ -161,7 +162,22 @@ export async function initiateDocumentAccess(
   }
   let lastAttempt = await latestPayment(auctionId, actor.userId);
   if (lastAttempt?.status === "pending") {
-    await processDocumentAccessPayment(lastAttempt.payment_reference);
+    try {
+      await processDocumentAccessPayment(lastAttempt.payment_reference);
+    } catch (error) {
+      logger.error(
+        { err: error, txRef: lastAttempt.payment_reference, auctionId },
+        "Could not verify pending document-access payment before retry",
+      );
+      if (lastAttempt.checkout_url) {
+        return {
+          status: "pending" as const,
+          checkoutUrl: lastAttempt.checkout_url,
+          txRef: lastAttempt.payment_reference,
+        };
+      }
+      throw new AppError("Could not verify the previous document payment. Retry shortly.", HttpStatus.SERVICE_UNAVAILABLE);
+    }
     lastAttempt = await latestPayment(auctionId, actor.userId);
   }
   if (lastAttempt?.status === "succeeded") {
@@ -252,13 +268,24 @@ export async function initiateDocumentAccess(
       },
     });
   } catch (error) {
-    await query(
-      `UPDATE auction_document_access
-          SET status = 'failed', updated_at = NOW()
-        WHERE id = $1 AND status = 'pending'`,
-      [payment.id],
+    try {
+      await query(
+        `UPDATE auction_document_access
+            SET status = 'failed', updated_at = NOW()
+          WHERE id = $1 AND status = 'pending'`,
+        [payment.id],
+      );
+    } catch (updateError) {
+      logger.error(
+        { err: updateError, initializationError: error, txRef: payment.txRef },
+        "Could not record failed document-access checkout initialization",
+      );
+    }
+    logger.error(
+      { err: error, txRef: payment.txRef, auctionId },
+      "Chapa document-access checkout initialization failed",
     );
-    throw error;
+    throw new AppError("Could not start document payment. Retry shortly.", HttpStatus.SERVICE_UNAVAILABLE);
   }
 
   await query(

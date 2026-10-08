@@ -14,7 +14,7 @@ import * as deposits from "../deposit/deposit.repository.js";
 import * as settlementRepo from "../settlement/settlement.repository.js";
 import type { SettlementObligation } from "../settlement/settlement.types.js";
 import { logger } from "../shared/utils/logger.js";
-import { ChapaAdapter, type ChapaVerification } from "./chapa.adapter.js";
+import { ChapaAdapter, ChapaInitializationError, type ChapaVerification } from "./chapa.adapter.js";
 import * as paymentRepo from "./payment.repository.js";
 import { processDocumentAccessPayment } from "../document/document-access.service.js";
 
@@ -155,12 +155,18 @@ export async function initiateChapaDeposit(
       status: "pending",
     };
   } catch (error) {
-    // Keep the attempt retryable with the same tx_ref if the network failed
-    // after Chapa accepted the initialization request.
     logger.error(
       { err: error, txRef: prepared.transaction.txRef },
       "Chapa checkout initialization failed",
     );
+    if (error instanceof ChapaInitializationError && error.definitiveFailure) {
+      await withTransaction(async (client) => {
+        await paymentRepo.markInitializationFailed(prepared.transaction!.id, client);
+        await deposits.updateStatus(prepared.deposit.id, "rejected", {
+          rejectionReason: "Chapa rejected checkout initialization",
+        }, client);
+      }, { userId: actor.userId });
+    }
     throw new AppError("Could not start Chapa checkout. Retry shortly.", HttpStatus.SERVICE_UNAVAILABLE);
   }
 }

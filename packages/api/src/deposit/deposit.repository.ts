@@ -134,6 +134,7 @@ export async function updateStatus(
     releaseReferenceNumber?: string;
     releaseDocumentId?: string;
   },
+  client?: Queryable,
 ): Promise<Deposit> {
   const result = await query<DbDeposit>(
     `UPDATE deposits
@@ -157,8 +158,50 @@ export async function updateStatus(
       extra?.releaseReferenceNumber ? hashSensitive(extra.releaseReferenceNumber) : null,
       extra?.releaseDocumentId ?? null,
     ],
+    client,
   );
   return mapDeposit(result.rows[0]);
+}
+
+export async function replaceRejectedChapaDepositWithManual(
+  id: string,
+  input: {
+    amount: string;
+    referenceNumber: string;
+    issuingBank: string;
+    instrumentType: Exclude<InstrumentType, "chapa">;
+    documentId?: string;
+  },
+  client?: Queryable,
+): Promise<Deposit | null> {
+  const row = await queryOne<DbDeposit>(
+    `UPDATE deposits
+        SET amount = $2,
+            reference_number = $3,
+            reference_number_hash = $4,
+            issuing_bank = $5,
+            instrument_type = $6,
+            document_id = $7,
+            status = 'pending',
+            rejection_reason = NULL,
+            provider_verified = FALSE,
+            verified_by = NULL,
+            verified_at = NULL,
+            updated_at = NOW()
+      WHERE id = $1 AND instrument_type = 'chapa' AND status = 'rejected'
+      RETURNING *`,
+    [
+      id,
+      input.amount,
+      encryptSensitive(input.referenceNumber),
+      hashSensitive(input.referenceNumber),
+      input.issuingBank,
+      input.instrumentType,
+      input.documentId ?? null,
+    ],
+    client,
+  );
+  return row ? mapDeposit(row) : null;
 }
 
 export async function resetChapaDepositForRetry(

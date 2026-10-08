@@ -11,6 +11,7 @@ import type { Deposit } from "./deposit.types.js";
 import { hashSensitive } from "../shared/security/sensitive-data.js";
 import * as documentService from "../document/document.service.js";
 import * as settlementRepo from "../settlement/settlement.repository.js";
+import * as paymentRepo from "../payments/payment.repository.js";
 
 interface Actor {
   userId: string;
@@ -54,7 +55,38 @@ export async function createDeposit(actor: Actor, input: CreateDepositRequest): 
 
       const existing = await repo.findByAuctionAndBidder(input.auctionId, actor.userId);
       if (existing) {
-        throw AppError.conflict("A deposit already exists for this auction");
+        const failedChapaAttempt =
+          existing.instrumentType === "chapa" &&
+          existing.status === "rejected" &&
+          (await paymentRepo.findLatestForDeposit(existing.id))?.status === "failed";
+        if (!failedChapaAttempt || input.instrumentType === "chapa") {
+          throw AppError.conflict("A deposit already exists for this auction");
+        }
+        if (await repo.hasActiveReference(input.issuingBank, hashSensitive(input.referenceNumber)!)) {
+          throw AppError.conflict("This bank reference is already associated with an active deposit");
+        }
+        const converted = await repo.replaceRejectedChapaDepositWithManual(existing.id, {
+          amount: input.amount,
+          referenceNumber: input.referenceNumber,
+          issuingBank: input.issuingBank,
+          instrumentType: input.instrumentType,
+          documentId: input.documentId,
+        });
+        if (!converted) throw AppError.conflict("The Chapa payment attempt is no longer available for manual registration");
+        await audit.appendAuditEvent({
+          auctionId: input.auctionId,
+          actorId: actor.userId,
+          actorRole: audit.actorRoleOf(actor.roles),
+          entityType: "deposit",
+          entityId: converted.id,
+          action: "deposit.chapa_attempt_replaced_with_manual",
+          payload: {
+            amount: converted.amount,
+            instrumentType: converted.instrumentType,
+            issuingBank: converted.issuingBank,
+          },
+        });
+        return converted;
       }
       if (await repo.hasActiveReference(input.issuingBank, hashSensitive(input.referenceNumber)!)) {
         throw AppError.conflict("This bank reference is already associated with an active deposit");

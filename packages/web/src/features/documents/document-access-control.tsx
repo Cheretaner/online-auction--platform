@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useDocumentAccessStatus, useInitiateDocumentAccess } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
+import { closeCheckoutWindow, navigateCheckoutWindow, openCheckoutWindow } from "@/lib/payments/checkout-window";
 import { formatMoney } from "@/lib/format";
 import { useT } from "@/i18n/context";
 import { useAuth } from "@/features/auth/auth-provider";
@@ -36,24 +37,28 @@ export function DocumentAccessControl({ auctionId, enabled = true }: { auctionId
   const startOrContinue = async () => {
     if (pending) {
       if (state.checkoutUrl) {
-        window.location.assign(state.checkoutUrl);
+        window.open(state.checkoutUrl, "_blank", "noopener,noreferrer");
       } else {
         const result = await access.refetch();
         if (result.data?.paid) toast.success(t("documents.accessGranted"));
       }
       return;
     }
+    const checkoutWindow = openCheckoutWindow();
     try {
       const result = await initiate.mutateAsync();
       if (result.checkoutUrl) {
-        window.location.assign(result.checkoutUrl);
+        navigateCheckoutWindow(checkoutWindow, result.checkoutUrl);
       } else if (result.status === "succeeded") {
+        closeCheckoutWindow(checkoutWindow);
         await access.refetch();
         toast.success(t("documents.accessGranted"));
       } else {
+        closeCheckoutWindow(checkoutWindow);
         await access.refetch();
       }
     } catch (error) {
+      closeCheckoutWindow(checkoutWindow);
       toast.error(getErrorMessage(error, t("documents.paymentFailed")));
     }
   };
