@@ -178,6 +178,46 @@ export class IdentityRepository {
     ]);
   }
 
+  async listProfiles(): Promise<Profile[]> {
+    const rows = await queryAll<DbProfile>(
+      `SELECT * FROM profiles WHERE is_active = TRUE ORDER BY created_at DESC`,
+    );
+    return rows.map(mapProfile);
+  }
+
+  async updatePlatformProfile(
+    id: string,
+    data: { fullName?: string; isActive?: boolean; platformRole?: Role | null },
+  ): Promise<Profile | null> {
+    const assignments: { field: string; value: unknown }[] = [];
+    if (data.fullName !== undefined) assignments.push({ field: "full_name", value: data.fullName });
+    if (data.isActive !== undefined) assignments.push({ field: "is_active", value: data.isActive });
+    if (data.platformRole !== undefined) assignments.push({ field: "platform_role", value: data.platformRole });
+    if (assignments.length === 0) return this.findProfileById(id);
+    const values = [id, ...assignments.map((assignment) => assignment.value)];
+    const row = await queryOne<DbProfile>(
+      `UPDATE profiles SET ${assignments.map((assignment, index) => `${assignment.field} = $${index + 2}`).join(", ")}, updated_at = NOW()
+       WHERE id = $1 AND is_active = TRUE
+       RETURNING *`,
+      values,
+    );
+    return row ? mapProfile(row) : null;
+  }
+
+  async deactivateProfile(id: string): Promise<void> {
+    await queryOne(
+      `UPDATE profiles SET is_active = FALSE, updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [id],
+    );
+  }
+
+  async countSuperAdmins(): Promise<number> {
+    const row = await queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM profiles WHERE platform_role = 'super_admin' AND is_active = TRUE`,
+    );
+    return Number(row?.count ?? 0);
+  }
+
   async countProfiles(): Promise<number> {
     const row = await queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM profiles`);
     return Number(row?.count ?? 0);

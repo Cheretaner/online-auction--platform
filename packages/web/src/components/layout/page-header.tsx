@@ -24,7 +24,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn("border-b border-border/70 pb-2  sm:pb-3", className)}>
+    <header className={cn("pb-2  sm:pb-3", className)}>
       {back ? (
         <Link
           to={back.to}

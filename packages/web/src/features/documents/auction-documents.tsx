@@ -1,18 +1,22 @@
 import { useRef, useState } from "react";
 import { DOCUMENT_TYPES, type DocumentType } from "@auction/shared";
-import { Download, FileText, FolderOpen, Lock, Search } from "lucide-react";
+import { Download, FileText, FolderOpen, Lock, Search, Trash2 } from "lucide-react";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
+import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FieldHint, Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useAuctionDocuments, useUploadDocument } from "@/features/operations/queries";
+import { useAuctionDocuments, useDeleteDocument, useUploadDocument } from "@/features/operations/queries";
 import { getErrorMessage } from "@/lib/api/errors";
 import type { DocumentRecord } from "@/lib/api/types";
 import { downloadDocument } from "@/lib/download";
+import { documentsApi } from "@/lib/api/resources";
 import { DocumentPreviewButton } from "@/features/documents/document-preview-button";
+import { useAuth } from "@/features/auth/auth-provider";
+import { hasRole } from "@/lib/format";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { enumLabel, formatDateTime } from "@/lib/format";
@@ -33,9 +37,12 @@ function formatSize(bytes: number) {
 
 const OCR_DOCUMENT_TYPES = new Set<DocumentType>(["specification", "inspection_report", "terms", "other"]);
 
-export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; canReview?: boolean }) {
+export function DocumentRow({ doc, canReview = false, canDelete = false }: { doc: DocumentRecord; canReview?: boolean; canDelete?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [paymentBusy, setPaymentBusy] = useState(false);
   const [showOcr, setShowOcr] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const remove = useDeleteDocument();
   const [reviewedText, setReviewedText] = useState<string | null>(null);
   const t = useT("auctions");
   const tc = useT("common");
@@ -83,6 +90,23 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
           </p>
         </div>
         <div className="flex flex-wrap gap-2 sm:shrink-0">
+        {doc.requiresPayment && doc.auctionId ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={paymentBusy}
+            onClick={() => {
+              setPaymentBusy(true);
+              void documentsApi.initiateAccess(doc.auctionId!).then((result) => {
+                if (result.checkoutUrl) window.location.assign(result.checkoutUrl);
+                else toast.success("Document access is active.");
+              }).catch((error: unknown) => toast.error(getErrorMessage(error, "Could not start document payment.")))
+                .finally(() => setPaymentBusy(false));
+            }}
+          >
+            {paymentBusy ? "Opening payment..." : "Pay to access"}
+          </Button>
+        ) : null}
         {canReview && supportsOcr ? (
           <Button
             size="sm"
@@ -109,8 +133,39 @@ export function DocumentRow({ doc, canReview = false }: { doc: DocumentRecord; c
           {busy ? null : <Download aria-hidden />}
           {busy ? tc("downloading") : tc("download")}
         </Button>
+        {canDelete ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10"
+            loading={deleting}
+            aria-label={`Delete ${doc.fileName}`}
+            onClick={() => setDeleting(true)}
+          >
+            <Trash2 aria-hidden />
+            Delete
+          </Button>
+        ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title="Delete document"
+        description={`This will permanently delete ${doc.fileName}. This action cannot be undone.`}
+        confirmLabel="Delete document"
+        destructive
+        pending={remove.isPending}
+        onConfirm={() => {
+          remove.mutate(doc.id, {
+            onSuccess: () => {
+              toast.success("Document deleted.");
+              setDeleting(false);
+            },
+            onError: (error) => toast.error(getErrorMessage(error, "Could not delete document.")),
+          });
+        }}
+      />
       {showOcr ? (
         <div
           id={`ocr-panel-${doc.id}`}
@@ -189,6 +244,8 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
   const upload = useUploadDocument();
   const uploads = usePlatformCapabilities(Boolean(canUpload));
   const fileRef = useRef<HTMLInputElement>(null);
+  const { roles } = useAuth();
+  const canDelete = hasRole(roles, "auction_officer", "org_admin", "super_admin");
   const [docType, setDocType] = useState<DocumentType>("specification");
   const [publicDoc, setPublicDoc] = useState(true);
   const [ocrQuery, setOcrQuery] = useState("");
@@ -210,7 +267,7 @@ export function AuctionDocuments({ auctionId, canUpload, canReview }: { auctionI
       ) : (
         <ul>
           {items.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} canReview={canReview} />
+            <DocumentRow key={doc.id} doc={doc} canReview={canReview} canDelete={canDelete} />
           ))}
         </ul>
       )}

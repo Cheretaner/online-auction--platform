@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import type { VerificationDecision } from "@auction/shared";
 import { AlertTriangle, Download, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -23,8 +24,12 @@ import { DocumentPreviewButton } from "@/features/documents/document-preview-but
 import { useT } from "@/i18n/context";
 
 export default function VerificationReviewPage() {
+  const [searchParams] = useSearchParams();
   const pending = usePendingVerifications();
-  const items = pending.data?.items ?? [];
+  const requestedId = searchParams.get("recordId");
+  const items = (pending.data?.items ?? []).filter(
+    (item) => !requestedId || item.id === requestedId,
+  );
   const t = useT("account");
   return (
     <div>

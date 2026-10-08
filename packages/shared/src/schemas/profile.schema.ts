@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ACCOUNT_TYPES, VERIFICATION_STATUS } from "../enums.js";
+import { ACCOUNT_TYPES, VERIFICATION_STATUS, ROLES } from "../enums.js";
 
 export const UpdateProfileRequest = z.object({
   fullName: z.string().min(1).max(150).optional(),
@@ -9,6 +9,22 @@ export const UpdateProfileRequest = z.object({
 });
 
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequest>;
+
+export const CreateUserRequest = z.object({
+  email: z.string().email().max(320),
+  password: z.string().min(8).max(256),
+  fullName: z.string().min(2).max(150),
+  platformRole: z.enum(ROLES).nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+export type CreateUserRequest = z.infer<typeof CreateUserRequest>;
+
+export const UpdateUserRequest = z.object({
+  fullName: z.string().min(2).max(150).optional(),
+  isActive: z.boolean().optional(),
+  platformRole: z.enum(ROLES).nullable().optional(),
+}).refine((data) => Object.keys(data).length > 0, "At least one field is required");
+export type UpdateUserRequest = z.infer<typeof UpdateUserRequest>;
 
 export const ProfileResponse = z.object({
   id: z.string().uuid(),

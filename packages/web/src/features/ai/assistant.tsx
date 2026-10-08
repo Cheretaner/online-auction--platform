@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { AssistantWorkflowMode } from "@auction/shared";
 import { usePublicAuctions } from "@/features/auctions/queries";
 import { LoaderCircle, Send, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,27 @@ import { useLocale, useT } from "@/i18n/context";
 
 const SUGGESTIONS = ["suggestion1", "suggestion2", "suggestion3"] as const;
 const NO_AUCTION = "none";
+const WORKFLOW_MODES: AssistantWorkflowMode[] = [
+  "general",
+  "summarize_auction",
+  "missing_information",
+  "compare_bid_patterns",
+  "suggest_investigation",
+  "draft_review_note",
+  "decision_brief",
+  "required_evidence",
+];
+const WORKFLOW_MODE_LABEL_KEYS = {
+  general: "assistant.mode.general",
+  summarize_auction: "assistant.mode.summarize_auction",
+  missing_information: "assistant.mode.missing_information",
+  compare_bid_patterns: "assistant.mode.compare_bid_patterns",
+  suggest_investigation: "assistant.mode.suggest_investigation",
+  draft_review_note: "assistant.mode.draft_review_note",
+  decision_brief: "assistant.mode.decision_brief",
+  required_evidence: "assistant.mode.required_evidence",
+} as const;
+const ROLES = ["authenticated_user", "auction_officer", "compliance_officer", "reviewer", "bidder"] as const;
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -35,6 +57,9 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
   const auctions = usePublicAuctions({ limit: 50 });
   const [prompt, setPrompt] = useState("");
   const [selectedAuctionId, setSelectedAuctionId] = useState(auctionId ?? NO_AUCTION);
+  const [mode, setMode] = useState<AssistantWorkflowMode>("general");
+  const [role, setRole] = useState<(typeof ROLES)[number]>("authenticated_user");
+  const [sourceLinks, setSourceLinks] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const { locale } = useLocale();
   const t = useT("tools");
@@ -46,9 +71,20 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
     if (!question || assist.isPending) return;
     setPrompt("");
     setTurns((previous) => [...previous, { role: "user", text: question }]);
+    const links = sourceLinks
+      .split(/\s*,\s*|\s+/)
+      .map((link) => link.trim())
+      .filter(Boolean);
     assist.mutate(activeAuctionId
-      ? { prompt: question, auctionId: activeAuctionId, language: locale }
-      : { prompt: question, language: locale }, {
+      ? {
+          prompt: question,
+          auctionId: activeAuctionId,
+          language: locale,
+          mode,
+          role,
+          sourceLinks: links,
+        }
+      : { prompt: question, language: locale, mode, role, sourceLinks: links }, {
       onSuccess: (result) =>
         setTurns((previous) => [
           ...previous,
@@ -73,19 +109,53 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="max-w-xl space-y-1.5">
-          <Label htmlFor="ai-auction-context">{t("assistant.contextLabel")}</Label>
-          <Select value={selectedAuctionId} onValueChange={setSelectedAuctionId}>
-            <SelectTrigger id="ai-auction-context">
-              <SelectValue placeholder={t("assistant.general")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NO_AUCTION}>{t("assistant.general")}</SelectItem>
-              {(auctions.data?.items ?? []).map((auction) => (
-                <SelectItem key={auction.id} value={auction.id}>{auction.title} ({statusLabel(auction.status)})</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="ai-auction-context">{t("assistant.contextLabel")}</Label>
+            <Select value={selectedAuctionId} onValueChange={setSelectedAuctionId}>
+              <SelectTrigger id="ai-auction-context">
+                <SelectValue placeholder={t("assistant.general")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_AUCTION}>{t("assistant.general")}</SelectItem>
+                {(auctions.data?.items ?? []).map((auction) => (
+                  <SelectItem key={auction.id} value={auction.id}>{auction.title} ({statusLabel(auction.status)})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ai-workflow-mode">{t("assistant.workflowMode")}</Label>
+            <Select value={mode} onValueChange={(value) => setMode(value as AssistantWorkflowMode)}>
+              <SelectTrigger id="ai-workflow-mode"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {WORKFLOW_MODES.map((workflowMode) => (
+                  <SelectItem key={workflowMode} value={workflowMode}>
+                    {t(WORKFLOW_MODE_LABEL_KEYS[workflowMode])}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ai-role">{t("assistant.role")}</Label>
+            <Select value={role} onValueChange={(value) => setRole(value as (typeof ROLES)[number])}>
+              <SelectTrigger id="ai-role"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ROLES.map((assistantRole) => <SelectItem key={assistantRole} value={assistantRole}>{assistantRole}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ai-source-links">{t("assistant.sourceLinks")}</Label>
+            <Textarea
+              id="ai-source-links"
+              rows={2}
+              value={sourceLinks}
+              onChange={(event) => setSourceLinks(event.target.value)}
+              placeholder={t("assistant.sourceLinksPlaceholder")}
+            />
+          </div>
         </div>
         {turns.length === 0 ? (
           <div className="flex flex-wrap gap-2">
@@ -116,7 +186,8 @@ export function Assistant({ auctionId, auctionTitle }: { auctionId?: string; auc
                   {turn.role === "user" ? t("assistant.you") : t("assistant.title")}
                   {turn.provider ? (
                     <Badge variant="outline" className="font-mono">
-                      {turn.fallback || turn.provider === "stub" ? t("assistant.fallback") : turn.provider}
+                      {turn.provider}
+                      {turn.fallback ? ` · ${t("assistant.fallback")}` : null}
                     </Badge>
                   ) : null}
                 </p>

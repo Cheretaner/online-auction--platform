@@ -1,5 +1,6 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "../../config/env.js";
 import { AppError, HttpStatus } from "../../shared/errors/index.js";
 
@@ -95,9 +96,62 @@ export class FilesystemStorageAdapter implements StorageAdapter {
   }
 }
 
+export class SupabaseStorageAdapter implements StorageAdapter {
+  constructor(
+    private readonly client: SupabaseClient,
+    private readonly bucket: string,
+  ) {}
+
+  private getBucket() {
+    return this.client.storage.from(this.bucket);
+  }
+
+  async put(key: string, data: Buffer, contentType: string): Promise<string> {
+    assertSafeKey(key);
+    const { error } = await this.getBucket().upload(key, data, {
+      contentType,
+      upsert: true,
+    });
+    if (error) throw error;
+    return key;
+  }
+
+  async get(key: string): Promise<StoredObject | null> {
+    assertSafeKey(key);
+    const { data, error } = await this.getBucket().download(key);
+    if (error || !data) return null;
+    return {
+      data: Buffer.from(await data.arrayBuffer()),
+      contentType: data.type || "application/octet-stream",
+    };
+  }
+
+  async delete(key: string): Promise<void> {
+    assertSafeKey(key);
+    const { error } = await this.getBucket().remove([key]);
+    if (error) throw error;
+  }
+
+  async exists(key: string): Promise<boolean> {
+    assertSafeKey(key);
+    const { data, error } = await this.getBucket().exists(key);
+    if (error) return false;
+    return data;
+  }
+}
+
 export function createStorageAdapter(): StorageAdapter {
   if (env.STORAGE_DRIVER === "memory") {
     return new MemoryStorageAdapter();
+  }
+  if (env.STORAGE_DRIVER === "supabase") {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new AppError("Supabase storage credentials are not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    return new SupabaseStorageAdapter(client, env.SUPABASE_DOCUMENT_BUCKET);
   }
   return new FilesystemStorageAdapter(env.STORAGE_DIR);
 }

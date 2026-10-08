@@ -7,8 +7,15 @@ import * as controller from "./document.controller.js";
 import * as searchController from "./document-search.controller.js";
 import { documentUpload } from "./upload.middleware.js";
 import { requireDocumentUploads } from "./document-availability.middleware.js";
+import * as accessController from "./document-access.controller.js";
 
 export const documentRouter = Router();
+
+documentRouter.post(
+  "/access/:auctionId/initiate",
+  requireAuth(["bidder"]),
+  asyncHandler(accessController.initiate),
+);
 
 documentRouter.post(
   "/",
@@ -30,6 +37,11 @@ documentRouter.get(
 );
 
 documentRouter.get("/:id", requireAuth(), asyncHandler(controller.getById));
+documentRouter.delete(
+  "/:id",
+  requireAuth(["auction_officer", "org_admin", "super_admin"]),
+  asyncHandler(controller.deleteById),
+);
 documentRouter.get("/:id/content", requireAuth(), asyncHandler(controller.download));
 documentRouter.get("/:id/ocr", requireAuth(), asyncHandler(controller.getOcr));
 documentRouter.post("/:id/ocr", requireAuth(), asyncHandler(controller.startOcr));

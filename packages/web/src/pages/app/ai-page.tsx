@@ -45,7 +45,7 @@ export default function AiPage() {
   const t = useT("tools");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title={t("anomaly.title")}
         description={t("anomaly.description")}

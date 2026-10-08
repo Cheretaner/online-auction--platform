@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { AddOrganizationMemberRequest, CreateOrganizationRequest } from "@auction/shared";
+import type { AddOrganizationMemberRequest, CreateOrganizationRequest, UpdateOrganizationRequest } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
 import { IdentityRepository } from "../identity/identity.repository.js";
@@ -34,6 +34,30 @@ export const getById: RequestHandler = async (req, res) => {
 
 export const list: RequestHandler = async (_req, res) => {
   res.json({ items: await service.listOrganizations() });
+};
+
+export const update: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  const organizationId = routeParam(req.params.id);
+  if (!auth.roles.includes("super_admin")) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+  }
+  res.json(await service.updateOrganization(organizationId, req.body as UpdateOrganizationRequest, {
+    userId: auth.userId,
+    roles: auth.roles,
+  }));
+};
+
+export const remove: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  if (!auth.roles.includes("super_admin")) {
+    throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+  }
+  await service.deleteOrganization(routeParam(req.params.id), {
+    userId: auth.userId,
+    roles: auth.roles,
+  });
+  res.status(HttpStatus.NO_CONTENT).send();
 };
 
 export const listMembers: RequestHandler = async (req, res) => {

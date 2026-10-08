@@ -32,12 +32,6 @@ export const CategorizeRequest = z.object({
 });
 export type CategorizeRequest = z.infer<typeof CategorizeRequest>;
 
-export const AssistRequest = z.object({
-  prompt: z.string().min(3).max(4000),
-  auctionId: z.string().uuid().optional(),
-});
-export type AssistRequest = z.infer<typeof AssistRequest>;
-
 export const RunComplianceRequest = z.object({
   notes: z.string().max(4000).optional(),
 });

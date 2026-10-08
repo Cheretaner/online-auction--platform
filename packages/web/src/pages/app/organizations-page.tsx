@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CreateOrganizationRequest, ORG_TYPES } from "@auction/shared";
-import { Building2, ChevronDown, Trash2, UserPlus } from "lucide-react";
+import { Building2, ChevronDown, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/feedback/query-state";
@@ -20,6 +20,7 @@ import { useAuth } from "@/features/auth/auth-provider";
 import {
   useAddOrgMember,
   useCreateOrganization,
+  useDeleteOrganization,
   useOrganizations,
   useOrgMembers,
   useRemoveOrgMember,
@@ -29,6 +30,8 @@ import type { OrganizationRecord } from "@/lib/api/types";
 import { applyApiFieldErrors } from "@/lib/forms/api-errors";
 import { enumLabel, hasRole, regionLabel } from "@/lib/format";
 import { useT } from "@/i18n/context";
+import { OrganizationEditor } from "./organization-editor";
+import { UsersPanel } from "./users-panel";
 
 const MEMBER_ROLES = ["auction_officer", "compliance_officer", "org_admin"] as const;
 
@@ -53,6 +56,7 @@ export default function OrganizationsPage() {
         }
       />
       {superAdmin ? <CreateOrganizationCard /> : null}
+      {superAdmin ? <UsersPanel /> : null}
       <QueryState
         isLoading={orgs.isLoading}
         isError={orgs.isError}
@@ -64,7 +68,7 @@ export default function OrganizationsPage() {
       >
         <div className="space-y-4">
           {visible.map((org) => (
-            <OrganizationCard key={org.id} org={org} />
+            <OrganizationCard key={org.id} org={org} canManage={superAdmin} />
           ))}
         </div>
       </QueryState>
@@ -164,8 +168,11 @@ function CreateOrganizationCard() {
   );
 }
 
-function OrganizationCard({ org }: { org: OrganizationRecord }) {
+function OrganizationCard({ org, canManage }: { org: OrganizationRecord; canManage: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const remove = useDeleteOrganization();
   const t = useT("tools");
   return (
     <Card>
@@ -185,18 +192,52 @@ function OrganizationCard({ org }: { org: OrganizationRecord }) {
               {org.contactEmail} · {org.contactPhone}
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? t("orgs.hideMembers") : t("orgs.manageMembers")}
-            <ChevronDown className={expanded ? "rotate-180 transition-transform" : "transition-transform"} aria-hidden />
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {canManage ? (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                  <Pencil aria-hidden /> {t("orgs.edit")}
+                </Button>
+                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleting(true)}>
+                  <Trash2 aria-hidden /> {t("orgs.delete")}
+                </Button>
+              </>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? t("orgs.hideMembers") : t("orgs.manageMembers")}
+              <ChevronDown className={expanded ? "rotate-180 transition-transform" : "transition-transform"} aria-hidden />
+            </Button>
+          </div>
         </div>
         {expanded ? <Members orgId={org.id} /> : null}
       </CardContent>
+      {canManage ? (
+        <>
+          <OrganizationEditor
+            open={editing}
+            organization={org}
+            onOpenChange={setEditing}
+          />
+          <ConfirmDialog
+            open={deleting}
+            onOpenChange={setDeleting}
+            title={t("orgs.deleteTitle")}
+            description={t("orgs.deleteDescription", { name: org.name })}
+            confirmLabel={t("orgs.delete")}
+            destructive
+            pending={remove.isPending}
+            onConfirm={() => remove.mutate(org.id, {
+              onSuccess: () => setDeleting(false),
+              onError: (error) => toast.error(getErrorMessage(error)),
+            })}
+          />
+        </>
+      ) : null}
     </Card>
   );
 }

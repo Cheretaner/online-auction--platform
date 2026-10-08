@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { Scale } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState, QueryState } from "@/components/feedback/query-state";
@@ -12,8 +13,12 @@ import { useState } from "react";
 
 export default function DisputesPage() {
   const { roles } = useAuth();
+  const [searchParams] = useSearchParams();
   const disputes = useDisputes();
-  const items = disputes.data?.items ?? [];
+  const requestedId = searchParams.get("recordId");
+  const items = (disputes.data?.items ?? []).filter(
+    (dispute) => !requestedId || dispute.id === requestedId,
+  );
   const [statusFilter, setStatusFilter] = useState("all");
   const t = useT("account");
   const filteredItems = statusFilter === "all" ? items : items.filter((dispute) => dispute.status === statusFilter);

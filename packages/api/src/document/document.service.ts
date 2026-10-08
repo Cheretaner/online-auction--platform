@@ -12,8 +12,10 @@ import { logger } from "../shared/utils/logger.js";
 import { hashSensitive } from "../shared/security/sensitive-data.js";
 import * as ocrRepo from "./document-ocr.repository.js";
 import { extractDocumentText } from "./document-ocr.service.js";
+import { hasPaidDocumentAccess } from "./document-access.service.js";
 
 const OFFICER_ROLES = ["auction_officer", "org_admin", "compliance_officer", "super_admin"];
+const DELETE_ROLES = ["auction_officer", "org_admin", "super_admin"];
 const OCR_TYPES = new Set(["specification", "inspection_report", "terms", "other"]);
 
 /** Strips any directory component so a crafted filename cannot escape the store. */
@@ -31,6 +33,7 @@ export async function uploadDocument(input: {
   mimeType: string;
   data: Buffer;
   isPrivate?: boolean;
+  requiresPayment?: boolean;
 }): Promise<DocumentRecord> {
   if (input.data.byteLength === 0) {
     // documents_file_size_positive would reject this at the database level
@@ -60,6 +63,7 @@ export async function uploadDocument(input: {
           fileSizeBytes: input.data.byteLength,
           checksumSha256,
           isPrivate: input.isPrivate ?? true,
+          requiresPayment: input.requiresPayment,
         });
 
         // The checksum goes into the ledger so a published document can
@@ -96,6 +100,44 @@ export async function getDocument(id: string): Promise<DocumentRecord | null> {
   return repo.findById(id);
 }
 
+export async function deleteDocument(id: string, viewer: DocumentViewer): Promise<void> {
+  const document = await repo.findById(id);
+  if (!document) throw AppError.notFound("Document not found");
+
+  if (!viewer.roles.includes("super_admin")) {
+    const isOfficer = viewer.roles.some((role) => DELETE_ROLES.includes(role));
+    if (!isOfficer || !viewer.organizationId || !document.auctionId) {
+      throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+    }
+    const owner = await findAuctionOwner(document.auctionId);
+    if (owner?.orgId !== viewer.organizationId) {
+      throw new AppError("Forbidden", HttpStatus.FORBIDDEN, "FORBIDDEN");
+    }
+  }
+
+  if (await repo.hasReferences(document.id)) {
+    throw AppError.conflict("This document is linked to a deposit or verification and cannot be deleted");
+  }
+
+  await storageAdapter.delete(document.storagePath);
+  const deleted = await repo.deleteById(document.id);
+  if (!deleted) throw AppError.notFound("Document not found");
+
+  await audit.appendAuditEvent({
+    auctionId: document.auctionId,
+    actorId: viewer.userId,
+    actorRole: audit.actorRoleOf(viewer.roles),
+    entityType: "document",
+    entityId: document.id,
+    action: "document.deleted",
+    payload: {
+      fileName: document.fileName,
+      documentType: document.documentType,
+      checksumSha256: document.checksumSha256,
+    },
+  });
+}
+
 /**
  * Reads the bytes back, verifying the stored checksum first. A mismatch
  * means the blob was altered outside the application, which is exactly the
@@ -116,6 +158,9 @@ export interface DocumentViewer {
  * compliance officers.
  */
 export async function canReadDocument(document: DocumentRecord, viewer: DocumentViewer): Promise<boolean> {
+  if (document.requiresPayment && document.auctionId && !(await hasPaidDocumentAccess(document.auctionId, viewer.userId))) {
+    return false;
+  }
   if (!document.isPrivate) return true;
   if (document.uploadedBy === viewer.userId) return true;
   if (viewer.roles.includes("super_admin")) return true;

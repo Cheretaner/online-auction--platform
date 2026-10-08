@@ -5,6 +5,7 @@ import { enqueueOutbox } from "../infrastructure/outbox/outbox.repository.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { logger } from "../shared/utils/logger.js";
+import { issueRefundLetters } from "../settlement/refund-letter.service.js";
 import * as settlementRepo from "../settlement/settlement.repository.js";
 import * as audit from "../audit/audit.service.js";
 import * as biddingRepo from "../bidding/bidding.repository.js";
@@ -528,6 +529,7 @@ export async function closeDueAuctions(now = new Date()): Promise<number> {
           relatedEntityId: result.auction.id,
         });
       }
+      await issueRefundLetters(result.auction.id, result.winnerId, result.auction.createdBy);
 
       const officers = await biddingRepo.listOrgOfficerIds(result.auction.orgId);
       await notifications.notifyMany(

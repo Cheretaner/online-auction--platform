@@ -18,6 +18,19 @@ interface Actor {
 }
 
 export async function createDeposit(actor: Actor, input: CreateDepositRequest): Promise<Deposit> {
+  if (input.instrumentType === "cpo") {
+    if (!input.documentId) throw AppError.badRequest("A scanned CPO proof is required");
+    const proof = await documentService.getDocument(input.documentId);
+    if (
+      !proof ||
+      proof.auctionId !== input.auctionId ||
+      proof.uploadedBy !== actor.userId ||
+      proof.documentType !== "cpo_proof" ||
+      !proof.isPrivate
+    ) {
+      throw AppError.badRequest("Upload a private CPO proof for this auction before submitting the bid security");
+    }
+  }
   return withTransaction(
     async () => {
       const auction = await biddingRepo.findAuction(input.auctionId);

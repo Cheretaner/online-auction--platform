@@ -74,6 +74,49 @@ export async function findBySlug(slug: string): Promise<Organization | null> {
   return row ? mapOrg(row) : null;
 }
 
+export async function updateOrganization(id: string, input: Partial<{
+  name: string;
+  slug: string;
+  orgType: OrgType;
+  taxpayerId: string;
+  region: string;
+  contactEmail: string;
+  contactPhone: string;
+  isActive: boolean;
+}>): Promise<Organization | null> {
+  const assignments: { field: string; value: unknown }[] = [];
+  if (input.name !== undefined) assignments.push({ field: "name", value: input.name });
+  if (input.slug !== undefined) assignments.push({ field: "slug", value: input.slug });
+  if (input.orgType !== undefined) assignments.push({ field: "org_type", value: input.orgType });
+  if (input.taxpayerId !== undefined) assignments.push({ field: "taxpayer_id", value: input.taxpayerId });
+  if (input.region !== undefined) assignments.push({ field: "region", value: input.region });
+  if (input.contactEmail !== undefined) assignments.push({ field: "contact_email", value: input.contactEmail });
+  if (input.contactPhone !== undefined) assignments.push({ field: "contact_phone", value: input.contactPhone });
+  if (input.isActive !== undefined) assignments.push({ field: "is_active", value: input.isActive });
+  if (assignments.length === 0) return findById(id);
+
+  const columns = assignments.map((assignment, index) => `${assignment.field} = $${index + 2}`);
+  const values: unknown[] = [id, ...assignments.map((assignment) => assignment.value)];
+  const row = await queryOne<DbOrg>(
+    `UPDATE organizations SET ${columns.join(", ")}, updated_at = NOW() WHERE id = $1 RETURNING *`,
+    values,
+  );
+  return row ? mapOrg(row) : null;
+}
+
+export async function hasOperationalDependencies(id: string): Promise<boolean> {
+  const [auction, source, pending] = await Promise.all([
+    queryOne<{ exists: boolean }>("SELECT EXISTS (SELECT 1 FROM auctions WHERE org_id = $1) AS exists", [id]),
+    queryOne<{ exists: boolean }>("SELECT EXISTS (SELECT 1 FROM autofetch_sources WHERE organization_id = $1) AS exists", [id]),
+    queryOne<{ exists: boolean }>("SELECT EXISTS (SELECT 1 FROM autofetch_pending_items WHERE organization_id = $1) AS exists", [id]),
+  ]);
+  return Boolean(auction?.exists || source?.exists || pending?.exists);
+}
+
+export async function deleteOrganization(id: string): Promise<void> {
+  await query(`DELETE FROM organizations WHERE id = $1`, [id]);
+}
+
 export interface OrganizationMemberRow {
   userId: string;
   email: string;

@@ -9,6 +9,10 @@ export const CreateDepositRequest = z.object({
   issuingBank: z.enum(ETHIOPIAN_BANKS),
   instrumentType: z.enum(DEPOSIT_INSTRUMENT_TYPES),
   documentId: z.string().uuid().optional(),
+}).superRefine((data, ctx) => {
+  if (data.instrumentType === "cpo" && !data.documentId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["documentId"], message: "A scanned CPO proof is required" });
+  }
 });
 
 export type CreateDepositRequest = z.infer<typeof CreateDepositRequest>;

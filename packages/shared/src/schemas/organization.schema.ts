@@ -11,6 +11,9 @@ export const CreateOrganizationRequest = z.object({
 });
 export type CreateOrganizationRequest = z.infer<typeof CreateOrganizationRequest>;
 
+export const UpdateOrganizationRequest = CreateOrganizationRequest.partial();
+export type UpdateOrganizationRequest = z.infer<typeof UpdateOrganizationRequest>;
+
 export const Organization = z.object({
   id: z.string().uuid(),
   name: z.string(),

@@ -1,11 +1,13 @@
 import type { RequestHandler } from "express";
 import type {
+  CreateUserRequest,
   LoginRequest,
   PasswordResetConfirm,
   PasswordResetRequest,
   RefreshTokenRequest,
   RegisterRequest,
   UpdateProfileRequest,
+  UpdateUserRequest,
 } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { getAuth, routeParam } from "../shared/types/request.js";
@@ -69,4 +71,33 @@ export const updateProfile: RequestHandler = async (req, res) => {
 
 export const getProfileById: RequestHandler = async (req, res) => {
   res.json(await service.getProfile(routeParam(req.params.id)));
+};
+
+export const listUsers: RequestHandler = async (_req, res) => {
+  res.json({ items: await service.listUsers() });
+};
+
+export const createUser: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  res.status(HttpStatus.CREATED).json(await service.createUser(req.body as CreateUserRequest, {
+    userId: auth.userId,
+    roles: auth.roles,
+  }));
+};
+
+export const updateUser: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  res.json(await service.updateUser(routeParam(req.params.id), req.body as UpdateUserRequest, {
+    userId: auth.userId,
+    roles: auth.roles,
+  }));
+};
+
+export const deleteUser: RequestHandler = async (req, res) => {
+  const auth = getAuth(req);
+  await service.deactivateUser(routeParam(req.params.id), {
+    userId: auth.userId,
+    roles: auth.roles,
+  });
+  res.status(HttpStatus.NO_CONTENT).send();
 };

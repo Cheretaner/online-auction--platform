@@ -7,6 +7,7 @@ export const PlaceBidRequest = z.object({
     .string()
     .regex(/^[a-fA-F0-9]{64}$/, "commitment hash must be sha256 hex")
     .optional(),
+  formResponses: z.record(z.string().min(1).max(500)).optional(),
 });
 export type PlaceBidRequest = z.infer<typeof PlaceBidRequest>;
 

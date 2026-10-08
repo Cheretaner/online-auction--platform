@@ -1,10 +1,12 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type {
+  CreateUserRequest,
   LoginRequest,
   RegisterRequest,
   Role,
   UpdateProfileRequest,
+  UpdateUserRequest,
 } from "@auction/shared";
 import { env } from "../config/env.js";
 import {
@@ -268,5 +270,58 @@ export class IdentityService {
       throw new AppError("Profile not found", HttpStatus.NOT_FOUND);
     }
     return toPublicProfile(profile);
+  }
+
+  async listUsers(): Promise<Array<PublicProfile & { roles: Role[] }>> {
+    const profiles = await this.repository.listProfiles();
+    return Promise.all(
+      profiles.map(async (profile) => ({
+        ...toPublicProfile(profile),
+        roles: await this.repository.findUserRoles(profile.id),
+      })),
+    );
+  }
+
+  async createUser(data: CreateUserRequest, actor: { userId: string; roles: Role[] }): Promise<PublicProfile> {
+    const email = data.email.trim().toLowerCase();
+    if (await this.repository.findProfileByEmail(email)) {
+      throw new AppError("Email already in use", HttpStatus.CONFLICT);
+    }
+    const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+    const profile = await this.repository.createProfile({
+      email,
+      fullName: data.fullName,
+      passwordHash,
+      accountType: "individual",
+      platformRole: data.platformRole ?? null,
+    });
+    return toPublicProfile(profile);
+  }
+
+  async updateUser(
+    id: string,
+    data: UpdateUserRequest,
+    actor: { userId: string; roles: Role[] },
+  ): Promise<PublicProfile> {
+    const profile = await this.repository.updatePlatformProfile(id, {
+      fullName: data.fullName,
+      isActive: data.isActive,
+      platformRole: data.platformRole,
+    });
+    if (!profile) throw new AppError("User not found", HttpStatus.NOT_FOUND);
+    return toPublicProfile(profile);
+  }
+
+  async deactivateUser(id: string, actor: { userId: string; roles: Role[] }): Promise<void> {
+    const profile = await this.repository.findProfileById(id);
+    if (!profile) throw new AppError("User not found", HttpStatus.NOT_FOUND);
+    if (profile.id === actor.userId) {
+      throw new AppError("You cannot deactivate your own account", HttpStatus.CONFLICT);
+    }
+    if (profile.platformRole === "super_admin") {
+      const count = await this.repository.countSuperAdmins();
+      if (count <= 1) throw new AppError("At least one active super admin is required", HttpStatus.UNPROCESSABLE);
+    }
+    await this.repository.deactivateProfile(id);
   }
 }

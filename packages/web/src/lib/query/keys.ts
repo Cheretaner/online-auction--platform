@@ -20,6 +20,10 @@ export const queryKeys = {
     detail: (id: string) => ["organizations", "detail", id] as const,
     members: (id: string) => ["organizations", id, "members"] as const,
   },
+  users: {
+    all: ["users"] as const,
+    list: () => ["users", "list"] as const,
+  },
   categories: {
     all: ["categories"] as const,
     detail: (id: string) => ["categories", id] as const,
@@ -67,6 +71,9 @@ export const queryKeys = {
     anomaly: (id: string) => ["ai", "anomaly", id] as const,
     /** Cache of the last user-triggered AI risk scan per auction. */
     scan: (auctionId: string) => ["ai", "scan", auctionId] as const,
+  },
+  operations: {
+    exceptions: ["operations", "exceptions"] as const,
   },
   telegram: {
     status: ["telegram", "status"] as const,

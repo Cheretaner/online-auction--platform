@@ -36,7 +36,7 @@ import type {
   CategoryRecord,
   CountResponse,
   ChapaDepositInitiation,
-  ChapaSettlementInitiation,
+  DocumentAccessInitiation,
   DepositRecord,
   FinancialReconciliationSnapshot,
   DisputeRecord,
@@ -54,6 +54,8 @@ import type {
   TelegramStatus,
   VerificationRecord,
   WatchlistRecord,
+  RefundLetter,
+  CommandCenterException,
 } from "@/lib/api/types";
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -93,11 +95,16 @@ export const depositsApi = {
 
 export const settlementsApi = {
   listMine: () => apiRequest<ItemList<SettlementRecord>>(v1("/settlements/me")),
-  initiateChapa: (auctionId: string) =>
-    apiRequest<ChapaSettlementInitiation>(v1(`/settlements/${auctionId}/initiate`), { method: "POST" }),
+};
+
+export const refundLettersApi = {
+  listMine: () => apiRequest<ItemList<RefundLetter>>(v1("/refund-letters/me")),
+  download: (id: string) => apiRequest<Blob>(v1(`/refund-letters/${id}`), { parse: "blob" }),
 };
 
 export const documentsApi = {
+  initiateAccess: (auctionId: string) =>
+    apiRequest<DocumentAccessInitiation>(v1(`/documents/access/${auctionId}/initiate`), { method: "POST" }),
   upload: (form: FormData) =>
     apiRequest<DocumentRecord>(v1("/documents"), { method: "POST", body: form }),
   listMine: () => apiRequest<ItemList<DocumentRecord>>(v1("/documents/me")),
@@ -112,11 +119,17 @@ export const documentsApi = {
     apiRequest<{ items: DocumentOcrSearchHit[] }>(v1(`/documents/ocr/search${queryString({ auctionId, q })}`)),
   reviewOcrReference: (id: string, candidate: string) =>
     apiRequest<{ item: DepositReferenceOcrReview }>(v1(`/documents/${id}/ocr/reference-review`), { method: "POST", body: { candidate } }),
+  delete: (id: string) => apiRequest<void>(v1(`/documents/${id}`), { method: "DELETE", parse: "void" }),
   download: (id: string) => apiRequest<Blob>(v1(`/documents/${id}/content`), { parse: "blob" }),
 };
 
 export const platformApi = {
   capabilities: () => apiRequest<{ documentUploadsEnabled: boolean }>(v1("/capabilities")),
+};
+
+export const commandCenterApi = {
+  exceptions: () =>
+    apiRequest<{ items: CommandCenterException[] }>(v1("/operations/exceptions")),
 };
 
 export const verificationApi = {

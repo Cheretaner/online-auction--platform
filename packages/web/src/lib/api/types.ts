@@ -4,6 +4,7 @@ import type {
   AuctionType,
   CreateAuctionItemRequest,
   DocumentType,
+  OrgType,
   Role,
   VerificationStatus,
 } from "@auction/shared";
@@ -93,7 +94,7 @@ export interface OrganizationRecord {
   id: string;
   name: string;
   slug: string;
-  orgType: string;
+  orgType: OrgType;
   taxpayerId: string;
   region: string;
   contactEmail: string;
@@ -110,6 +111,10 @@ export interface OrganizationMember {
   email?: string;
   fullName?: string;
   role: Role;
+}
+
+export interface AdminUserRecord extends PublicProfile {
+  roles: Role[];
 }
 
 export interface AuctionItem {
@@ -157,6 +162,7 @@ export interface DocumentRecord {
   fileSizeBytes: number;
   checksumSha256: string;
   isPrivate: boolean;
+  requiresPayment: boolean;
   summary: string | null;
   extractedText: string | null;
   ocrStatus: string;
@@ -204,11 +210,19 @@ export interface SettlementRecord {
   updatedAt: string;
 }
 
-export interface ChapaSettlementInitiation {
-  settlementId: string;
-  txRef: string;
-  checkoutUrl: string | null;
+export interface DocumentAccessInitiation {
   status: string;
+  checkoutUrl: string | null;
+  txRef: string;
+}
+
+export interface RefundLetter {
+  id: string;
+  auctionId: string;
+  letterNumber: string;
+  body: string;
+  officialStamp: string;
+  createdAt: string;
 }
 
 export interface FinancialReconciliationSnapshot {
@@ -287,6 +301,18 @@ export interface VerificationRecord {
   reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CommandCenterException {
+  id: string;
+  source: "verification" | "deposit" | "dispute" | "anomaly";
+  title: string;
+  status: string;
+  severity: "low" | "medium" | "high";
+  createdAt: string;
+  updatedAt: string;
+  auctionId: string | null;
+  actionPath: string;
 }
 
 export interface AuditEvent {

@@ -37,9 +37,12 @@ import { createAutofetchRouter } from "./autofetch/autofetch.routes.js";
 import { getPool } from "./infrastructure/database/pool.js";
 import { analyticsRouter } from "./analytics/analytics.routes.js";
 import { watchlistRouter, savedSearchRouter, notificationPreferencesRouter } from "./watchlist/watchlist.routes.js";
+import { commandCenterRouter } from "./operations/command-center.routes.js";
 import path from "node:path";
 import { chapaWebhook } from "./payments/chapa.controller.js";
 import { openDataRouter } from "./open-data/open-data.routes.js";
+import { auctionFormRouter } from "./auction/auction-form.routes.js";
+import { refundLetterRouter } from "./settlement/refund-letter.routes.js";
 
 export function createApp(dependencies: { identityVerificationProvider?: IdentityVerificationProvider } = {}): express.Express {
   const app = express();
@@ -94,11 +97,13 @@ export function createApp(dependencies: { identityVerificationProvider?: Identit
   app.use("/api/v1/organizations", organizationRouter);
   app.use("/api/v1/auctions", auctionRouter);
   app.use("/api/v1/auctions/:auctionId/bids", biddingRouter);
+  app.use("/api/v1/auctions/:auctionId/form-fields", auctionFormRouter);
   app.use("/api/v1/auctions/:auctionId/items", auctionItemRouter);
   app.use("/api/v1/organizations/:orgId/auctions", orgAuctionRouter);
   app.use("/api/v1/categories", categoryRouter);
   app.use("/api/v1/deposits", depositRouter);
   app.use("/api/v1/settlements", settlementRouter);
+  app.use("/api/v1/refund-letters", refundLetterRouter);
   app.use("/api/v1/documents", documentRouter);
   app.use("/api/v1/verifications", createVerificationRouter(dependencies.identityVerificationProvider));
   app.use("/api/v1/audit", auditRouter);
@@ -115,6 +120,7 @@ export function createApp(dependencies: { identityVerificationProvider?: Identit
   app.use("/api/v1/watchlist", watchlistRouter);
   app.use("/api/v1/saved-searches", savedSearchRouter);
   app.use("/api/v1/notification-preferences", notificationPreferencesRouter);
+  app.use("/api/v1/operations", commandCenterRouter);
 
   // Server-sent events for live bid/auction updates. Clients subscribe to
   // exactly one channel: their own `user:<id>` feed or an `auction:<id>` they

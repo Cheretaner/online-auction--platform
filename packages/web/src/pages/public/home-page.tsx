@@ -74,7 +74,7 @@ export default function HomePage() {
 
   return (
     <div className="w-full min-w-0 space-y-10 pb-8 sm:space-y-20 lg:space-y-24">
-      <section className="relative isolate -mt-2 w-full min-w-0 overflow-hidden rounded-xl bg-inverse text-inverse-foreground shadow-lg sm:-mt-4">
+      <section className="relative isolate -mt-2 w-full min-w-0 overflow-hidden rounded-xl bg-[#0d0804] text-[#faf9f6] shadow-lg sm:-mt-4">
          <video
         src={heroVedio} 
         loop
@@ -85,8 +85,8 @@ export default function HomePage() {
       >
         Your browser does not support the video tag.
       </video>
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-inverse/95 via-inverse/85 to-inverse/30 lg:to-inverse/10" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-inverse/70 via-transparent to-inverse/10" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0d0804]/95 via-[#0d0804]/85 to-[#0d0804]/30 lg:to-[#0d0804]/10" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0d0804]/70 via-transparent to-[#0d0804]/10" />
 
         <div className="grid w-full min-w-0 min-h-[440px] items-end gap-8 px-4 py-7 sm:min-h-[520px] sm:gap-10 sm:px-10 sm:py-12 lg:grid-cols-[1.1fr_0.65fr] lg:items-center lg:px-14 lg:py-16">
           <div className="min-w-0 max-w-2xl">
@@ -97,17 +97,17 @@ export default function HomePage() {
               </span>
               {t("hero.eyebrow")}
             </p>
-            <h1 className="mt-5 max-w-2xl text-4xl leading-[1.06] font-semibold text-inverse-foreground sm:text-5xl lg:text-6xl">
+            <h1 className="mt-5 max-w-2xl text-4xl leading-[1.06] font-semibold text-[#faf9f6] sm:text-5xl lg:text-6xl">
               {t("hero.title")}
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-inverse-foreground/80 sm:text-lg sm:leading-8">
+            <p className="mt-5 max-w-xl text-base leading-7 text-[#faf9f6]/80 sm:text-lg sm:leading-8">
               {t("hero.body", { app: locale === "am" ? tc("brandName") : APP_NAME })}
             </p>
 
             <form onSubmit={submitSearch} role="search" className="mt-6 flex w-full max-w-xl min-w-0 flex-col gap-2 rounded-lg bg-card p-2 shadow-xl sm:mt-8 sm:flex-row">
               <label htmlFor="home-auction-search" className="sr-only">{t("hero.searchLabel")}</label>
               <div className="flex min-w-0 flex-1 items-center gap-3 px-3">
-                <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <Search className="size-5 shrink-0 text-[#746d65]" aria-hidden="true" />
                 <input
                   id="home-auction-search"
                   type="search"
@@ -122,7 +122,7 @@ export default function HomePage() {
               </Button>
             </form>
 
-            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-inverse-foreground/75">
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[#faf9f6]/75">
               <Link to="/auctions?status=live" className="inline-flex items-center gap-1.5 rounded-sm hover:text-inverse-foreground">
                 <span className="size-1.5 rounded-full bg-highlight" aria-hidden="true" /> {t("hero.viewLive")}
               </Link>
@@ -387,7 +387,7 @@ function ProcessCard() {
 
   return (
     <div
-      className="w-64 rounded-lg border border-inverse-foreground/15 bg-inverse/80 p-5 shadow-xl backdrop-blur-md transition-[border-color,box-shadow] duration-300 hover:border-highlight/40 hover:shadow-2xl"
+      className="w-64 rounded-lg border border-[#faf9f6]/15 bg-[#0d0804]/80 p-5 shadow-xl backdrop-blur-md transition-[border-color,box-shadow] duration-300 hover:border-highlight/40 hover:shadow-2xl"
       onMouseEnter={() => {
         setPaused(false);
         setActive(0);
@@ -400,7 +400,7 @@ function ProcessCard() {
       <p className="eyebrow text-highlight">{t("process.title")}</p>
       <ol className="relative mt-5 space-y-4">
         {/* Connector behind the circles; fills up to the highlighted step. */}
-        <span className="absolute top-4 bottom-4 left-4 w-px -translate-x-1/2 bg-inverse-foreground/15" aria-hidden="true" />
+        <span className="absolute top-4 bottom-4 left-4 w-px -translate-x-1/2 bg-[#faf9f6]/15" aria-hidden="true" />
         <span
           className="absolute top-4 left-4 w-px -translate-x-1/2 bg-highlight transition-[height] duration-500 ease-out"
           // Circles are 2rem tall with a 1rem gap, so step centres sit 3rem apart.
@@ -426,10 +426,10 @@ function ProcessCard() {
               <span
                 className={`relative flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all duration-300 ease-out ${
                   isActive
-                    ? "scale-110 bg-highlight text-inverse shadow-[0_0_0_4px_color-mix(in_oklch,var(--highlight)_25%,transparent)]"
+                    ? "scale-110 bg-highlight text-[#0d0804] shadow-[0_0_0_4px_color-mix(in_oklch,var(--highlight)_25%,transparent)]"
                     : isDone
-                      ? "border border-highlight bg-inverse text-highlight"
-                      : "border border-inverse-foreground/25 bg-inverse text-inverse-foreground"
+                      ? "border border-highlight bg-[#0d0804] text-highlight"
+                      : "border border-inverse-foreground/25 bg-[#0d0804] text-[#faf9f6]"
                 }`}
               >
                 {isActive && !resting ? (
@@ -441,7 +441,7 @@ function ProcessCard() {
               </span>
               <span
                 className={`text-sm transition-colors duration-300 ${
-                  isActive ? "font-medium text-inverse-foreground" : "text-inverse-foreground/75"
+                  isActive ? "font-medium text-[#faf9f6]" : "text-[#faf9f6]/75"
                 }`}
               >
                 {label}
@@ -450,7 +450,7 @@ function ProcessCard() {
           );
         })}
       </ol>
-      <p className="mt-5 border-t border-inverse-foreground/15 pt-4 text-xs leading-5 text-inverse-foreground/65">
+      <p className="mt-5 border-t border-[#faf9f6]/15 pt-4 text-xs leading-5 text-[#faf9f6]/65">
         {t("process.footnote")}
       </p>
     </div>

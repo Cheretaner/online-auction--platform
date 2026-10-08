@@ -1,4 +1,4 @@
-import type { AddOrganizationMemberRequest, CreateOrganizationRequest, Role } from "@auction/shared";
+import type { AddOrganizationMemberRequest, CreateOrganizationRequest, Role, UpdateOrganizationRequest } from "@auction/shared";
 import { AppError, HttpStatus } from "../shared/errors/index.js";
 import { withTransaction } from "../infrastructure/database/tx.js";
 import { isUniqueViolation } from "../kernel/pg.js";
@@ -93,6 +93,50 @@ export async function getOrganization(id: string): Promise<Organization> {
 
 export async function listOrganizations(): Promise<Organization[]> {
   return repo.listOrganizations();
+}
+
+export async function updateOrganization(
+  id: string,
+  input: UpdateOrganizationRequest,
+  actor: { userId: string; roles: Role[] },
+): Promise<Organization> {
+  return withTransaction(async () => {
+    const organization = await getOrganization(id);
+    const updated = await repo.updateOrganization(id, input);
+    if (!updated) throw AppError.notFound("Organization not found");
+    await audit.appendAuditEvent({
+      auctionId: null,
+      actorId: actor.userId,
+      actorRole: audit.actorRoleOf(actor.roles),
+      entityType: "organization",
+      entityId: id,
+      action: "organization.updated",
+      payload: { fields: Object.keys(input), previousName: organization.name, currentName: updated.name },
+    });
+    return updated;
+  }, { userId: actor.userId, organizationId: id });
+}
+
+export async function deleteOrganization(
+  id: string,
+  actor: { userId: string; roles: Role[] },
+): Promise<void> {
+  return withTransaction(async () => {
+    const organization = await getOrganization(id);
+    if (await repo.hasOperationalDependencies(id)) {
+      throw AppError.unprocessable("Organization has active auctions or autofetch dependencies");
+    }
+    await repo.deleteOrganization(id);
+    await audit.appendAuditEvent({
+      auctionId: null,
+      actorId: actor.userId,
+      actorRole: audit.actorRoleOf(actor.roles),
+      entityType: "organization",
+      entityId: id,
+      action: "organization.deleted",
+      payload: { name: organization.name },
+    });
+  }, { userId: actor.userId, organizationId: id });
 }
 
 export async function listMembers(organizationId: string) {
